@@ -1,0 +1,96 @@
+# Development Docker Compose configuration
+# This is a copy of the root docker-compose.dev.yml for infrastructure organization
+# Use this file with: docker-compose -f infrastructure/docker/docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  # Redis for caching and session storage
+  redis:
+    image: redis:7.2-alpine
+    container_name: travel-companion-redis-infra-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL database (using official postgres image)
+  # Note: In production, we'll use Supabase hosted PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: travel-companion-postgres-infra-dev
+    environment:
+      POSTGRES_DB: travel_companion
+      POSTGRES_USER: travel_user
+      POSTGRES_PASSWORD: travel_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travel_user -d travel_companion"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ../../packages/api
+      dockerfile: Dockerfile
+      target: development
+    container_name: travel-companion-api-infra-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../packages/api/src:/app/src:rw
+      - ../../packages/api/pyproject.toml:/app/pyproject.toml:ro
+    environment:
+      - DEBUG=true
+      - DATABASE_URL=postgresql://travel_user:travel_password@postgres:5432/travel_companion
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Next.js Frontend
+  web:
+    build:
+      context: ../../packages/web
+      dockerfile: Dockerfile
+      target: deps
+    container_name: travel-companion-web-infra-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../packages/web:/app:rw
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    command: npm run dev
+
+volumes:
+  postgres_data:
+    name: travel-companion-postgres-data-infra-dev
+  redis_data:
+    name: travel-companion-redis-data-infra-dev
+
+networks:
+  default:
+    name: travel-companion-network-infra-dev
