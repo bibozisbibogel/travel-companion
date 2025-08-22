@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Redis for caching and session storage
+  redis:
+    image: redis:7.2-alpine
+    container_name: travel-companion-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # PostgreSQL database (using official postgres image)
+  # Note: In production, we'll use Supabase hosted PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: travel-companion-postgres
+    environment:
+      POSTGRES_DB: travel_companion
+      POSTGRES_USER: travel_user
+      POSTGRES_PASSWORD: travel_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./packages/api
+      dockerfile: Dockerfile
+      target: production
+    container_name: travel-companion-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - DATABASE_URL=postgresql://travel_user:travel_password@postgres:5432/travel_companion
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # Next.js Frontend
+  web:
+    build:
+      context: ./packages/web
+      dockerfile: Dockerfile
+      target: runner
+    container_name: travel-companion-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: travel-companion-postgres-data
+  redis_data:
+    name: travel-companion-redis-data
+
+networks:
+  default:
+    name: travel-companion-network

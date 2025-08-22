@@ -1,5 +1,15 @@
 An AI-powered multi-agent travel planner that helps users plan trips end-to-end: flights, hotels, food, and activities. The assistant uses LangGraph for multi-step reasoning and tool orchestration, with a Python backend exposing APIs and integrating with travel and payment providers.
 
+# Quick start
+  ./scripts/setup.sh      # Initial setup
+  ./scripts/dev.sh        # Start development environment  
+  ./scripts/test.sh       # Run all tests
+
+  Services available at:
+  - 📡 API: http://localhost:8000 (with /docs)
+  - 🖥️ Frontend: http://localhost:3000
+  - ❤️ Health Check: http://localhost:8000/api/v1/health
+
 # How It Works (Workflow)
 
 User submits request → “7-day trip to Tokyo, budget $2000, focus on food + culture.”

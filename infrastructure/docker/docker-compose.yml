@@ -1,0 +1,83 @@
+# Production Docker Compose configuration
+# This file contains the production-ready setup for the Travel Companion application
+# For development, use the docker-compose.dev.yml file in the project root
+
+version: '3.8'
+
+services:
+  # Redis for caching and session storage
+  redis:
+    image: redis:7.2-alpine
+    container_name: travel-companion-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ../../packages/api
+      dockerfile: Dockerfile
+      target: production
+    container_name: travel-companion-api-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # Next.js Frontend
+  web:
+    build:
+      context: ../../packages/web
+      dockerfile: Dockerfile
+      target: runner
+    container_name: travel-companion-web-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+volumes:
+  redis_data:
+    name: travel-companion-redis-data-prod
+
+networks:
+  default:
+    name: travel-companion-network-prod
