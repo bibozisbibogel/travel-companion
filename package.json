@@ -7,9 +7,7 @@
     "type": "git",
     "url": "https://github.com/your-org/travel-companion.git"
   },
-  "workspaces": [
-    "packages/*"
-  ],
+
   "scripts": {
     "dev": "./scripts/dev.sh",
     "dev:api": "./scripts/dev.sh --service api",
