@@ -87,8 +87,9 @@ setup_python_env() {
     
     # Install Python dependencies
     print_status "Installing Python dependencies..."
+    source .venv/bin/activate
     cd packages/api
-    uv sync --dev
+    uv sync --dev --active
     cd ../..
     print_success "Python dependencies installed"
 }

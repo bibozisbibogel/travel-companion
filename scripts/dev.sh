@@ -107,7 +107,7 @@ check_environment() {
             print_error "Python virtual environment not found. Run './scripts/setup.sh' first"
             exit 1
         fi
-        
+
         # Check Node.js dependencies
         if [ ! -d "packages/web/node_modules" ]; then
             print_error "Node.js dependencies not installed. Run './scripts/setup.sh' first"
@@ -119,7 +119,7 @@ check_environment() {
             print_error "Docker is not installed"
             exit 1
         fi
-        
+
         if ! command -v docker-compose &> /dev/null; then
             print_error "Docker Compose is not installed"
             exit 1
@@ -129,10 +129,29 @@ check_environment() {
     print_success "Environment check passed"
 }
 
+# Health check helper
+wait_for_service() {
+    local name=$1
+    local url=$2
+    local retries=30
+    local count=0
+
+    print_status "Waiting for $name to be ready at $url ..."
+    until curl -fsS "$url" >/dev/null 2>&1; do
+        count=$((count + 1))
+        if [ $count -ge $retries ]; then
+            print_error "$name did not start in time at $url"
+            exit 1
+        fi
+        sleep 1
+    done
+    print_success "$name is ready at $url"
+}
+
 # Start services locally
 start_local() {
     print_status "Starting services locally..."
-    
+        
     # Create log directory
     mkdir -p logs
     
@@ -140,7 +159,7 @@ start_local() {
     start_api() {
         print_api "Starting FastAPI backend on port $PORT_API..."
         cd packages/api
-        
+                
         # Activate virtual environment and start server
         (
             source ../../.venv/bin/activate
@@ -151,63 +170,60 @@ start_local() {
                 --reload \
                 --reload-dir src \
                 --log-level info \
-                2>&1 | while read line; do print_api "$line"; done
+                2>&1 | tee >(while read line; do print_api "$line"; done)
         ) &
         API_PID=$!
         cd ../..
-        
-        # Wait a moment for API to start
-        sleep 2
-        print_success "FastAPI backend started (PID: $API_PID)"
-        return $API_PID
+        print_success "FastAPI backend process started (PID: $API_PID)"
     }
     
     # Function to start web service
     start_web() {
         print_web "Starting Next.js frontend on port $PORT_WEB..."
         cd packages/web
-        
+
         (
-            PORT=$PORT_WEB npm run dev 2>&1 | while read line; do print_web "$line"; done
+            PORT=$PORT_WEB npm run dev \
+                2>&1 | tee >(while read line; do print_web "$line"; done)
         ) &
         WEB_PID=$!
         cd ../..
-        
-        # Wait a moment for web to start
-        sleep 2
-        print_success "Next.js frontend started (PID: $WEB_PID)"
-        return $WEB_PID
+        print_success "Next.js frontend process started (PID: $WEB_PID)"
     }
     
     # Start requested services
     PIDS=()
-    
+
     if [ "$SERVICES" = "all" ] || [ "$SERVICES" = "api" ]; then
         start_api
-        PIDS+=($!)
+        PIDS+=($API_PID)
     fi
-    
+
     if [ "$SERVICES" = "all" ] || [ "$SERVICES" = "web" ]; then
         start_web
-        PIDS+=($!)
+        PIDS+=($WEB_PID)
     fi
-    
-    # Wait for services to be ready
-    sleep 5
+
+    # Health checks
+    if [ "$SERVICES" = "all" ] || [ "$SERVICES" = "api" ]; then
+        wait_for_service "API" "http://localhost:$PORT_API/api/v1/health"
+    fi
+    if [ "$SERVICES" = "all" ] || [ "$SERVICES" = "web" ]; then
+        wait_for_service "Frontend" "http://localhost:$PORT_WEB"
+    fi
     
     print_success "All services started successfully!"
     echo ""
     echo "🌐 Services available at:"
-    
-    if [ "$SERVICES" = "all" ] || [ "$SERVICES" = "api" ]; then
+
+    [ "$SERVICES" = "all" ] || [ "$SERVICES" = "api" ] && {
         echo "   📡 API:         http://localhost:$PORT_API"
         echo "   📊 API Docs:    http://localhost:$PORT_API/docs"
         echo "   ❤️  Health:     http://localhost:$PORT_API/api/v1/health"
-    fi
-    
-    if [ "$SERVICES" = "all" ] || [ "$SERVICES" = "web" ]; then
+    }
+    [ "$SERVICES" = "all" ] || [ "$SERVICES" = "web" ] && {
         echo "   🖥️  Frontend:   http://localhost:$PORT_WEB"
-    fi
+    }
     
     echo ""
     echo "📝 Logs are being displayed above"
@@ -226,7 +242,7 @@ start_local() {
         print_success "All services stopped"
         exit 0
     }
-    
+
     trap cleanup SIGINT SIGTERM
     
     # Wait for all background processes
@@ -238,13 +254,13 @@ start_local() {
 # Start services with Docker
 start_docker() {
     print_status "Starting services with Docker Compose..."
-    
+        
     # Check if Docker daemon is running
     if ! docker info >/dev/null 2>&1; then
         print_error "Docker daemon is not running. Please start Docker first."
         exit 1
     fi
-    
+        
     # Start services based on selection
     if [ "$SERVICES" = "all" ]; then
         docker-compose -f docker-compose.dev.yml up --build
@@ -271,17 +287,9 @@ main() {
     echo ""
     
     case $MODE in
-        local)
-            start_local
-            ;;
-        docker)
-            start_docker
-            ;;
-        *)
-            print_error "Unknown mode: $MODE"
-            echo "Supported modes: local, docker"
-            exit 1
-            ;;
+        local) start_local ;;
+        docker) start_docker ;;
+        *) print_error "Unknown mode: $MODE"; exit 1 ;;
     esac
 }
 

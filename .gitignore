@@ -12,3 +12,4 @@ __pycache__
 # Cursor
 .cursorignore
 .cursorindexingignore
+node_modules
