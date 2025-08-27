@@ -4,10 +4,11 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from travel_companion.api.deps import get_current_user
 from travel_companion.core.config import get_settings
 from travel_companion.core.database import DatabaseManager, get_database
 from travel_companion.core.security import create_access_token
-from travel_companion.models.user import AuthToken, UserCreate, UserLogin, UserResponse
+from travel_companion.models.user import AuthToken, User, UserCreate, UserLogin, UserResponse
 from travel_companion.services.user_service import UserService
 from travel_companion.utils.errors import UserAlreadyExistsError, ValidationError
 
@@ -144,3 +145,27 @@ async def login_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": "Internal server error", "error_code": "INTERNAL_ERROR"},
         ) from e
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get current user profile",
+    description="Retrieve authenticated user's profile information",
+)
+async def get_current_user_profile(current_user: User = Depends(get_current_user)) -> UserResponse:
+    """
+    Get the current authenticated user's profile.
+
+    This is a protected endpoint that requires valid JWT token.
+    Returns user profile information without sensitive data.
+    """
+    return UserResponse(
+        user_id=current_user.user_id,
+        email=current_user.email,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        travel_preferences=current_user.travel_preferences,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
+    )

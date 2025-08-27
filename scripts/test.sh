@@ -120,8 +120,7 @@ run_api_tests() {
     print_api "Running FastAPI backend tests..."
     cd packages/api
     
-    # Activate virtual environment
-    source ../../.venv/bin/activate
+    # Set Python path for imports
     export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
     
     # Build pytest command
@@ -203,7 +202,6 @@ run_linting() {
     # API linting
     print_api "Running Python linting (Ruff)..."
     cd packages/api
-    source ../../.venv/bin/activate
     
     if uv run ruff check .; then
         print_success "Python linting passed"
@@ -286,13 +284,13 @@ run_all_tests() {
         print_status "Running tests sequentially..."
         
         run_api_tests
-        RESULTS+=(($?))
+        RESULTS+=($?)
         
         run_web_tests
-        RESULTS+=(($?))
+        RESULTS+=($?)
         
         run_linting
-        RESULTS+=(($?))
+        RESULTS+=($?)
     fi
     
     # Check results

@@ -22,7 +22,7 @@ class DatabaseManager:
         if self._client is None:
             if not self._settings.supabase_url or not self._settings.supabase_key:
                 raise ValueError(
-                    "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_ANON_KEY"
+                    "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_KEY"
                 )
 
             self._client = create_client(self._settings.supabase_url, self._settings.supabase_key)
