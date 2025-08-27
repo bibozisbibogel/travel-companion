@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from travel_companion.models.user import User, UserCreate, UserLogin, UserResponse
+from travel_companion.models.user import User, UserCreate, UserLogin, UserResponse, TravelPreferences
 
 
 class TestUserCreate:
@@ -112,12 +112,20 @@ class TestUserResponse:
         now = datetime.now(UTC)
         user_id = uuid4()
 
+        travel_prefs = TravelPreferences(
+            budget_min=0,
+            budget_max=5000,
+            preferred_currency="USD",
+            accommodation_types=["hotel"],
+            activity_interests=["museums"]
+        )
+        
         user_response = UserResponse(
             user_id=user_id,
             email="test@example.com",
             first_name="Test",
             last_name="User",
-            travel_preferences={"budget_range": {"min": 0, "max": 5000}},
+            travel_preferences=travel_prefs,
             created_at=now,
             updated_at=now,
         )
@@ -126,7 +134,9 @@ class TestUserResponse:
         assert user_response.email == "test@example.com"
         assert user_response.first_name == "Test"
         assert user_response.last_name == "User"
-        assert user_response.travel_preferences["budget_range"]["min"] == 0
+        assert user_response.travel_preferences.budget_min == 0
+        assert user_response.travel_preferences.budget_max == 5000
+        assert user_response.travel_preferences.preferred_currency == "USD"
 
 
 class TestUser:
@@ -148,13 +158,20 @@ class TestUser:
         assert isinstance(user.user_id, type(uuid4()))
         assert isinstance(user.created_at, datetime)
         assert isinstance(user.updated_at, datetime)
-        assert user.travel_preferences == {}
+        assert isinstance(user.travel_preferences, TravelPreferences)
+        assert user.travel_preferences.preferred_currency == "USD"  # Default value
 
     def test_user_creation_with_explicit_values(self):
         """Test User model with explicit values."""
         now = datetime.now(UTC)
         user_id = uuid4()
-        preferences = {"budget_range": {"min": 100, "max": 1000}}
+        preferences = TravelPreferences(
+            budget_min=100,
+            budget_max=1000,
+            preferred_currency="EUR",
+            accommodation_types=["apartment"],
+            activity_interests=["beaches"]
+        )
 
         user = User(
             user_id=user_id,
@@ -171,3 +188,6 @@ class TestUser:
         assert user.created_at == now
         assert user.updated_at == now
         assert user.travel_preferences == preferences
+        assert user.travel_preferences.budget_min == 100
+        assert user.travel_preferences.budget_max == 1000
+        assert user.travel_preferences.preferred_currency == "EUR"

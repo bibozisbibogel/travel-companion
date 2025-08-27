@@ -6,7 +6,7 @@ from uuid import UUID
 from supabase import Client
 
 from travel_companion.core.security import hash_password, verify_password
-from travel_companion.models.user import User, UserCreate
+from travel_companion.models.user import User, UserCreate, UserUpdate, TravelPreferences
 from travel_companion.utils.errors import DatabaseError, UserAlreadyExistsError
 
 
@@ -31,23 +31,23 @@ class UserService:
         now = datetime.now(UTC)
 
         # Default travel preferences
-        default_preferences = {
-            "budget_range": {"min": 0, "max": 5000},
-            "accommodation_types": ["hotel", "apartment"],
-            "activity_interests": [],
-            "dietary_restrictions": [],
-            "accessibility_needs": [],
-            "travel_pace": "moderate",
-            "group_size_preference": "small",
-            "season_preferences": [],
-        }
+        default_preferences = TravelPreferences(
+            budget_min=0,
+            budget_max=5000,
+            preferred_currency="USD",
+            accommodation_types=["hotel", "apartment"],
+            activity_interests=[],
+            dietary_restrictions=[],
+            accessibility_needs=[],
+            travel_style="moderate"
+        )
 
         user_dict = {
             "email": user_data.email,
             "password_hash": hashed_password,
             "first_name": user_data.first_name,
             "last_name": user_data.last_name,
-            "travel_preferences": default_preferences,
+            "travel_preferences": default_preferences.model_dump(),
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         }
@@ -101,3 +101,28 @@ class UserService:
             return None
 
         return user
+
+    async def update_user(self, user_id: UUID, update_data: UserUpdate) -> User | None:
+        """Update user profile information."""
+        try:
+            # Build update dictionary with only provided fields
+            update_dict = {"updated_at": datetime.now(UTC).isoformat()}
+            
+            if update_data.first_name is not None:
+                update_dict["first_name"] = update_data.first_name
+                
+            if update_data.last_name is not None:
+                update_dict["last_name"] = update_data.last_name
+                
+            if update_data.travel_preferences is not None:
+                update_dict["travel_preferences"] = update_data.travel_preferences.model_dump()
+
+            # Update user in database
+            result = self.client.table("users").update(update_dict).eq("user_id", str(user_id)).execute()
+
+            if not result.data:
+                return None
+
+            return User(**result.data[0])
+        except Exception as e:
+            raise DatabaseError(f"Database error updating user profile: {str(e)}") from e
