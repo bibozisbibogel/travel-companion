@@ -12,9 +12,7 @@ router = APIRouter()
 
 
 @router.get("")
-async def health_check(
-    settings: Settings = Depends(get_current_settings)
-) -> dict[str, Any]:
+async def health_check(settings: Settings = Depends(get_current_settings)) -> dict[str, Any]:
     """Basic health check endpoint."""
     return {
         "status": "healthy",
@@ -26,7 +24,7 @@ async def health_check(
 
 @router.get("/detailed")
 async def detailed_health_check(
-    settings: Settings = Depends(get_current_settings)
+    settings: Settings = Depends(get_current_settings),
 ) -> dict[str, Any]:
     """Detailed health check with service dependencies."""
     from travel_companion.core.database import get_database_manager
@@ -38,7 +36,7 @@ async def detailed_health_check(
         "timestamp": datetime.utcnow().isoformat(),
         "version": settings.version,
         "service": settings.app_name,
-        "dependencies": {}
+        "dependencies": {},
     }
 
     # Check database connection
@@ -47,13 +45,13 @@ async def detailed_health_check(
         db_healthy = await db_manager.health_check()
         health_status["dependencies"]["database"] = {
             "status": "healthy" if db_healthy else "unhealthy",
-            "configured": bool(settings.supabase_url and settings.supabase_key)
+            "configured": bool(settings.supabase_url and settings.supabase_key),
         }
     except Exception as e:
         health_status["dependencies"]["database"] = {
             "status": "error",
             "error": str(e),
-            "configured": bool(settings.supabase_url and settings.supabase_key)
+            "configured": bool(settings.supabase_url and settings.supabase_key),
         }
 
     # Check Redis connection
@@ -62,13 +60,13 @@ async def detailed_health_check(
         redis_healthy = await redis_manager.ping()
         health_status["dependencies"]["redis"] = {
             "status": "healthy" if redis_healthy else "unhealthy",
-            "configured": bool(settings.redis_url)
+            "configured": bool(settings.redis_url),
         }
     except Exception as e:
         health_status["dependencies"]["redis"] = {
             "status": "error",
             "error": str(e),
-            "configured": bool(settings.redis_url)
+            "configured": bool(settings.redis_url),
         }
 
     # Check external API keys configuration
@@ -76,19 +74,19 @@ async def detailed_health_check(
         "amadeus": {
             "configured": bool(settings.amadeus_api_key and settings.amadeus_api_secret),
             "api_key_present": bool(settings.amadeus_api_key),
-            "api_secret_present": bool(settings.amadeus_api_secret)
+            "api_secret_present": bool(settings.amadeus_api_secret),
         },
         "booking": {
             "configured": bool(settings.booking_api_key),
-            "api_key_present": bool(settings.booking_api_key)
+            "api_key_present": bool(settings.booking_api_key),
         },
         "tripadvisor": {
             "configured": bool(settings.tripadvisor_api_key),
-            "api_key_present": bool(settings.tripadvisor_api_key)
+            "api_key_present": bool(settings.tripadvisor_api_key),
         },
         "openai": {
             "configured": bool(settings.openai_api_key),
-            "api_key_present": bool(settings.openai_api_key)
+            "api_key_present": bool(settings.openai_api_key),
         },
     }
 

@@ -25,10 +25,7 @@ class DatabaseManager:
                     "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_ANON_KEY"
                 )
 
-            self._client = create_client(
-                self._settings.supabase_url,
-                self._settings.supabase_key
-            )
+            self._client = create_client(self._settings.supabase_url, self._settings.supabase_key)
 
         return self._client
 
@@ -43,7 +40,7 @@ class DatabaseManager:
                 response = await client.get(
                     f"{self._settings.supabase_url}/rest/v1/",
                     headers={"apikey": self._settings.supabase_key},
-                    timeout=5.0
+                    timeout=5.0,
                 )
                 return response.status_code in [200, 404]  # 404 is OK for root endpoint
         except Exception:

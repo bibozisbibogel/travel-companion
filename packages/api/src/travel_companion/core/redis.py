@@ -21,7 +21,9 @@ class RedisManager:
         """Get or create Redis client instance."""
         if self._client is None:
             if not self._settings.redis_url:
-                raise ValueError("Redis URL not configured. Please set REDIS_URL environment variable")
+                raise ValueError(
+                    "Redis URL not configured. Please set REDIS_URL environment variable"
+                )
 
             self._client = redis.from_url(
                 self._settings.redis_url,
@@ -42,12 +44,7 @@ class RedisManager:
         except Exception:
             return False
 
-    async def set(
-        self,
-        key: str,
-        value: str | dict | list,
-        expire: int | None = None
-    ) -> bool:
+    async def set(self, key: str, value: str | dict | list, expire: int | None = None) -> bool:
         """Set a value in Redis with optional expiration."""
         try:
             # Serialize complex data types
