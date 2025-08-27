@@ -1,6 +1,6 @@
 """Health check endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -16,7 +16,7 @@ async def health_check(settings: Settings = Depends(get_current_settings)) -> di
     """Basic health check endpoint."""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": settings.version,
         "service": settings.app_name,
     }
@@ -33,7 +33,7 @@ async def detailed_health_check(
     # Basic service status
     health_status = {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": settings.version,
         "service": settings.app_name,
         "dependencies": {},

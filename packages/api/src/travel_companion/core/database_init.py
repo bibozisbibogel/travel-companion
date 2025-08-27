@@ -24,7 +24,7 @@ class DatabaseInitializer:
             bool: True if initialization successful, False otherwise
         """
         try:
-            client = self.db_manager.client
+            _ = self.db_manager.client  # Initialize client for connection test
 
             # Read the setup SQL file
             if not self._setup_sql_path.exists():
@@ -60,7 +60,7 @@ class DatabaseInitializer:
 
             # Test basic table access (this will work if RLS is properly configured)
             # We'll use a simple query that should work with proper auth setup
-            result = client.table("users").select("user_id").limit(1).execute()
+            _ = client.table("users").select("user_id").limit(1).execute()
 
             logger.info("Database schema verification successful")
             return True
@@ -77,7 +77,7 @@ class DatabaseInitializer:
             bool: True if auth setup is working, False otherwise
         """
         try:
-            client = self.db_manager.client
+            _ = self.db_manager.client  # Initialize client
 
             # Test that we can access auth functions
             # This is a basic connectivity test
@@ -112,7 +112,7 @@ async def setup_database() -> bool:
         return False
 
     # Verify the schema
-    schema_valid = await initializer.verify_schema()
+    _ = await initializer.verify_schema()  # Test schema accessibility
 
     # Test authentication setup
     auth_working = await initializer.test_authentication_setup()

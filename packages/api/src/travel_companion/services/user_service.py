@@ -61,7 +61,9 @@ class UserService:
             return User(**result.data[0])
         except Exception as e:
             if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-                raise UserAlreadyExistsError(f"User with email {user_data.email} already exists") from e
+                raise UserAlreadyExistsError(
+                    f"User with email {user_data.email} already exists"
+                ) from e
             raise DatabaseError(f"Database error during user creation: {str(e)}") from e
 
     async def get_user_by_email(self, email: str) -> User | None:

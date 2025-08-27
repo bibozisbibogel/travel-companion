@@ -29,8 +29,12 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v: Any) -> list[str]:
         """Parse CORS origins from environment variable or default."""
         if isinstance(v, str):
+            # Return default for empty strings
+            if not v.strip():
+                return ["http://localhost:3000", "http://127.0.0.1:3000"]
             # Handle JSON string from environment variable
             import json
+
             try:
                 return json.loads(v)
             except json.JSONDecodeError:

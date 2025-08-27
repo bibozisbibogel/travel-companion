@@ -233,9 +233,7 @@ class TestUserLogin:
             updated_at=now,
         )
 
-    def test_login_user_success(
-        self, client, valid_login_data, authenticated_user
-    ):
+    def test_login_user_success(self, client, valid_login_data, authenticated_user):
         """Test successful user login."""
         from travel_companion.api.v1.users import get_user_service
         from travel_companion.main import app

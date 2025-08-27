@@ -48,7 +48,7 @@ class RedisManager:
         """Set a value in Redis with optional expiration."""
         try:
             # Serialize complex data types
-            if isinstance(value, (dict, list)):
+            if isinstance(value, dict | list):
                 value = json.dumps(value)
 
             if expire:
