@@ -5,9 +5,4 @@ describe('Travel Companion Frontend', () => {
   it('should have basic structure', () => {
     expect(true).toBe(true);
   });
-  
-  it('should be able to run tests', () => {
-    const greeting = 'Hello, Travel Companion!';
-    expect(greeting).toContain('Travel');
-  });
 });

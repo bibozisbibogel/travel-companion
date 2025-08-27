@@ -8,7 +8,7 @@ from travel_companion.api.deps import get_current_user
 from travel_companion.core.config import get_settings
 from travel_companion.core.database import DatabaseManager, get_database
 from travel_companion.core.security import create_access_token
-from travel_companion.models.user import AuthToken, User, UserCreate, UserLogin, UserResponse
+from travel_companion.models.user import AuthToken, User, UserCreate, UserLogin, UserResponse, UserUpdate
 from travel_companion.services.user_service import UserService
 from travel_companion.utils.errors import UserAlreadyExistsError, ValidationError
 
@@ -169,3 +169,60 @@ async def get_current_user_profile(current_user: User = Depends(get_current_user
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
     )
+
+
+@router.put(
+    "/me",
+    response_model=UserResponse,
+    summary="Update current user profile",
+    description="Update authenticated user's profile information and travel preferences",
+)
+async def update_current_user_profile(
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+) -> UserResponse:
+    """
+    Update the current authenticated user's profile.
+    
+    Allows updating:
+    - first_name: User's first name
+    - last_name: User's last name  
+    - travel_preferences: Complete travel preferences object
+    
+    This is a protected endpoint that requires valid JWT token.
+    """
+    try:
+        # Update user profile
+        updated_user = await user_service.update_user(current_user.user_id, update_data)
+        
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "message": "User not found",
+                    "error_code": "USER_NOT_FOUND",
+                },
+            )
+
+        # Return updated user profile
+        return UserResponse(
+            user_id=updated_user.user_id,
+            email=updated_user.email,
+            first_name=updated_user.first_name,
+            last_name=updated_user.last_name,
+            travel_preferences=updated_user.travel_preferences,
+            created_at=updated_user.created_at,
+            updated_at=updated_user.updated_at,
+        )
+
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": str(e), "error_code": "VALIDATION_ERROR"},
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": "Internal server error", "error_code": "INTERNAL_ERROR"},
+        ) from e
