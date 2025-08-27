@@ -1,8 +1,9 @@
 """Application configuration settings."""
 
 from functools import lru_cache
+from typing import Any
 
-from pydantic import Field
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,36 +18,48 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Travel Companion API"
-    debug: bool = Field(default=False, env="DEBUG")
+    debug: bool = False
     version: str = "0.1.0"
 
     # CORS
-    allowed_origins: list[str] = Field(
-        default=["http://localhost:3000", "http://127.0.0.1:3000"],
-        env="ALLOWED_ORIGINS"
-    )
+    allowed_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> list[str]:
+        """Parse CORS origins from environment variable or default."""
+        if isinstance(v, str):
+            # Handle JSON string from environment variable
+            import json
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # Handle comma-separated string
+                return [origin.strip() for origin in v.split(",")]
+        elif isinstance(v, list):
+            return v
+        else:
+            return ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Database
-    database_url: str = Field(env="DATABASE_URL", default="")
-    supabase_url: str = Field(env="SUPABASE_URL", default="")
-    supabase_key: str = Field(env="SUPABASE_ANON_KEY", default="")
+    database_url: str = ""
+    supabase_url: str = ""
+    supabase_key: str = ""
 
     # Redis
-    redis_url: str = Field(env="REDIS_URL", default="redis://localhost:6379")
+    redis_url: str = "redis://localhost:6379"
 
     # External APIs
-    amadeus_api_key: str = Field(env="AMADEUS_API_KEY", default="")
-    amadeus_api_secret: str = Field(env="AMADEUS_API_SECRET", default="")
-
-    booking_api_key: str = Field(env="BOOKING_API_KEY", default="")
-
-    tripadvisor_api_key: str = Field(env="TRIPADVISOR_API_KEY", default="")
-
-    openai_api_key: str = Field(env="OPENAI_API_KEY", default="")
+    amadeus_api_key: str = ""
+    amadeus_api_secret: str = ""
+    booking_api_key: str = ""
+    tripadvisor_api_key: str = ""
+    openai_api_key: str = ""
 
     # Security
-    secret_key: str = Field(env="SECRET_KEY", default="your-secret-key-change-in-production")
-    access_token_expire_minutes: int = Field(env="ACCESS_TOKEN_EXPIRE_MINUTES", default=30)
+    secret_key: str = "your-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
 
 
 @lru_cache

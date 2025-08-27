@@ -22,23 +22,23 @@ async def main():
     print("Travel Companion Database Setup for Authentication")
     print("=" * 60)
     print()
-    
+
     print("This script will set up the database schema and security policies")
     print("required for user authentication in the Travel Companion application.")
     print()
-    
+
     # Check if user wants to proceed
     response = input("Do you want to proceed with database setup? (y/N): ")
-    if response.lower() not in ['y', 'yes']:
+    if response.lower() not in ["y", "yes"]:
         print("Setup cancelled.")
         return
-        
+
     print("\nStarting database setup...")
     print("-" * 40)
-    
+
     try:
         success = await setup_database()
-        
+
         print("-" * 40)
         if success:
             print("✅ Database setup completed successfully!")
@@ -51,7 +51,7 @@ async def main():
             print("1. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in your .env file")
             print("2. Verify your Supabase project is accessible")
             print("3. Run the SQL commands shown above in your Supabase SQL Editor")
-            
+
     except Exception as e:
         print(f"❌ Database setup failed: {e}")
         sys.exit(1)

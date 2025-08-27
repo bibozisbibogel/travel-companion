@@ -1,18 +1,31 @@
 """Pytest configuration and fixtures for Travel Companion API tests."""
 
 import asyncio
+import os
 
 import pytest
 from fastapi.testclient import TestClient
-
-from travel_companion.main import app
 
 
 @pytest.fixture
 def client():
     """Create a test client for the FastAPI application."""
-    with TestClient(app) as client:
-        yield client
+    # Set test environment variables to avoid pydantic parsing issues
+    os.environ["SECRET_KEY"] = "test-secret-key"
+    os.environ["SUPABASE_URL"] = "https://test.supabase.co"
+    os.environ["SUPABASE_KEY"] = "test-key"
+    os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
+
+    try:
+        # Import app after setting environment
+        from travel_companion.main import app
+
+        with TestClient(app) as client:
+            yield client
+    finally:
+        # Clean up environment variables
+        for key in ["SECRET_KEY", "SUPABASE_URL", "SUPABASE_KEY", "ALLOWED_ORIGINS"]:
+            os.environ.pop(key, None)
 
 
 @pytest.fixture(scope="session")
