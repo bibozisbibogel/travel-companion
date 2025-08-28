@@ -3,31 +3,39 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, ValidationInfo, field_validator
 
 
 class TravelPreferences(BaseModel):
     """Travel preferences schema with validation."""
-    
+
     budget_min: int | None = Field(None, ge=0, description="Minimum budget per trip")
     budget_max: int | None = Field(None, ge=0, description="Maximum budget per trip")
-    preferred_currency: str = Field(default="USD", min_length=3, max_length=3, description="Currency code")
-    accommodation_types: list[str] = Field(default_factory=list, description="Preferred accommodation types")
+    preferred_currency: str = Field(
+        default="USD", min_length=3, max_length=3, description="Currency code"
+    )
+    accommodation_types: list[str] = Field(
+        default_factory=list, description="Preferred accommodation types"
+    )
     activity_interests: list[str] = Field(default_factory=list, description="Activity interests")
-    dietary_restrictions: list[str] = Field(default_factory=list, description="Dietary restrictions")
-    accessibility_needs: list[str] = Field(default_factory=list, description="Accessibility requirements")
+    dietary_restrictions: list[str] = Field(
+        default_factory=list, description="Dietary restrictions"
+    )
+    accessibility_needs: list[str] = Field(
+        default_factory=list, description="Accessibility requirements"
+    )
     travel_style: str | None = Field(None, description="Travel style preference")
-    
+
     @field_validator("budget_max")
     @classmethod
-    def validate_budget_range(cls, v: int | None, info) -> int | None:
+    def validate_budget_range(cls, v: int | None, info: ValidationInfo) -> int | None:
         """Ensure budget_max is greater than budget_min if both are set."""
         if v is not None and "budget_min" in info.data:
             budget_min = info.data["budget_min"]
             if budget_min is not None and v <= budget_min:
                 raise ValueError("Maximum budget must be greater than minimum budget")
         return v
-    
+
     @field_validator("preferred_currency")
     @classmethod
     def validate_currency_code(cls, v: str) -> str:
@@ -37,13 +45,18 @@ class TravelPreferences(BaseModel):
         return v
 
 
+def _create_default_preferences() -> TravelPreferences:
+    """Create default travel preferences."""
+    return TravelPreferences(budget_min=None, budget_max=None, travel_style=None)
+
+
 class UserBase(BaseModel):
     """Base user model with common fields."""
 
     email: EmailStr = Field(..., description="User email address")
     first_name: str | None = Field(None, min_length=1, max_length=100)
     last_name: str | None = Field(None, min_length=1, max_length=100)
-    travel_preferences: TravelPreferences = Field(default_factory=TravelPreferences)
+    travel_preferences: TravelPreferences = Field(default_factory=_create_default_preferences)
 
 
 class UserCreate(BaseModel):
@@ -78,7 +91,7 @@ class UserLogin(BaseModel):
 
 class UserUpdate(BaseModel):
     """Model for user profile updates."""
-    
+
     first_name: str | None = Field(None, min_length=1, max_length=100)
     last_name: str | None = Field(None, min_length=1, max_length=100)
     travel_preferences: TravelPreferences | None = None

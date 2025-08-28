@@ -1,12 +1,13 @@
 """User service for handling user operations."""
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from supabase import Client
 
 from travel_companion.core.security import hash_password, verify_password
-from travel_companion.models.user import User, UserCreate, UserUpdate, TravelPreferences
+from travel_companion.models.user import TravelPreferences, User, UserCreate, UserUpdate
 from travel_companion.utils.errors import DatabaseError, UserAlreadyExistsError
 
 
@@ -39,7 +40,7 @@ class UserService:
             activity_interests=[],
             dietary_restrictions=[],
             accessibility_needs=[],
-            travel_style="moderate"
+            travel_style="moderate",
         )
 
         user_dict = {
@@ -106,19 +107,21 @@ class UserService:
         """Update user profile information."""
         try:
             # Build update dictionary with only provided fields
-            update_dict = {"updated_at": datetime.now(UTC).isoformat()}
-            
+            update_dict: dict[str, Any] = {"updated_at": datetime.now(UTC).isoformat()}
+
             if update_data.first_name is not None:
                 update_dict["first_name"] = update_data.first_name
-                
+
             if update_data.last_name is not None:
                 update_dict["last_name"] = update_data.last_name
-                
+
             if update_data.travel_preferences is not None:
                 update_dict["travel_preferences"] = update_data.travel_preferences.model_dump()
 
             # Update user in database
-            result = self.client.table("users").update(update_dict).eq("user_id", str(user_id)).execute()
+            result = (
+                self.client.table("users").update(update_dict).eq("user_id", str(user_id)).execute()
+            )
 
             if not result.data:
                 return None

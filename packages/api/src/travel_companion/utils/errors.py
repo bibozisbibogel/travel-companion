@@ -1,12 +1,12 @@
 """Custom exception classes and error handling for the Travel Companion API."""
 
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any
 
 
 class AuthErrorCode(str, Enum):
     """Authentication error codes for standardized responses."""
-    
+
     INVALID_CREDENTIALS = "AUTH001"
     TOKEN_EXPIRED = "AUTH002"
     TOKEN_INVALID = "AUTH003"
@@ -24,7 +24,7 @@ class AuthErrorCode(str, Enum):
 
 class DatabaseErrorCode(str, Enum):
     """Database error codes for standardized responses."""
-    
+
     CONNECTION_FAILED = "DB001"
     QUERY_FAILED = "DB002"
     CONSTRAINT_VIOLATION = "DB003"
@@ -34,7 +34,7 @@ class DatabaseErrorCode(str, Enum):
 
 class ValidationErrorCode(str, Enum):
     """Validation error codes for standardized responses."""
-    
+
     INVALID_EMAIL_FORMAT = "VAL001"
     INVALID_PASSWORD_FORMAT = "VAL002"
     MISSING_REQUIRED_FIELD = "VAL003"
@@ -48,28 +48,28 @@ class TravelCompanionError(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message)
         self.message = message
         self.error_code = error_code
         self.details = details or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert exception to standardized error response format."""
         error_response = {
             "error": True,
             "message": self.message,
             "data": None,
         }
-        
+
         if self.error_code:
             error_response["error_code"] = self.error_code
-            
+
         if self.details:
             error_response["details"] = self.details
-            
+
         return error_response
 
 
@@ -80,8 +80,8 @@ class ValidationError(TravelCompanionError):
         self,
         message: str,
         error_code: str = ValidationErrorCode.MISSING_REQUIRED_FIELD,
-        field: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        field: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         enhanced_details = details or {}
         if field:
@@ -96,7 +96,7 @@ class AuthenticationError(TravelCompanionError):
         self,
         message: str = "Authentication failed",
         error_code: str = AuthErrorCode.INVALID_CREDENTIALS,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message, error_code, details)
 
@@ -108,7 +108,7 @@ class AuthorizationError(TravelCompanionError):
         self,
         message: str = "Insufficient permissions",
         error_code: str = AuthErrorCode.INSUFFICIENT_PERMISSIONS,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message, error_code, details)
 
@@ -120,8 +120,8 @@ class UserNotFoundError(TravelCompanionError):
         self,
         message: str = "User not found",
         error_code: str = AuthErrorCode.USER_NOT_FOUND,
-        user_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        user_id: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         enhanced_details = details or {}
         if user_id:
@@ -136,8 +136,8 @@ class UserAlreadyExistsError(TravelCompanionError):
         self,
         message: str = "User already exists",
         error_code: str = AuthErrorCode.USER_ALREADY_EXISTS,
-        email: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        email: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         enhanced_details = details or {}
         if email:
@@ -151,7 +151,7 @@ class TokenExpiredError(AuthenticationError):
     def __init__(
         self,
         message: str = "Token has expired",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message, AuthErrorCode.TOKEN_EXPIRED, details)
 
@@ -162,7 +162,7 @@ class InvalidTokenError(AuthenticationError):
     def __init__(
         self,
         message: str = "Invalid token",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message, AuthErrorCode.TOKEN_INVALID, details)
 
@@ -173,7 +173,7 @@ class TokenMissingError(AuthenticationError):
     def __init__(
         self,
         message: str = "Authentication token required",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message, AuthErrorCode.TOKEN_MISSING, details)
 
@@ -182,18 +182,20 @@ class ExternalAPIError(TravelCompanionError):
     """Raised when external API calls fail."""
 
     def __init__(
-        self, 
-        message: str, 
-        service: str, 
-        status_code: Optional[int] = None,
-        error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        self,
+        message: str,
+        service: str,
+        status_code: int | None = None,
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         enhanced_details = details or {}
-        enhanced_details.update({
-            "service": service,
-            "status_code": status_code,
-        })
+        enhanced_details.update(
+            {
+                "service": service,
+                "status_code": status_code,
+            }
+        )
         super().__init__(message, error_code, enhanced_details)
 
 
@@ -204,8 +206,8 @@ class DatabaseError(TravelCompanionError):
         self,
         message: str,
         error_code: str = DatabaseErrorCode.QUERY_FAILED,
-        operation: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        operation: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         enhanced_details = details or {}
         if operation:
@@ -216,10 +218,10 @@ class DatabaseError(TravelCompanionError):
 # Standardized error response helper functions
 def create_error_response(
     message: str,
-    error_code: Optional[str] = None,
-    details: Optional[Dict[str, Any]] = None,
+    error_code: str | None = None,
+    details: dict[str, Any] | None = None,
     status_code: int = 400,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a standardized error response."""
     response = {
         "error": True,
@@ -227,21 +229,21 @@ def create_error_response(
         "data": None,
         "status_code": status_code,
     }
-    
+
     if error_code:
         response["error_code"] = error_code
-        
+
     if details:
         response["details"] = details
-        
+
     return response
 
 
 def create_auth_error_response(
     message: str = "Authentication failed",
     error_code: str = AuthErrorCode.INVALID_CREDENTIALS,
-    details: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Create a standardized authentication error response."""
     return create_error_response(
         message=message,
@@ -253,9 +255,9 @@ def create_auth_error_response(
 
 def create_validation_error_response(
     message: str,
-    field: Optional[str] = None,
+    field: str | None = None,
     error_code: str = ValidationErrorCode.MISSING_REQUIRED_FIELD,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a standardized validation error response."""
     details = {"field": field} if field else None
     return create_error_response(

@@ -31,7 +31,7 @@ async def detailed_health_check(
     from travel_companion.core.redis import get_redis_manager
 
     # Basic service status
-    health_status = {
+    health_status: dict[str, Any] = {
         "status": "healthy",
         "timestamp": datetime.now(UTC).isoformat(),
         "version": settings.version,

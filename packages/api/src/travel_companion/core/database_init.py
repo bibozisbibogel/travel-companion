@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class DatabaseInitializer:
     """Handles database initialization and schema setup."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.db_manager = get_database_manager()
         self._setup_sql_path = Path(__file__).parent / "database_setup.sql"
 

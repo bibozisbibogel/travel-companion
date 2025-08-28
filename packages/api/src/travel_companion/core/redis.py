@@ -12,7 +12,7 @@ from travel_companion.core.config import get_settings
 class RedisManager:
     """Manages Redis connections and operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._client: redis.Redis | None = None
         self._settings = get_settings()
 
@@ -44,7 +44,9 @@ class RedisManager:
         except Exception:
             return False
 
-    async def set(self, key: str, value: str | dict | list, expire: int | None = None) -> bool:
+    async def set(
+        self, key: str, value: str | dict[str, Any] | list[Any], expire: int | None = None
+    ) -> bool:
         """Set a value in Redis with optional expiration."""
         try:
             # Serialize complex data types
@@ -52,9 +54,9 @@ class RedisManager:
                 value = json.dumps(value)
 
             if expire:
-                return await self.client.setex(key, expire, value)
+                return bool(await self.client.setex(key, expire, value))
             else:
-                return await self.client.set(key, value)
+                return bool(await self.client.set(key, value))
         except Exception:
             return False
 
@@ -76,7 +78,7 @@ class RedisManager:
         """Delete a key from Redis."""
         try:
             result = await self.client.delete(key)
-            return result > 0
+            return bool(result > 0)
         except Exception:
             return False
 
@@ -84,28 +86,28 @@ class RedisManager:
         """Check if a key exists in Redis."""
         try:
             result = await self.client.exists(key)
-            return result > 0
+            return bool(result > 0)
         except Exception:
             return False
 
     async def incr(self, key: str, amount: int = 1) -> int | None:
         """Increment a counter in Redis."""
         try:
-            return await self.client.incr(key, amount)
+            return int(await self.client.incr(key, amount))
         except Exception:
             return None
 
     async def expire(self, key: str, time: int) -> bool:
         """Set expiration time for a key."""
         try:
-            return await self.client.expire(key, time)
+            return bool(await self.client.expire(key, time))
         except Exception:
             return False
 
     async def ttl(self, key: str) -> int:
         """Get time to live for a key."""
         try:
-            return await self.client.ttl(key)
+            return int(await self.client.ttl(key))
         except Exception:
             return -1
 

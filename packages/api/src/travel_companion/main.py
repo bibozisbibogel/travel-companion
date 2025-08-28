@@ -52,6 +52,6 @@ app = create_app()
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     """Root endpoint."""
     return {"message": "Travel Companion API", "version": "0.1.0"}

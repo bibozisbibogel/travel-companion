@@ -12,7 +12,7 @@ from travel_companion.core.config import get_settings
 class DatabaseManager:
     """Manages database connections and operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._client: Client | None = None
         self._settings = get_settings()
 
