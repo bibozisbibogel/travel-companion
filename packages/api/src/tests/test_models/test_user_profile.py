@@ -12,7 +12,7 @@ class TestTravelPreferences:
     def test_travel_preferences_default_creation(self):
         """Test creating travel preferences with default values."""
         prefs = TravelPreferences()
-        
+
         assert prefs.budget_min is None
         assert prefs.budget_max is None
         assert prefs.preferred_currency == "USD"
@@ -32,9 +32,9 @@ class TestTravelPreferences:
             activity_interests=["museums", "hiking"],
             dietary_restrictions=["vegetarian"],
             accessibility_needs=["wheelchair"],
-            travel_style="luxury"
+            travel_style="luxury",
         )
-        
+
         assert prefs.budget_min == 1000
         assert prefs.budget_max == 5000
         assert prefs.preferred_currency == "EUR"
@@ -50,12 +50,12 @@ class TestTravelPreferences:
         prefs = TravelPreferences(budget_min=1000, budget_max=5000)
         assert prefs.budget_min == 1000
         assert prefs.budget_max == 5000
-        
+
         # Valid: only min set
         prefs = TravelPreferences(budget_min=1000)
         assert prefs.budget_min == 1000
         assert prefs.budget_max is None
-        
+
         # Valid: only max set
         prefs = TravelPreferences(budget_max=5000)
         assert prefs.budget_min is None
@@ -67,7 +67,7 @@ class TestTravelPreferences:
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(budget_min=5000, budget_max=1000)
         assert "Maximum budget must be greater than minimum budget" in str(exc_info.value)
-        
+
         # Invalid: max == min
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(budget_min=1000, budget_max=1000)
@@ -78,7 +78,7 @@ class TestTravelPreferences:
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(budget_min=-100)
         assert "Input should be greater than or equal to 0" in str(exc_info.value)
-        
+
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(budget_max=-500)
         assert "Input should be greater than or equal to 0" in str(exc_info.value)
@@ -86,7 +86,7 @@ class TestTravelPreferences:
     def test_travel_preferences_currency_validation_success(self):
         """Test valid currency code validation."""
         valid_currencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"]
-        
+
         for currency in valid_currencies:
             prefs = TravelPreferences(preferred_currency=currency)
             assert prefs.preferred_currency == currency
@@ -97,17 +97,17 @@ class TestTravelPreferences:
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(preferred_currency="usd")
         assert "Currency code must be uppercase" in str(exc_info.value)
-        
+
         # Invalid: mixed case
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(preferred_currency="Eur")
         assert "Currency code must be uppercase" in str(exc_info.value)
-        
+
         # Invalid: too short
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(preferred_currency="US")
         assert "String should have at least 3 characters" in str(exc_info.value)
-        
+
         # Invalid: too long
         with pytest.raises(ValidationError) as exc_info:
             TravelPreferences(preferred_currency="USDT")
@@ -119,9 +119,9 @@ class TestTravelPreferences:
             accommodation_types=["hotel", "hostel", "apartment", "resort"],
             activity_interests=["museums", "hiking", "beaches", "nightlife"],
             dietary_restrictions=["vegetarian", "gluten-free", "halal"],
-            accessibility_needs=["wheelchair", "hearing-impaired", "visual-impaired"]
+            accessibility_needs=["wheelchair", "hearing-impaired", "visual-impaired"],
         )
-        
+
         assert len(prefs.accommodation_types) == 4
         assert len(prefs.activity_interests) == 4
         assert len(prefs.dietary_restrictions) == 3
@@ -134,18 +134,15 @@ class TestUserUpdate:
     def test_user_update_empty(self):
         """Test creating empty user update (all fields None)."""
         update = UserUpdate()
-        
+
         assert update.first_name is None
         assert update.last_name is None
         assert update.travel_preferences is None
 
     def test_user_update_partial_name(self):
         """Test updating only name fields."""
-        update = UserUpdate(
-            first_name="John",
-            last_name="Doe"
-        )
-        
+        update = UserUpdate(first_name="John", last_name="Doe")
+
         assert update.first_name == "John"
         assert update.last_name == "Doe"
         assert update.travel_preferences is None
@@ -153,7 +150,7 @@ class TestUserUpdate:
     def test_user_update_only_first_name(self):
         """Test updating only first name."""
         update = UserUpdate(first_name="Jane")
-        
+
         assert update.first_name == "Jane"
         assert update.last_name is None
         assert update.travel_preferences is None
@@ -161,7 +158,7 @@ class TestUserUpdate:
     def test_user_update_only_last_name(self):
         """Test updating only last name."""
         update = UserUpdate(last_name="Smith")
-        
+
         assert update.first_name is None
         assert update.last_name == "Smith"
         assert update.travel_preferences is None
@@ -173,11 +170,11 @@ class TestUserUpdate:
             budget_max=8000,
             preferred_currency="EUR",
             accommodation_types=["hotel"],
-            activity_interests=["museums"]
+            activity_interests=["museums"],
         )
-        
+
         update = UserUpdate(travel_preferences=prefs)
-        
+
         assert update.first_name is None
         assert update.last_name is None
         assert update.travel_preferences == prefs
@@ -191,15 +188,11 @@ class TestUserUpdate:
             accommodation_types=["apartment", "hotel"],
             activity_interests=["hiking", "museums", "food"],
             dietary_restrictions=["vegetarian"],
-            travel_style="adventure"
+            travel_style="adventure",
         )
-        
-        update = UserUpdate(
-            first_name="Alice",
-            last_name="Johnson",
-            travel_preferences=prefs
-        )
-        
+
+        update = UserUpdate(first_name="Alice", last_name="Johnson", travel_preferences=prefs)
+
         assert update.first_name == "Alice"
         assert update.last_name == "Johnson"
         assert update.travel_preferences == prefs
@@ -210,7 +203,7 @@ class TestUserUpdate:
         with pytest.raises(ValidationError) as exc_info:
             UserUpdate(first_name="")
         assert "String should have at least 1 character" in str(exc_info.value)
-        
+
         # Too long name not allowed
         with pytest.raises(ValidationError) as exc_info:
             UserUpdate(last_name="a" * 101)  # 101 characters
@@ -220,8 +213,10 @@ class TestUserUpdate:
         """Test that nested travel preferences validation works in updates."""
         # Invalid nested preferences should raise ValidationError
         with pytest.raises(ValidationError) as exc_info:
-            UserUpdate(travel_preferences=TravelPreferences(
-                budget_min=5000,
-                budget_max=1000  # Invalid: max < min
-            ))
+            UserUpdate(
+                travel_preferences=TravelPreferences(
+                    budget_min=5000,
+                    budget_max=1000,  # Invalid: max < min
+                )
+            )
         assert "Maximum budget must be greater than minimum budget" in str(exc_info.value)

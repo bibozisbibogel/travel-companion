@@ -289,7 +289,7 @@ run_all_tests() {
         run_web_tests
         RESULTS+=($?)
         
-        # run_linting
+        run_linting
         RESULTS+=($?)
     fi
     

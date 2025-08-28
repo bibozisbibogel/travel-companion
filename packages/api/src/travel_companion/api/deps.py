@@ -1,6 +1,7 @@
 """FastAPI dependencies."""
 
 from collections.abc import Generator
+from typing import Any
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
@@ -17,7 +18,7 @@ from travel_companion.utils.logging import auth_logger, get_client_ip, get_user_
 security = HTTPBearer()
 
 
-def get_current_settings() -> Generator:
+def get_current_settings() -> Generator[Any, None, None]:
     """Get current application settings."""
     settings = get_settings()
     try:
@@ -41,7 +42,7 @@ async def get_current_user(
     client_ip = get_client_ip(request)
     user_agent = get_user_agent(request)
     endpoint = str(request.url.path)
-    
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -51,9 +52,7 @@ async def get_current_user(
     if not credentials or not credentials.credentials:
         # Log missing token
         auth_logger.log_token_missing(
-            ip_address=client_ip,
-            endpoint=endpoint,
-            user_agent=user_agent
+            ip_address=client_ip, endpoint=endpoint, user_agent=user_agent
         )
         raise credentials_exception
 
@@ -65,7 +64,7 @@ async def get_current_user(
             ip_address=client_ip,
             endpoint=endpoint,
             reason="Failed to extract user ID from token",
-            user_agent=user_agent
+            user_agent=user_agent,
         )
         raise credentials_exception
 
@@ -77,7 +76,7 @@ async def get_current_user(
             ip_address=client_ip,
             endpoint=endpoint,
             reason="Invalid user ID format in token",
-            user_agent=user_agent
+            user_agent=user_agent,
         )
         raise credentials_exception from None
 
@@ -90,19 +89,17 @@ async def get_current_user(
                 ip_address=client_ip,
                 endpoint=endpoint,
                 reason="User not found for token",
-                user_agent=user_agent
+                user_agent=user_agent,
             )
             raise credentials_exception
-        
+
         # Log successful token validation
         auth_logger.log_token_validated(
-            user_id=user.user_id,
-            ip_address=client_ip,
-            endpoint=endpoint
+            user_id=user.user_id, ip_address=client_ip, endpoint=endpoint
         )
-        
+
         return user
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions (already logged above)
         raise
@@ -112,7 +109,7 @@ async def get_current_user(
             ip_address=client_ip,
             endpoint=endpoint,
             reason="Database error during user lookup",
-            user_agent=user_agent
+            user_agent=user_agent,
         )
         # Any database or service error should result in authentication failure
         raise credentials_exception from None

@@ -1,6 +1,7 @@
 """Security utilities for authentication and authorization."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -29,7 +30,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token."""
     to_encode = data.copy()
 
@@ -43,7 +44,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return encoded_jwt
 
 
-def verify_token(token: str) -> dict | None:
+def verify_token(token: str) -> dict[str, Any] | None:
     """Verify and decode a JWT token."""
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])

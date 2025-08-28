@@ -36,7 +36,8 @@ class Settings(BaseSettings):
             import json
 
             try:
-                return json.loads(v)
+                parsed = json.loads(v)
+                return list(parsed) if isinstance(parsed, list) else [str(parsed)]
             except json.JSONDecodeError:
                 # Handle comma-separated string
                 return [origin.strip() for origin in v.split(",")]

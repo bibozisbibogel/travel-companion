@@ -6,7 +6,13 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from travel_companion.models.user import User, UserCreate, UserLogin, UserResponse, TravelPreferences
+from travel_companion.models.user import (
+    TravelPreferences,
+    User,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 
 
 class TestUserCreate:
@@ -117,9 +123,9 @@ class TestUserResponse:
             budget_max=5000,
             preferred_currency="USD",
             accommodation_types=["hotel"],
-            activity_interests=["museums"]
+            activity_interests=["museums"],
         )
-        
+
         user_response = UserResponse(
             user_id=user_id,
             email="test@example.com",
@@ -170,7 +176,7 @@ class TestUser:
             budget_max=1000,
             preferred_currency="EUR",
             accommodation_types=["apartment"],
-            activity_interests=["beaches"]
+            activity_interests=["beaches"],
         )
 
         user = User(
