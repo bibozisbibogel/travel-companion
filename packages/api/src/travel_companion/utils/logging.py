@@ -33,6 +33,23 @@ class AuthEvent(str, Enum):
     PASSWORD_RESET_SUCCESS = "password_reset_success"
 
 
+class WorkflowEvent(str, Enum):
+    """Workflow event types for logging."""
+
+    WORKFLOW_STARTED = "workflow_started"
+    WORKFLOW_COMPLETED = "workflow_completed"
+    WORKFLOW_FAILED = "workflow_failed"
+    WORKFLOW_TIMEOUT = "workflow_timeout"
+
+    NODE_ENTERED = "node_entered"
+    NODE_COMPLETED = "node_completed"
+    NODE_FAILED = "node_failed"
+
+    STATE_UPDATED = "state_updated"
+    STATE_PERSISTED = "state_persisted"
+    STATE_RESTORED = "state_restored"
+
+
 class SecurityLogLevel(str, Enum):
     """Security-specific log levels."""
 
@@ -406,8 +423,207 @@ class AuthLogger:
         return email
 
 
-# Global auth logger instance
+class WorkflowLogger:
+    """Centralized workflow event logger for LangGraph workflows."""
+
+    def __init__(self) -> None:
+        self.logger = setup_auth_logger("travel_companion.workflow")
+
+    def log_workflow_started(
+        self,
+        workflow_id: str,
+        workflow_type: str,
+        request_id: str,
+        input_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Log workflow execution start."""
+        self.logger.info(
+            f"Workflow {workflow_type} started",
+            extra={
+                "event_type": WorkflowEvent.WORKFLOW_STARTED,
+                "workflow_id": workflow_id,
+                "workflow_type": workflow_type,
+                "request_id": request_id,
+                "details": {"input_keys": list(input_data.keys()) if input_data else []},
+            },
+        )
+
+    def log_workflow_completed(
+        self,
+        workflow_id: str,
+        workflow_type: str,
+        request_id: str,
+        execution_time_ms: float,
+        output_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Log successful workflow completion."""
+        self.logger.info(
+            f"Workflow {workflow_type} completed successfully",
+            extra={
+                "event_type": WorkflowEvent.WORKFLOW_COMPLETED,
+                "workflow_id": workflow_id,
+                "workflow_type": workflow_type,
+                "request_id": request_id,
+                "details": {
+                    "execution_time_ms": execution_time_ms,
+                    "output_keys": list(output_data.keys()) if output_data else [],
+                },
+            },
+        )
+
+    def log_workflow_failed(
+        self,
+        workflow_id: str,
+        workflow_type: str,
+        request_id: str,
+        error: str,
+        execution_time_ms: float,
+        node_name: str | None = None,
+    ) -> None:
+        """Log workflow execution failure."""
+        self.logger.error(
+            f"Workflow {workflow_type} failed: {error}",
+            extra={
+                "event_type": WorkflowEvent.WORKFLOW_FAILED,
+                "workflow_id": workflow_id,
+                "workflow_type": workflow_type,
+                "request_id": request_id,
+                "error_code": "WORKFLOW_FAILED",
+                "details": {
+                    "execution_time_ms": execution_time_ms,
+                    "failed_node": node_name,
+                    "error_message": error,
+                },
+            },
+        )
+
+    def log_node_entered(
+        self,
+        workflow_id: str,
+        node_name: str,
+        request_id: str,
+        state_keys: list[str] | None = None,
+    ) -> None:
+        """Log node execution start."""
+        self.logger.debug(
+            f"Entering node: {node_name}",
+            extra={
+                "event_type": WorkflowEvent.NODE_ENTERED,
+                "workflow_id": workflow_id,
+                "node_name": node_name,
+                "request_id": request_id,
+                "details": {"state_keys": state_keys or []},
+            },
+        )
+
+    def log_node_completed(
+        self,
+        workflow_id: str,
+        node_name: str,
+        request_id: str,
+        execution_time_ms: float,
+        output_keys: list[str] | None = None,
+    ) -> None:
+        """Log successful node completion."""
+        self.logger.debug(
+            f"Node {node_name} completed",
+            extra={
+                "event_type": WorkflowEvent.NODE_COMPLETED,
+                "workflow_id": workflow_id,
+                "node_name": node_name,
+                "request_id": request_id,
+                "details": {
+                    "execution_time_ms": execution_time_ms,
+                    "output_keys": output_keys or [],
+                },
+            },
+        )
+
+    def log_node_failed(
+        self,
+        workflow_id: str,
+        node_name: str,
+        request_id: str,
+        error: str,
+        execution_time_ms: float,
+    ) -> None:
+        """Log node execution failure."""
+        self.logger.error(
+            f"Node {node_name} failed: {error}",
+            extra={
+                "event_type": WorkflowEvent.NODE_FAILED,
+                "workflow_id": workflow_id,
+                "node_name": node_name,
+                "request_id": request_id,
+                "error_code": "NODE_FAILED",
+                "details": {
+                    "execution_time_ms": execution_time_ms,
+                    "error_message": error,
+                },
+            },
+        )
+
+    def log_state_updated(
+        self,
+        workflow_id: str,
+        request_id: str,
+        updated_keys: list[str],
+        node_name: str | None = None,
+    ) -> None:
+        """Log workflow state update."""
+        self.logger.debug(
+            "Workflow state updated",
+            extra={
+                "event_type": WorkflowEvent.STATE_UPDATED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "node_name": node_name,
+                "details": {"updated_keys": updated_keys},
+            },
+        )
+
+    def log_state_persisted(
+        self,
+        workflow_id: str,
+        request_id: str,
+        persistence_time_ms: float,
+    ) -> None:
+        """Log workflow state persistence."""
+        self.logger.debug(
+            "Workflow state persisted",
+            extra={
+                "event_type": WorkflowEvent.STATE_PERSISTED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": {"persistence_time_ms": persistence_time_ms},
+            },
+        )
+
+    def log_state_restored(
+        self,
+        workflow_id: str,
+        request_id: str,
+        restoration_time_ms: float,
+        restored_keys: list[str],
+    ) -> None:
+        """Log workflow state restoration."""
+        self.logger.info(
+            "Workflow state restored",
+            extra={
+                "event_type": WorkflowEvent.STATE_RESTORED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": {
+                    "restoration_time_ms": restoration_time_ms,
+                    "restored_keys": restored_keys,
+                },
+            },
+        )
+
+
+# Global logger instances
 auth_logger = AuthLogger()
+workflow_logger = WorkflowLogger()
 
 
 def get_client_ip(request: Any) -> str:
