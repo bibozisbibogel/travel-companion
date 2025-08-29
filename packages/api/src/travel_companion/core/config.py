@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    # LangGraph Workflow Configuration
+    workflow_timeout_seconds: int = 300
+    workflow_max_retries: int = 3
+    workflow_state_ttl: int = 3600
+    workflow_enable_debug_logging: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

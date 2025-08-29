@@ -32,3 +32,4 @@ def test_detailed_health_check(client: TestClient):
     assert "database" in dependencies
     assert "redis" in dependencies
     assert "external_apis" in dependencies
+    assert "workflow_engine" in dependencies
