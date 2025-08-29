@@ -72,8 +72,8 @@ class TestBaseWorkflow:
         mock.workflow_enable_debug_logging = True
         return mock
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
     def test_initialization(self, mock_get_settings, mock_get_redis, mock_settings, mock_redis):
         """Test workflow initialization."""
         mock_get_settings.return_value = mock_settings
@@ -88,9 +88,11 @@ class TestBaseWorkflow:
         assert workflow._nodes == {}
         assert workflow._edges == []
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    def test_build_graph_success(self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    def test_build_graph_success(
+        self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test successful graph building."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -104,10 +106,12 @@ class TestBaseWorkflow:
         assert len(workflow._nodes) == 3
         assert len(workflow._edges) == 2
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    def test_build_graph_failure(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    def test_build_graph_failure(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis
+    ):
         """Test graph building failure."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -134,10 +138,12 @@ class TestBaseWorkflow:
 
         mock_logger.log_workflow_failed.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    async def test_execute_success(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    async def test_execute_success(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test successful workflow execution."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -154,10 +160,12 @@ class TestBaseWorkflow:
         mock_logger.log_workflow_started.assert_called_once()
         mock_logger.log_workflow_completed.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    async def test_execute_timeout(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    async def test_execute_timeout(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis
+    ):
         """Test workflow execution timeout."""
         mock_settings.workflow_timeout_seconds = 0.1
         mock_get_settings.return_value = mock_settings
@@ -168,6 +176,7 @@ class TestBaseWorkflow:
         class SlowWorkflow(MockTestWorkflow):
             def _process_node(self, state: WorkflowState) -> WorkflowState:
                 import time
+
                 time.sleep(1)  # Longer than timeout
                 return super()._process_node(state)
 
@@ -178,10 +187,12 @@ class TestBaseWorkflow:
 
         mock_logger.log_workflow_failed.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    async def test_execute_failure(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    async def test_execute_failure(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis
+    ):
         """Test workflow execution failure."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -199,10 +210,12 @@ class TestBaseWorkflow:
 
         mock_logger.log_workflow_failed.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    async def test_persist_state_success(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    async def test_persist_state_success(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test successful state persistence."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -231,10 +244,12 @@ class TestBaseWorkflow:
         mock_redis.setex.assert_called_once()
         mock_logger.log_state_persisted.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    async def test_persist_state_failure(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    async def test_persist_state_failure(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test state persistence failure."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -263,10 +278,12 @@ class TestBaseWorkflow:
 
         mock_logger.log_workflow_failed.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    @patch('travel_companion.workflows.orchestrator.workflow_logger')
-    async def test_restore_state_success(self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    async def test_restore_state_success(
+        self, mock_logger, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test successful state restoration."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -290,9 +307,11 @@ class TestBaseWorkflow:
         mock_redis.get.assert_called_once_with(f"workflow_state:{workflow_id}")
         mock_logger.log_state_restored.assert_called_once()
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    async def test_restore_state_not_found(self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    async def test_restore_state_not_found(
+        self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test state restoration when workflow not found."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -307,9 +326,11 @@ class TestBaseWorkflow:
 
         assert result is None
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    async def test_get_workflow_status(self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    async def test_get_workflow_status(
+        self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test workflow status retrieval."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -336,9 +357,11 @@ class TestBaseWorkflow:
         assert result["workflow_type"] == "TestWorkflow"
         assert result["status"] == "completed"
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    def test_get_health_status_healthy(self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    def test_get_health_status_healthy(
+        self, mock_get_settings, mock_get_redis, mock_settings, mock_redis, workflow
+    ):
         """Test healthy workflow health status."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()
@@ -355,9 +378,11 @@ class TestBaseWorkflow:
         assert result["node_count"] == 3
         assert result["edge_count"] == 2
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
-    def test_get_health_status_degraded(self, mock_get_settings, mock_get_redis, mock_settings, mock_redis):
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    def test_get_health_status_degraded(
+        self, mock_get_settings, mock_get_redis, mock_settings, mock_redis
+    ):
         """Test degraded workflow health status when Redis fails."""
         mock_get_settings.return_value = mock_settings
         mock_redis_manager = MagicMock()

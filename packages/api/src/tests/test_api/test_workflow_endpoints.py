@@ -14,6 +14,7 @@ class TestWorkflowEndpoints:
         """Create test client."""
         # Import here to avoid issues during collection
         from travel_companion.main import app
+
         return TestClient(app)
 
     def test_workflow_health_endpoint_exists(self, client):
@@ -28,7 +29,7 @@ class TestWorkflowEndpoints:
             # Even if it fails due to dependencies, the route should exist
             assert "404" not in str(e)
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_workflow_execute_endpoint_basic(self, mock_workflow_class, client):
         """Test basic workflow execute endpoint functionality."""
         # Mock successful workflow execution
@@ -38,14 +39,12 @@ class TestWorkflowEndpoints:
             "request_id": "req123",
             "execution_summary": {"status": "completed"},
             "results": {"test": "data"},
-            "input_echo": {"destination": "Paris"}
+            "input_echo": {"destination": "Paris"},
         }
         mock_workflow_class.return_value = mock_workflow
 
         # Valid request
-        request_data = {
-            "input_data": {"destination": "Paris"}
-        }
+        request_data = {"input_data": {"destination": "Paris"}}
 
         response = client.post("/api/v1/workflows/execute", json=request_data)
 
@@ -58,7 +57,7 @@ class TestWorkflowEndpoints:
             assert "workflow_id" in data
             assert "status" in data
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_workflow_status_endpoint_exists(self, mock_workflow_class, client):
         """Test that workflow status endpoint exists."""
         # Mock the workflow to avoid Redis connection issues
@@ -70,7 +69,7 @@ class TestWorkflowEndpoints:
             "current_node": "start",
             "start_time": 12345.0,
             "end_time": None,
-            "error": None
+            "error": None,
         }
         mock_workflow_class.return_value = mock_workflow
 

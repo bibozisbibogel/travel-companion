@@ -22,18 +22,15 @@ class TestWorkflowAPI:
         return {
             "input_data": {
                 "destination": "Paris, France",
-                "travel_dates": {
-                    "start": "2024-06-01",
-                    "end": "2024-06-07"
-                },
+                "travel_dates": {"start": "2024-06-01", "end": "2024-06-07"},
                 "budget": 2000,
                 "preferences": {
                     "accommodation_type": "hotel",
-                    "activity_types": ["cultural", "culinary"]
-                }
+                    "activity_types": ["cultural", "culinary"],
+                },
             },
             "user_id": "user123",
-            "request_id": "req123"
+            "request_id": "req123",
         }
 
     @pytest.fixture
@@ -56,21 +53,20 @@ class TestWorkflowAPI:
                     "workflow_id": "wf123",
                 }
             },
-            "input_echo": {"destination": "Paris, France"}
+            "input_echo": {"destination": "Paris, France"},
         }
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
-    def test_execute_workflow_success(self, mock_workflow_class, client, sample_workflow_request, mock_workflow_result):
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    def test_execute_workflow_success(
+        self, mock_workflow_class, client, sample_workflow_request, mock_workflow_result
+    ):
         """Test successful workflow execution."""
         # Mock workflow instance and execution
         mock_workflow = AsyncMock()
         mock_workflow.execute.return_value = mock_workflow_result
         mock_workflow_class.return_value = mock_workflow
 
-        response = client.post(
-            "/api/v1/workflows/execute",
-            json=sample_workflow_request
-        )
+        response = client.post("/api/v1/workflows/execute", json=sample_workflow_request)
 
         assert response.status_code == 200
         data = response.json()
@@ -84,39 +80,31 @@ class TestWorkflowAPI:
 
         # Verify workflow was called correctly
         mock_workflow.execute.assert_called_once_with(
-            input_data=sample_workflow_request["input_data"],
-            user_id="user123",
-            request_id="req123"
+            input_data=sample_workflow_request["input_data"], user_id="user123", request_id="req123"
         )
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_execute_workflow_timeout(self, mock_workflow_class, client, sample_workflow_request):
         """Test workflow execution timeout."""
         mock_workflow = AsyncMock()
         mock_workflow.execute.side_effect = TimeoutError("Workflow timeout")
         mock_workflow_class.return_value = mock_workflow
 
-        response = client.post(
-            "/api/v1/workflows/execute",
-            json=sample_workflow_request
-        )
+        response = client.post("/api/v1/workflows/execute", json=sample_workflow_request)
 
         assert response.status_code == 408
         data = response.json()
         assert data["detail"]["error"] == "WORKFLOW_TIMEOUT"
         assert "timeout limit" in data["detail"]["message"]
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_execute_workflow_failure(self, mock_workflow_class, client, sample_workflow_request):
         """Test workflow execution failure."""
         mock_workflow = AsyncMock()
         mock_workflow.execute.side_effect = RuntimeError("Workflow failed")
         mock_workflow_class.return_value = mock_workflow
 
-        response = client.post(
-            "/api/v1/workflows/execute",
-            json=sample_workflow_request
-        )
+        response = client.post("/api/v1/workflows/execute", json=sample_workflow_request)
 
         assert response.status_code == 500
         data = response.json()
@@ -129,10 +117,7 @@ class TestWorkflowAPI:
             "input_data": "invalid_data_type"  # Should be dict
         }
 
-        response = client.post(
-            "/api/v1/workflows/execute",
-            json=invalid_request
-        )
+        response = client.post("/api/v1/workflows/execute", json=invalid_request)
 
         assert response.status_code == 422  # Validation error
 
@@ -143,14 +128,11 @@ class TestWorkflowAPI:
             # Missing input_data
         }
 
-        response = client.post(
-            "/api/v1/workflows/execute",
-            json=incomplete_request
-        )
+        response = client.post("/api/v1/workflows/execute", json=incomplete_request)
 
         assert response.status_code == 422  # Validation error
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_get_workflow_status_success(self, mock_workflow_class, client):
         """Test successful workflow status retrieval."""
         mock_workflow = AsyncMock()
@@ -161,7 +143,7 @@ class TestWorkflowAPI:
             "current_node": "end",
             "start_time": 1234567890.0,
             "end_time": 1234567920.0,
-            "error": None
+            "error": None,
         }
         mock_workflow.get_workflow_status.return_value = mock_status
         mock_workflow_class.return_value = mock_workflow
@@ -173,7 +155,7 @@ class TestWorkflowAPI:
         assert data == mock_status
         mock_workflow.get_workflow_status.assert_called_once_with("wf123")
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_get_workflow_status_not_found(self, mock_workflow_class, client):
         """Test workflow status when workflow not found."""
         mock_workflow = AsyncMock()
@@ -187,7 +169,7 @@ class TestWorkflowAPI:
         assert data["detail"]["error"] == "WORKFLOW_NOT_FOUND"
         assert "nonexistent" in data["detail"]["message"]
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_get_workflow_status_error(self, mock_workflow_class, client):
         """Test workflow status retrieval with error."""
         mock_workflow = AsyncMock()
@@ -201,7 +183,7 @@ class TestWorkflowAPI:
         assert data["detail"]["error"] == "STATUS_CHECK_FAILED"
         assert data["detail"]["workflow_id"] == "wf123"
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_get_workflow_health_success(self, mock_workflow_class, client):
         """Test successful workflow health check."""
         mock_workflow = MagicMock()
@@ -228,7 +210,7 @@ class TestWorkflowAPI:
         assert data["workflows"][0] == mock_health
         assert "timestamp" in data
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_get_workflow_health_degraded(self, mock_workflow_class, client):
         """Test workflow health check with degraded status."""
         mock_workflow = MagicMock()
@@ -252,7 +234,7 @@ class TestWorkflowAPI:
         assert data["redis_connected"] is False
         assert data["workflows"][0]["status"] == "degraded"
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_get_workflow_health_error(self, mock_workflow_class, client):
         """Test workflow health check with error."""
         mock_workflow_class.side_effect = Exception("Initialization error")
@@ -272,9 +254,7 @@ class TestWorkflowAPI:
     def test_workflow_execute_endpoint_path(self, client):
         """Test that workflow execute endpoint is properly routed."""
         # Test with minimal valid data to check routing
-        minimal_request = {
-            "input_data": {"test": "data"}
-        }
+        minimal_request = {"input_data": {"test": "data"}}
 
         # Should reach the endpoint (may fail due to mock setup, but routing should work)
         response = client.post("/api/v1/workflows/execute", json=minimal_request)
@@ -282,7 +262,7 @@ class TestWorkflowAPI:
         # Should not be 404 (route exists)
         assert response.status_code != 404
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
     def test_workflow_status_endpoint_path(self, mock_workflow_class, client):
         """Test that workflow status endpoint is properly routed."""
         # Mock the workflow to avoid Redis connection issues
@@ -294,7 +274,7 @@ class TestWorkflowAPI:
             "current_node": "start",
             "start_time": 12345.0,
             "end_time": None,
-            "error": None
+            "error": None,
         }
         mock_workflow_class.return_value = mock_workflow
 
@@ -310,28 +290,23 @@ class TestWorkflowAPI:
         # Should not be 404 (route exists)
         assert response.status_code != 404
 
-    @patch('travel_companion.api.v1.workflows.TravelPlanningWorkflow')
-    def test_execute_workflow_optional_fields(self, mock_workflow_class, client, mock_workflow_result):
+    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    def test_execute_workflow_optional_fields(
+        self, mock_workflow_class, client, mock_workflow_result
+    ):
         """Test workflow execution with optional fields."""
         mock_workflow = AsyncMock()
         mock_workflow.execute.return_value = mock_workflow_result
         mock_workflow_class.return_value = mock_workflow
 
         # Request without optional fields
-        minimal_request = {
-            "input_data": {"destination": "London"}
-        }
+        minimal_request = {"input_data": {"destination": "London"}}
 
-        response = client.post(
-            "/api/v1/workflows/execute",
-            json=minimal_request
-        )
+        response = client.post("/api/v1/workflows/execute", json=minimal_request)
 
         assert response.status_code == 200
 
         # Verify workflow was called with None for optional fields
         mock_workflow.execute.assert_called_once_with(
-            input_data=minimal_request["input_data"],
-            user_id=None,
-            request_id=None
+            input_data=minimal_request["input_data"], user_id=None, request_id=None
         )

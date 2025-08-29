@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class TestWorkflowIntegration:
     """Integration tests for workflow system."""
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
     def test_workflow_imports_and_instantiation(self, mock_get_settings, mock_get_redis):
         """Test that workflows can be imported and instantiated."""
         from travel_companion.workflows.simple_workflow import TravelPlanningWorkflow
@@ -28,8 +28,8 @@ class TestWorkflowIntegration:
         workflow = TravelPlanningWorkflow()
         assert workflow.workflow_type == "TravelPlanningWorkflow"
 
-    @patch('travel_companion.workflows.orchestrator.get_redis_manager')
-    @patch('travel_companion.workflows.orchestrator.get_settings')
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
     def test_workflow_graph_building(self, mock_get_settings, mock_get_redis):
         """Test that workflow graph can be built."""
         from travel_companion.workflows.simple_workflow import TravelPlanningWorkflow
@@ -96,10 +96,7 @@ class TestWorkflowIntegration:
         )
 
         # Test request model
-        request = WorkflowExecutionRequest(
-            input_data={"destination": "Paris"},
-            user_id="user123"
-        )
+        request = WorkflowExecutionRequest(input_data={"destination": "Paris"}, user_id="user123")
         assert request.input_data["destination"] == "Paris"
         assert request.user_id == "user123"
 
@@ -110,7 +107,7 @@ class TestWorkflowIntegration:
             status="completed",
             output_data={"result": "success"},
             execution_time_ms=150.0,
-            workflow_type="TravelPlanningWorkflow"
+            workflow_type="TravelPlanningWorkflow",
         )
         assert response.workflow_id == "wf123"
         assert response.status == "completed"

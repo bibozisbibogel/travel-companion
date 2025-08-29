@@ -29,7 +29,7 @@ class TestWorkflowNodes:
             "intermediate_results": {},
         }
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_start_node_success(self, mock_logger, sample_state):
         """Test successful start node execution."""
         result = WorkflowNodes.start_node(sample_state)
@@ -41,13 +41,13 @@ class TestWorkflowNodes:
         mock_logger.log_node_entered.assert_called_once()
         mock_logger.log_node_completed.assert_called_once()
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_start_node_with_input_data(self, mock_logger, sample_state):
         """Test start node with various input data."""
         sample_state["input_data"] = {
             "destination": "Tokyo",
             "dates": {"start": "2024-06-01", "end": "2024-06-07"},
-            "preferences": {"budget": 3000, "style": "luxury"}
+            "preferences": {"budget": 3000, "style": "luxury"},
         }
 
         result = WorkflowNodes.start_node(sample_state)
@@ -56,7 +56,7 @@ class TestWorkflowNodes:
         assert result["status"] == "processing"
         assert result["input_data"] == sample_state["input_data"]
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_process_node_success(self, mock_logger, sample_state):
         """Test successful process node execution."""
         result = WorkflowNodes.process_node(sample_state)
@@ -73,7 +73,7 @@ class TestWorkflowNodes:
         mock_logger.log_node_entered.assert_called_once()
         mock_logger.log_node_completed.assert_called_once()
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_process_node_empty_input(self, mock_logger, sample_state):
         """Test process node with empty input data."""
         sample_state["input_data"] = {}
@@ -84,12 +84,10 @@ class TestWorkflowNodes:
         process_results = result["intermediate_results"]["process_results"]
         assert process_results["original_input"] == {}
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_end_node_success(self, mock_logger, sample_state):
         """Test successful end node execution."""
-        sample_state["intermediate_results"] = {
-            "process_results": {"data": "processed"}
-        }
+        sample_state["intermediate_results"] = {"process_results": {"data": "processed"}}
 
         result = WorkflowNodes.end_node(sample_state)
 
@@ -112,18 +110,14 @@ class TestWorkflowNodes:
         mock_logger.log_node_entered.assert_called_once()
         mock_logger.log_node_completed.assert_called_once()
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_end_node_with_complex_results(self, mock_logger, sample_state):
         """Test end node with complex intermediate results."""
         sample_state["intermediate_results"] = {
             "process_results": {"flights": ["flight1", "flight2"]},
             "external_data": {"weather": "sunny", "events": ["event1"]},
         }
-        sample_state["input_data"] = {
-            "destination": "Barcelona",
-            "budget": 1500,
-            "travelers": 2
-        }
+        sample_state["input_data"] = {"destination": "Barcelona", "budget": 1500, "travelers": 2}
 
         result = WorkflowNodes.end_node(sample_state)
 
@@ -131,7 +125,7 @@ class TestWorkflowNodes:
         assert output["results"] == sample_state["intermediate_results"]
         assert output["input_echo"] == sample_state["input_data"]
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_start_node_logging_details(self, mock_logger, sample_state):
         """Test start node logging with correct parameters."""
         WorkflowNodes.start_node(sample_state)
@@ -152,7 +146,7 @@ class TestWorkflowNodes:
         assert "execution_time_ms" in kwargs
         assert kwargs["output_keys"] == ["status", "current_node"]
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_process_node_logging_details(self, mock_logger, sample_state):
         """Test process node logging with correct parameters."""
         result = WorkflowNodes.process_node(sample_state)
@@ -166,7 +160,7 @@ class TestWorkflowNodes:
         expected_output_keys = list(result["intermediate_results"]["process_results"].keys())
         assert set(kwargs["output_keys"]) == set(expected_output_keys)
 
-    @patch('travel_companion.workflows.nodes.workflow_logger')
+    @patch("travel_companion.workflows.nodes.workflow_logger")
     def test_end_node_logging_details(self, mock_logger, sample_state):
         """Test end node logging with correct parameters."""
         result = WorkflowNodes.end_node(sample_state)
