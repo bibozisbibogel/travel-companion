@@ -30,6 +30,7 @@ def client():
         mock_service = AsyncMock()
         mock_service.create_user = AsyncMock()
         mock_service.authenticate_user = AsyncMock()
+        mock_service.get_user_by_id = AsyncMock()
 
         # Override the dependency globally for this test client
         app.dependency_overrides[get_user_service] = lambda: mock_service
