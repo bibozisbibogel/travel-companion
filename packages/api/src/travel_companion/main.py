@@ -17,6 +17,7 @@ from travel_companion.middleware.logging import (
     PerformanceLoggingMiddleware,
     SecurityLoggingMiddleware,
 )
+from travel_companion.middleware.versioning import APIVersionMiddleware
 from travel_companion.models.base import ErrorResponse
 
 
@@ -123,6 +124,9 @@ def create_app() -> FastAPI:
         allow_headers=settings.allowed_headers,
         max_age=settings.max_age,
     )
+
+    # Add API versioning middleware
+    app.add_middleware(APIVersionMiddleware, api_version="v1", app_version=settings.version)
 
     # Add logging and monitoring middleware
     app.add_middleware(PerformanceLoggingMiddleware, slow_request_threshold_ms=1000)

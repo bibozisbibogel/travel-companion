@@ -7,9 +7,13 @@ from .error_handler import (
 from .logging import (
     LoggingMiddleware,
 )
+from .versioning import (
+    APIVersionMiddleware,
+)
 
 __all__ = [
     "AuthErrorHandlerMiddleware",
     "LoggingMiddleware",
+    "APIVersionMiddleware",
     "add_error_handlers",
 ]
