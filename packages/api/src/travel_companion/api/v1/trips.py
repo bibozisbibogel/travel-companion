@@ -1,5 +1,7 @@
 """Trip planning API endpoints."""
 
+from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -7,9 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from travel_companion.api.deps import get_current_user
 from travel_companion.models.base import PaginatedResponse, PaginationMeta, SuccessResponse
 from travel_companion.models.trip import (
+    TravelClass,
     TripCreate,
+    TripDestination,
     TripPlanRequest,
+    TripRequirements,
     TripResponse,
+    TripStatus,
     TripUpdate,
 )
 from travel_companion.models.user import User
@@ -62,8 +68,7 @@ async def generate_trip_plan(
     )
 
     return SuccessResponse[TripResponse](
-        data=trip_response,
-        message="Trip plan generated successfully"
+        data=trip_response, message="Trip plan generated successfully"
     )
 
 
@@ -110,8 +115,7 @@ async def create_trip(
         )
 
         return SuccessResponse[TripResponse](
-            data=trip_response,
-            message="Trip created successfully"
+            data=trip_response, message="Trip created successfully"
         )
 
     except Exception as e:
@@ -149,13 +153,16 @@ async def list_user_trips(
     if page < 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": "Page must be greater than 0", "error_code": "INVALID_PAGE"}
+            detail={"message": "Page must be greater than 0", "error_code": "INVALID_PAGE"},
         )
 
     if per_page < 1 or per_page > 100:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": "Per page must be between 1 and 100", "error_code": "INVALID_PER_PAGE"}
+            detail={
+                "message": "Per page must be between 1 and 100",
+                "error_code": "INVALID_PER_PAGE",
+            },
         )
 
     try:
@@ -169,13 +176,11 @@ async def list_user_trips(
             total_items=0,
             total_pages=0,
             has_next=False,
-            has_prev=False
+            has_prev=False,
         )
 
         return PaginatedResponse[list[TripResponse]](
-            data=[],
-            pagination=pagination_meta,
-            message="Trips retrieved successfully"
+            data=[], pagination=pagination_meta, message="Trips retrieved successfully"
         )
 
     except Exception as e:
@@ -213,7 +218,7 @@ async def get_trip(
         if str(trip_id) == "00000000-0000-4000-8000-000000000404":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"}
+                detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
             )
 
         trip_response = TripResponse(
@@ -221,28 +226,30 @@ async def get_trip(
             user_id=current_user.user_id,
             name="Sample Trip",
             description="Sample trip description",
-            destination={
-                "city": "Paris",
-                "country": "France",
-                "country_code": "FR",
-                "airport_code": "CDG"
-            },
-            requirements={
-                "budget": 2000.00,
-                "currency": "EUR",
-                "start_date": "2024-06-01",
-                "end_date": "2024-06-07",
-                "travelers": 2,
-                "travel_class": "economy"
-            },
+            destination=TripDestination(
+                city="Paris",
+                country="France",
+                country_code="FR",
+                airport_code="CDG",
+                latitude=None,
+                longitude=None,
+            ),
+            requirements=TripRequirements(
+                budget=Decimal("2000.00"),
+                currency="EUR",
+                start_date=date(2024, 6, 1),
+                end_date=date(2024, 6, 7),
+                travelers=2,
+                travel_class=TravelClass.ECONOMY,
+                accommodation_type=None,
+            ),
             plan=None,
             created_at=current_user.created_at,
             updated_at=current_user.updated_at,
         )
 
         return SuccessResponse[TripResponse](
-            data=trip_response,
-            message="Trip retrieved successfully"
+            data=trip_response, message="Trip retrieved successfully"
         )
 
     except HTTPException:
@@ -284,7 +291,7 @@ async def update_trip(
         if str(trip_id) == "00000000-0000-4000-8000-000000000404":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"}
+                detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
             )
 
         trip_response = TripResponse(
@@ -292,29 +299,31 @@ async def update_trip(
             user_id=current_user.user_id,
             name=trip_update.name or "Updated Trip",
             description=trip_update.description or "Updated description",
-            destination={
-                "city": "Paris",
-                "country": "France",
-                "country_code": "FR",
-                "airport_code": "CDG"
-            },
-            requirements={
-                "budget": 2500.00,
-                "currency": "EUR",
-                "start_date": "2024-06-01",
-                "end_date": "2024-06-07",
-                "travelers": 2,
-                "travel_class": "economy"
-            },
-            status=trip_update.status or "draft",
+            destination=TripDestination(
+                city="Paris",
+                country="France",
+                country_code="FR",
+                airport_code="CDG",
+                latitude=None,
+                longitude=None,
+            ),
+            requirements=TripRequirements(
+                budget=Decimal("2500.00"),
+                currency="EUR",
+                start_date=date(2024, 6, 1),
+                end_date=date(2024, 6, 7),
+                travelers=2,
+                travel_class=TravelClass.ECONOMY,
+                accommodation_type=None,
+            ),
+            status=trip_update.status or TripStatus.DRAFT,
             plan=None,
             created_at=current_user.created_at,
             updated_at=current_user.updated_at,
         )
 
         return SuccessResponse[TripResponse](
-            data=trip_response,
-            message="Trip updated successfully"
+            data=trip_response, message="Trip updated successfully"
         )
 
     except HTTPException:
@@ -328,7 +337,7 @@ async def update_trip(
 
 @router.delete(
     "/{trip_id}",
-    response_model=SuccessResponse[dict],
+    response_model=SuccessResponse[dict[str, str]],
     summary="Delete trip",
     description="Delete a trip and all associated data",
 )
@@ -336,7 +345,7 @@ async def delete_trip(
     trip_id: UUID,
     request: Request,
     current_user: User = Depends(get_current_user),
-) -> SuccessResponse[dict]:
+) -> SuccessResponse[dict[str, str]]:
     """
     Delete an existing trip.
 
@@ -355,12 +364,11 @@ async def delete_trip(
         if str(trip_id) == "00000000-0000-4000-8000-000000000404":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"}
+                detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
             )
 
-        return SuccessResponse[dict](
-            data={"trip_id": str(trip_id)},
-            message="Trip deleted successfully"
+        return SuccessResponse[dict[str, str]](
+            data={"trip_id": str(trip_id)}, message="Trip deleted successfully"
         )
 
     except HTTPException:

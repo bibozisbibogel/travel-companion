@@ -46,6 +46,41 @@ def client():
             app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def authenticated_client(sample_user):
+    """Create a test client with authenticated user."""
+    os.environ["SECRET_KEY"] = "test-secret-key"
+    os.environ["SUPABASE_URL"] = "https://test.supabase.co"
+    os.environ["SUPABASE_KEY"] = "test-key"
+    os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
+
+    try:
+        from unittest.mock import AsyncMock
+
+        from travel_companion.api.deps import get_current_user, get_user_service
+        from travel_companion.main import app
+
+        # Create a global mock for the user service to prevent database access
+        mock_service = AsyncMock()
+        mock_service.create_user = AsyncMock()
+        mock_service.authenticate_user = AsyncMock()
+        mock_service.get_user_by_id = AsyncMock()
+
+        # Override the dependencies with authenticated user
+        app.dependency_overrides[get_user_service] = lambda: mock_service
+        app.dependency_overrides[get_current_user] = lambda: sample_user
+
+        with TestClient(app) as client:
+            yield client
+    finally:
+        # Clean up environment variables and dependency overrides
+        for key in ["SECRET_KEY", "SUPABASE_URL", "SUPABASE_KEY", "ALLOWED_ORIGINS"]:
+            os.environ.pop(key, None)
+        # Clear all dependency overrides
+        if hasattr(app, "dependency_overrides"):
+            app.dependency_overrides.clear()
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an event loop for async tests."""

@@ -1,7 +1,5 @@
 """Tests for CORS configuration functionality."""
 
-
-
 from travel_companion.core.config import Settings
 
 

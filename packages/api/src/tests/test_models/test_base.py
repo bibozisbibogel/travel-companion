@@ -22,11 +22,7 @@ class TestBaseResponse:
 
     def test_base_response_creation(self):
         """Test creating a base response with data."""
-        response = BaseResponse[dict](
-            success=True,
-            data={"key": "value"},
-            message="Test message"
-        )
+        response = BaseResponse[dict](success=True, data={"key": "value"}, message="Test message")
 
         assert response.success is True
         assert response.data == {"key": "value"}
@@ -37,9 +33,7 @@ class TestBaseResponse:
     def test_base_response_without_data(self):
         """Test creating a base response without data."""
         response = BaseResponse[None](
-            success=False,
-            message="Error occurred",
-            error_code="TEST_ERROR"
+            success=False, message="Error occurred", error_code="TEST_ERROR"
         )
 
         assert response.success is False
@@ -49,11 +43,7 @@ class TestBaseResponse:
 
     def test_base_response_serialization(self):
         """Test base response serialization to dict."""
-        response = BaseResponse[dict](
-            success=True,
-            data={"test": "data"},
-            message="Success"
-        )
+        response = BaseResponse[dict](success=True, data={"test": "data"}, message="Success")
 
         data = response.model_dump()
         assert "success" in data
@@ -79,8 +69,7 @@ class TestSuccessResponse:
     def test_success_response_with_message(self):
         """Test success response with custom message."""
         response = SuccessResponse[dict](
-            data={"result": "ok"},
-            message="Operation completed successfully"
+            data={"result": "ok"}, message="Operation completed successfully"
         )
 
         assert response.success is True
@@ -88,10 +77,7 @@ class TestSuccessResponse:
 
     def test_success_response_type_safety(self):
         """Test success response maintains type safety."""
-        response = SuccessResponse[list[str]](
-            data=["item1", "item2"],
-            message="Items retrieved"
-        )
+        response = SuccessResponse[list[str]](data=["item1", "item2"], message="Items retrieved")
 
         assert isinstance(response.data, list)
         assert all(isinstance(item, str) for item in response.data)
@@ -102,10 +88,7 @@ class TestErrorResponse:
 
     def test_error_response_creation(self):
         """Test creating an error response."""
-        response = ErrorResponse(
-            error_code="VALIDATION_ERROR",
-            message="Validation failed"
-        )
+        response = ErrorResponse(error_code="VALIDATION_ERROR", message="Validation failed")
 
         assert response.success is False
         assert response.data is None
@@ -125,10 +108,7 @@ class TestErrorResponse:
 
     def test_error_response_immutable_success_field(self):
         """Test that success field is always False for error responses."""
-        response = ErrorResponse(
-            error_code="TEST_ERROR",
-            message="Test message"
-        )
+        response = ErrorResponse(error_code="TEST_ERROR", message="Test message")
 
         assert response.success is False  # Should always be False
 
@@ -137,14 +117,14 @@ class TestErrorResponse:
         error_details = {
             "errors": [
                 {"field": "email", "message": "Invalid format"},
-                {"field": "password", "message": "Too short"}
+                {"field": "password", "message": "Too short"},
             ]
         }
 
         response = ErrorResponse(
             error_code="VALIDATION_ERROR",
             message="Validation failed for 2 field(s)",
-            data=error_details
+            data=error_details,
         )
 
         assert response.success is False
@@ -174,12 +154,7 @@ class TestPaginationMeta:
     def test_pagination_meta_creation(self):
         """Test creating pagination metadata."""
         meta = PaginationMeta(
-            page=2,
-            per_page=10,
-            total_items=45,
-            total_pages=5,
-            has_next=True,
-            has_prev=True
+            page=2, per_page=10, total_items=45, total_pages=5, has_next=True, has_prev=True
         )
 
         assert meta.page == 2
@@ -194,44 +169,24 @@ class TestPaginationMeta:
         # Page must be >= 1
         with pytest.raises(ValidationError):
             PaginationMeta(
-                page=0,
-                per_page=10,
-                total_items=0,
-                total_pages=0,
-                has_next=False,
-                has_prev=False
+                page=0, per_page=10, total_items=0, total_pages=0, has_next=False, has_prev=False
             )
 
         # Per page must be >= 1 and <= 100
         with pytest.raises(ValidationError):
             PaginationMeta(
-                page=1,
-                per_page=0,
-                total_items=0,
-                total_pages=0,
-                has_next=False,
-                has_prev=False
+                page=1, per_page=0, total_items=0, total_pages=0, has_next=False, has_prev=False
             )
 
         with pytest.raises(ValidationError):
             PaginationMeta(
-                page=1,
-                per_page=101,
-                total_items=0,
-                total_pages=0,
-                has_next=False,
-                has_prev=False
+                page=1, per_page=101, total_items=0, total_pages=0, has_next=False, has_prev=False
             )
 
         # Total items must be >= 0
         with pytest.raises(ValidationError):
             PaginationMeta(
-                page=1,
-                per_page=10,
-                total_items=-1,
-                total_pages=0,
-                has_next=False,
-                has_prev=False
+                page=1, per_page=10, total_items=-1, total_pages=0, has_next=False, has_prev=False
             )
 
 
@@ -242,18 +197,11 @@ class TestPaginatedResponse:
         """Test creating a paginated response."""
         data = [{"id": 1, "name": "Item 1"}, {"id": 2, "name": "Item 2"}]
         pagination = PaginationMeta(
-            page=1,
-            per_page=2,
-            total_items=10,
-            total_pages=5,
-            has_next=True,
-            has_prev=False
+            page=1, per_page=2, total_items=10, total_pages=5, has_next=True, has_prev=False
         )
 
         response = PaginatedResponse[list[dict]](
-            data=data,
-            pagination=pagination,
-            message="Items retrieved successfully"
+            data=data, pagination=pagination, message="Items retrieved successfully"
         )
 
         assert response.success is True
@@ -265,18 +213,10 @@ class TestPaginatedResponse:
     def test_paginated_response_empty_data(self):
         """Test paginated response with empty data."""
         pagination = PaginationMeta(
-            page=1,
-            per_page=10,
-            total_items=0,
-            total_pages=0,
-            has_next=False,
-            has_prev=False
+            page=1, per_page=10, total_items=0, total_pages=0, has_next=False, has_prev=False
         )
 
-        response = PaginatedResponse[list](
-            data=[],
-            pagination=pagination
-        )
+        response = PaginatedResponse[list](data=[], pagination=pagination)
 
         assert response.success is True
         assert response.data == []
@@ -316,16 +256,9 @@ class TestStatusResponse:
 
     def test_status_response_with_details(self):
         """Test creating a status response with details."""
-        details = {
-            "database": "connected",
-            "redis": "connected",
-            "uptime": "2h 30m"
-        }
+        details = {"database": "connected", "redis": "connected", "uptime": "2h 30m"}
 
-        response = StatusResponse(
-            status="healthy",
-            details=details
-        )
+        response = StatusResponse(status="healthy", details=details)
 
         assert response.status == "healthy"
         assert response.details == details

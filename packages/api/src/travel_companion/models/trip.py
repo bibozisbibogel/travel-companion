@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -57,12 +58,16 @@ class TripRequirements(BaseModel):
     start_date: date = Field(..., description="Trip start date")
     end_date: date = Field(..., description="Trip end date")
     travelers: int = Field(..., ge=1, le=10, description="Number of travelers")
-    travel_class: TravelClass = Field(default=TravelClass.ECONOMY, description="Preferred travel class")
-    accommodation_type: AccommodationType | None = Field(None, description="Preferred accommodation")
+    travel_class: TravelClass = Field(
+        default=TravelClass.ECONOMY, description="Preferred travel class"
+    )
+    accommodation_type: AccommodationType | None = Field(
+        None, description="Preferred accommodation"
+    )
 
     @field_validator("end_date")
     @classmethod
-    def validate_date_range(cls, v: date, info) -> date:
+    def validate_date_range(cls, v: date, info: Any) -> date:
         """Ensure end date is after start date."""
         if "start_date" in info.data:
             start_date = info.data["start_date"]
@@ -116,7 +121,9 @@ class HotelOption(BaseModel):
     currency: str = Field(..., description="Price currency")
     accommodation_type: AccommodationType = Field(..., description="Accommodation type")
     amenities: list[str] = Field(default_factory=list, description="Hotel amenities")
-    distance_to_center: float | None = Field(None, ge=0, description="Distance to city center in km")
+    distance_to_center: float | None = Field(
+        None, ge=0, description="Distance to city center in km"
+    )
 
 
 class ActivityOption(BaseModel):

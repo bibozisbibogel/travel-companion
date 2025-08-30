@@ -228,7 +228,7 @@ class TestTravelPreferences:
             activity_interests=["museums", "beaches"],
             dietary_restrictions=["vegetarian", "gluten-free"],
             accessibility_needs=["wheelchair"],
-            travel_style="luxury"
+            travel_style="luxury",
         )
 
         assert prefs.budget_min == 500
@@ -296,11 +296,7 @@ class TestUserUpdate:
     def test_user_update_full(self):
         """Test UserUpdate with all optional fields."""
         prefs = TravelPreferences(preferred_currency="EUR")
-        update_data = UserUpdate(
-            first_name="Updated",
-            last_name="Name",
-            travel_preferences=prefs
-        )
+        update_data = UserUpdate(first_name="Updated", last_name="Name", travel_preferences=prefs)
 
         assert update_data.first_name == "Updated"
         assert update_data.last_name == "Name"
@@ -330,10 +326,7 @@ class TestUserBase:
         """Test UserBase model creation."""
         prefs = TravelPreferences(preferred_currency="CAD")
         user_base = UserBase(
-            email="test@example.com",
-            first_name="Test",
-            last_name="User",
-            travel_preferences=prefs
+            email="test@example.com", first_name="Test", last_name="User", travel_preferences=prefs
         )
 
         assert user_base.email == "test@example.com"
@@ -377,14 +370,10 @@ class TestAuthToken:
             user_id=uuid4(),
             email="test@example.com",
             created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            updated_at=datetime.now(UTC),
         )
 
-        token = AuthToken(
-            access_token="jwt.token.here",
-            expires_in=3600,
-            user=user_response
-        )
+        token = AuthToken(access_token="jwt.token.here", expires_in=3600, user=user_response)
 
         assert token.access_token == "jwt.token.here"
         assert token.token_type == "bearer"  # Default value
@@ -397,14 +386,11 @@ class TestAuthToken:
             user_id=uuid4(),
             email="test@example.com",
             created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            updated_at=datetime.now(UTC),
         )
 
         token = AuthToken(
-            access_token="custom.token",
-            token_type="custom",
-            expires_in=7200,
-            user=user_response
+            access_token="custom.token", token_type="custom", expires_in=7200, user=user_response
         )
 
         assert token.token_type == "custom"
@@ -420,8 +406,8 @@ class TestAuthToken:
                     user_id=uuid4(),
                     email="test@example.com",
                     created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC)
-                )
+                    updated_at=datetime.now(UTC),
+                ),
             )
 
         # Missing expires_in
@@ -432,13 +418,10 @@ class TestAuthToken:
                     user_id=uuid4(),
                     email="test@example.com",
                     created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC)
-                )
+                    updated_at=datetime.now(UTC),
+                ),
             )
 
         # Missing user
         with pytest.raises(ValidationError):
-            AuthToken(
-                access_token="token",
-                expires_in=3600
-            )
+            AuthToken(access_token="token", expires_in=3600)

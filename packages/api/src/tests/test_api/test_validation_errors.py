@@ -1,21 +1,16 @@
 """Tests for Pydantic validation error handling."""
 
-from fastapi.testclient import TestClient
-
-from travel_companion.main import app
-
 
 class TestValidationErrorHandling:
     """Test validation error handling middleware."""
 
-    def test_request_validation_error_handling(self):
+    def test_request_validation_error_handling(self, authenticated_client):
         """Test handling of FastAPI RequestValidationError."""
-        client = TestClient(app)
 
         # Send invalid data to a validated endpoint - missing required fields
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/trips/",
-            json={}  # Missing required fields
+            json={},  # Missing required fields
         )
 
         assert response.status_code == 422
@@ -37,27 +32,26 @@ class TestValidationErrorHandling:
         assert "message" in error_detail
         assert "type" in error_detail
 
-    def test_request_validation_error_with_field_details(self):
+    def test_request_validation_error_with_field_details(self, authenticated_client):
         """Test validation error with specific field validation failures."""
-        client = TestClient(app)
 
         # Send data with invalid field types/values
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/trips/",
             json={
                 "name": "",  # Empty name should fail validation
                 "destination": {
                     "city": "",  # Empty city should fail
                     "country": "France",
-                    "country_code": "FR"
+                    "country_code": "FR",
                 },
                 "requirements": {
                     "budget": -100,  # Negative budget should fail
                     "start_date": "2024-06-01",
                     "end_date": "2024-05-01",  # End before start should fail
-                    "travelers": 0  # Zero travelers should fail
-                }
-            }
+                    "travelers": 0,  # Zero travelers should fail
+                },
+            },
         )
 
         assert response.status_code == 422
@@ -75,11 +69,10 @@ class TestValidationErrorHandling:
         field_paths = [error["field"] for error in errors]
         assert any("name" in path for path in field_paths)
 
-    def test_request_validation_error_with_nested_fields(self):
+    def test_request_validation_error_with_nested_fields(self, authenticated_client):
         """Test validation errors in nested model structures."""
-        client = TestClient(app)
 
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/trips/",
             json={
                 "name": "Test Trip",
@@ -87,16 +80,16 @@ class TestValidationErrorHandling:
                     "city": "Paris",
                     "country": "France",
                     "country_code": "FR",
-                    "latitude": 91  # Invalid latitude > 90
+                    "latitude": 91,  # Invalid latitude > 90
                 },
                 "requirements": {
                     "budget": 1000,
                     "currency": "eur",  # Should be uppercase
                     "start_date": "2024-06-01",
                     "end_date": "2024-06-07",
-                    "travelers": 2
-                }
-            }
+                    "travelers": 2,
+                },
+            },
         )
 
         assert response.status_code == 422
@@ -111,11 +104,10 @@ class TestValidationErrorHandling:
         # Should have nested path for currency error
         assert any("requirements" in path and "currency" in path for path in field_paths)
 
-    def test_validation_error_response_format(self):
+    def test_validation_error_response_format(self, authenticated_client):
         """Test that validation error response follows standardized format."""
-        client = TestClient(app)
 
-        response = client.post("/api/v1/trips/", json={"invalid": "data"})
+        response = authenticated_client.post("/api/v1/trips/", json={"invalid": "data"})
 
         assert response.status_code == 422
         data = response.json()
@@ -132,27 +124,26 @@ class TestValidationErrorHandling:
         assert isinstance(data["data"], dict)
         assert "errors" in data["data"]
 
-    def test_validation_error_message_count(self):
+    def test_validation_error_message_count(self, authenticated_client):
         """Test that error message includes correct error count."""
-        client = TestClient(app)
 
         # Create request with multiple validation errors
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/trips/",
             json={
                 "name": "",  # Error 1: empty name
                 "destination": {
                     "city": "",  # Error 2: empty city
                     "country": "",  # Error 3: empty country
-                    "country_code": ""  # Error 4: empty country code
+                    "country_code": "",  # Error 4: empty country code
                 },
                 "requirements": {
                     "budget": 0,  # Error 5: zero budget
                     "start_date": "invalid-date",  # Error 6: invalid date
                     "end_date": "2024-06-07",
-                    "travelers": -1  # Error 7: negative travelers
-                }
-            }
+                    "travelers": -1,  # Error 7: negative travelers
+                },
+            },
         )
 
         assert response.status_code == 422
@@ -161,45 +152,39 @@ class TestValidationErrorHandling:
         error_count = len(data["data"]["errors"])
         assert f"{error_count} field(s)" in data["message"]
 
-    def test_valid_request_no_validation_error(self):
+    def test_valid_request_no_validation_error(self, authenticated_client):
         """Test that valid requests don't trigger validation errors."""
-        client = TestClient(app)
 
         # This might fail due to other business logic, but shouldn't have validation errors
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/trips/",
             json={
                 "name": "Valid Trip",
-                "destination": {
-                    "city": "Paris",
-                    "country": "France",
-                    "country_code": "FR"
-                },
+                "destination": {"city": "Paris", "country": "France", "country_code": "FR"},
                 "requirements": {
                     "budget": 1500,
                     "currency": "EUR",
                     "start_date": "2024-08-01",
                     "end_date": "2024-08-07",
-                    "travelers": 2
-                }
+                    "travelers": 2,
+                },
             },
-            headers={"Authorization": "Bearer valid-token-would-go-here"}
+            headers={"Authorization": "Bearer valid-token-would-go-here"},
         )
 
         # Should not be a validation error (422), might be auth error (401) or other
         assert response.status_code != 422
 
-    def test_validation_error_field_paths(self):
+    def test_validation_error_field_paths(self, authenticated_client):
         """Test that field paths in validation errors are properly formatted."""
-        client = TestClient(app)
 
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/trips/",
             json={
                 "requirements": {
                     "budget": "not-a-number"  # Type validation error
                 }
-            }
+            },
         )
 
         assert response.status_code == 422

@@ -19,7 +19,7 @@ class BaseResponse(BaseModel, Generic[T]):
     error_code: str | None = Field(None, description="Error code for failed requests")
     timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
 
-    @field_serializer('timestamp')
+    @field_serializer("timestamp")
     def serialize_timestamp(self, value: datetime) -> str:
         """Serialize timestamp to ISO format string."""
         return value.isoformat()
@@ -29,13 +29,14 @@ class SuccessResponse(BaseResponse[T]):
     """Standardized success response."""
 
     success: bool = Field(default=True, description="Success flag")
+    error_code: str | None = Field(default=None, description="Error code for failed requests")
 
 
-class ErrorResponse(BaseResponse[dict]):
+class ErrorResponse(BaseResponse[dict[str, Any]]):
     """Standardized error response."""
 
     success: bool = Field(default=False, description="Success flag")
-    data: dict | None = Field(default=None, description="Error details")
+    data: dict[str, Any] | None = Field(default=None, description="Error details")
     error_code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
 
@@ -57,6 +58,7 @@ class PaginatedResponse(BaseResponse[T]):
     success: bool = Field(default=True, description="Success flag")
     data: T = Field(..., description="Response data")
     pagination: PaginationMeta = Field(..., description="Pagination metadata")
+    error_code: str | None = Field(default=None, description="Error code for failed requests")
 
 
 class IDResponse(BaseModel):

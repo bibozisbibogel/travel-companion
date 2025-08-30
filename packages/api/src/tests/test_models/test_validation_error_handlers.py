@@ -12,6 +12,7 @@ from travel_companion.main import (
 
 class MockRequest:
     """Mock FastAPI Request for testing."""
+
     pass
 
 
@@ -22,28 +23,21 @@ class TestValidationExceptionHandler:
         """Test validation exception handler with mock request validation error."""
         # Create a mock RequestValidationError
         errors = [
-            {
-                "loc": ("name",),
-                "msg": "field required",
-                "type": "missing",
-                "input": {}
-            },
+            {"loc": ("name",), "msg": "field required", "type": "missing", "input": {}},
             {
                 "loc": ("destination", "city"),
                 "msg": "ensure this value has at least 1 characters",
                 "type": "value_error.any_str.min_length",
-                "input": ""
-            }
+                "input": "",
+            },
         ]
 
         exc = RequestValidationError(errors)
         request = MockRequest()
 
-        # Test the handler
-        response = validation_exception_handler(request, exc)
-
-        # Since it's async, we need to await it
+        # Test the handler (since it's async, we need to await it)
         import asyncio
+
         response = asyncio.run(validation_exception_handler(request, exc))
 
         assert isinstance(response, JSONResponse)
@@ -52,6 +46,7 @@ class TestValidationExceptionHandler:
         # Check response content
         content = response.body.decode()
         import json
+
         data = json.loads(content)
 
         assert data["success"] is False
@@ -83,6 +78,7 @@ class TestValidationExceptionHandler:
 
             # Test the handler
             import asyncio
+
             response = asyncio.run(pydantic_validation_exception_handler(request, exc))
 
             assert isinstance(response, JSONResponse)
@@ -91,6 +87,7 @@ class TestValidationExceptionHandler:
             # Check response content
             content = response.body.decode()
             import json
+
             data = json.loads(content)
 
             assert data["success"] is False
@@ -112,24 +109,26 @@ class TestValidationExceptionHandler:
                 "loc": ("requirements", "budget"),
                 "msg": "ensure this value is greater than 0",
                 "type": "value_error.number.not_gt",
-                "input": -100
+                "input": -100,
             },
             {
                 "loc": ("requirements", "travelers"),
                 "msg": "ensure this value is greater than or equal to 1",
                 "type": "value_error.number.not_ge",
-                "input": 0
-            }
+                "input": 0,
+            },
         ]
 
         exc = RequestValidationError(errors)
         request = MockRequest()
 
         import asyncio
+
         response = asyncio.run(validation_exception_handler(request, exc))
 
         content = response.body.decode()
         import json
+
         data = json.loads(content)
 
         error_details = data["data"]["errors"]
@@ -145,22 +144,18 @@ class TestValidationExceptionHandler:
 
     def test_validation_exception_handler_single_field(self):
         """Test validation exception handler with single field error."""
-        errors = [
-            {
-                "loc": ("email",),
-                "msg": "field required",
-                "type": "missing"
-            }
-        ]
+        errors = [{"loc": ("email",), "msg": "field required", "type": "missing"}]
 
         exc = RequestValidationError(errors)
         request = MockRequest()
 
         import asyncio
+
         response = asyncio.run(validation_exception_handler(request, exc))
 
         content = response.body.decode()
         import json
+
         data = json.loads(content)
 
         assert "Validation failed for 1 field(s)" in data["message"]
@@ -174,7 +169,7 @@ class TestValidationExceptionHandler:
                 "loc": ("trip_data", "destination", "coordinates", "latitude"),
                 "msg": "ensure this value is less than or equal to 90",
                 "type": "value_error.number.not_le",
-                "input": 95.5
+                "input": 95.5,
             }
         ]
 
@@ -182,10 +177,12 @@ class TestValidationExceptionHandler:
         request = MockRequest()
 
         import asyncio
+
         response = asyncio.run(validation_exception_handler(request, exc))
 
         content = response.body.decode()
         import json
+
         data = json.loads(content)
 
         error_details = data["data"]["errors"]

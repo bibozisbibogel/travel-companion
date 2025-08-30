@@ -24,51 +24,57 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print("Shutting down Travel Companion API...")
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     """Handle Pydantic validation errors."""
     error_details = []
     for error in exc.errors():
         field_path = " -> ".join(str(loc) for loc in error["loc"])
-        error_details.append({
-            "field": field_path,
-            "message": error["msg"],
-            "type": error["type"],
-            "input": error.get("input"),
-        })
+        error_details.append(
+            {
+                "field": field_path,
+                "message": error["msg"],
+                "type": error["type"],
+                "input": error.get("input"),
+            }
+        )
 
     error_response = ErrorResponse(
         error_code="VALIDATION_ERROR",
         message=f"Validation failed for {len(error_details)} field(s)",
-        data={"errors": error_details}
+        data={"errors": error_details},
     )
 
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error_response.model_dump()
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=error_response.model_dump()
     )
 
 
-async def pydantic_validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
+async def pydantic_validation_exception_handler(
+    request: Request, exc: ValidationError
+) -> JSONResponse:
     """Handle direct Pydantic validation errors."""
     error_details = []
     for error in exc.errors():
         field_path = " -> ".join(str(loc) for loc in error["loc"])
-        error_details.append({
-            "field": field_path,
-            "message": error["msg"],
-            "type": error["type"],
-            "input": error.get("input"),
-        })
+        error_details.append(
+            {
+                "field": field_path,
+                "message": error["msg"],
+                "type": error["type"],
+                "input": error.get("input"),
+            }
+        )
 
     error_response = ErrorResponse(
         error_code="VALIDATION_ERROR",
         message=f"Model validation failed for {len(error_details)} field(s)",
-        data={"errors": error_details}
+        data={"errors": error_details},
     )
 
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error_response.model_dump()
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=error_response.model_dump()
     )
 
 
@@ -86,8 +92,8 @@ def create_app() -> FastAPI:
     )
 
     # Register exception handlers
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    app.add_exception_handler(ValidationError, pydantic_validation_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(ValidationError, pydantic_validation_exception_handler)  # type: ignore[arg-type]
 
     # Configure CORS
     cors_origins = settings.get_cors_origins_for_environment()

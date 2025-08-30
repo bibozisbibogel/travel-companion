@@ -31,7 +31,7 @@ class TestTripDestination:
             country_code="FR",
             airport_code="CDG",
             latitude=48.8566,
-            longitude=2.3522
+            longitude=2.3522,
         )
 
         assert destination.city == "Paris"
@@ -43,11 +43,7 @@ class TestTripDestination:
 
     def test_destination_without_optional_fields(self):
         """Test creating a destination with only required fields."""
-        destination = TripDestination(
-            city="London",
-            country="United Kingdom",
-            country_code="GB"
-        )
+        destination = TripDestination(city="London", country="United Kingdom", country_code="GB")
 
         assert destination.city == "London"
         assert destination.airport_code is None
@@ -66,7 +62,7 @@ class TestTripDestination:
                 city="Paris",
                 country="France",
                 country_code="FR",
-                latitude=91  # > 90
+                latitude=91,  # > 90
             )
 
         # Invalid longitude
@@ -75,7 +71,7 @@ class TestTripDestination:
                 city="Paris",
                 country="France",
                 country_code="FR",
-                longitude=181  # > 180
+                longitude=181,  # > 180
             )
 
 
@@ -91,7 +87,7 @@ class TestTripRequirements:
             end_date=date(2024, 6, 7),
             travelers=2,
             travel_class=TravelClass.BUSINESS,
-            accommodation_type=AccommodationType.HOTEL
+            accommodation_type=AccommodationType.HOTEL,
         )
 
         assert requirements.budget == Decimal("2000.00")
@@ -108,7 +104,7 @@ class TestTripRequirements:
             budget=Decimal("1500.00"),
             start_date=date(2024, 6, 1),
             end_date=date(2024, 6, 7),
-            travelers=1
+            travelers=1,
         )
 
         assert requirements.currency == "USD"  # Default
@@ -123,7 +119,7 @@ class TestTripRequirements:
                 budget=Decimal("1000.00"),
                 start_date=date(2024, 6, 7),
                 end_date=date(2024, 6, 1),  # Before start
-                travelers=1
+                travelers=1,
             )
 
         # Zero budget
@@ -132,7 +128,7 @@ class TestTripRequirements:
                 budget=Decimal("0.00"),  # Must be > 0
                 start_date=date(2024, 6, 1),
                 end_date=date(2024, 6, 7),
-                travelers=1
+                travelers=1,
             )
 
         # Invalid traveler count
@@ -141,7 +137,7 @@ class TestTripRequirements:
                 budget=Decimal("1000.00"),
                 start_date=date(2024, 6, 1),
                 end_date=date(2024, 6, 7),
-                travelers=0  # Must be >= 1
+                travelers=0,  # Must be >= 1
             )
 
         with pytest.raises(ValidationError):
@@ -149,7 +145,7 @@ class TestTripRequirements:
                 budget=Decimal("1000.00"),
                 start_date=date(2024, 6, 1),
                 end_date=date(2024, 6, 7),
-                travelers=11  # Must be <= 10
+                travelers=11,  # Must be <= 10
             )
 
         # Invalid currency format
@@ -159,7 +155,7 @@ class TestTripRequirements:
                 currency="eur",  # Must be uppercase
                 start_date=date(2024, 6, 1),
                 end_date=date(2024, 6, 7),
-                travelers=1
+                travelers=1,
             )
 
 
@@ -168,28 +164,22 @@ class TestTripPlanRequest:
 
     def test_plan_request_creation(self):
         """Test creating a trip plan request."""
-        destination = TripDestination(
-            city="Tokyo",
-            country="Japan",
-            country_code="JP"
-        )
+        destination = TripDestination(city="Tokyo", country="Japan", country_code="JP")
 
         requirements = TripRequirements(
             budget=Decimal("3000.00"),
             start_date=date(2024, 8, 1),
             end_date=date(2024, 8, 10),
-            travelers=2
+            travelers=2,
         )
 
         preferences = {
             "dietary_restrictions": ["vegetarian"],
-            "activity_interests": ["culture", "food"]
+            "activity_interests": ["culture", "food"],
         }
 
         request = TripPlanRequest(
-            destination=destination,
-            requirements=requirements,
-            preferences=preferences
+            destination=destination, requirements=requirements, preferences=preferences
         )
 
         assert request.destination.city == "Tokyo"
@@ -198,23 +188,16 @@ class TestTripPlanRequest:
 
     def test_plan_request_without_preferences(self):
         """Test creating a trip plan request without preferences."""
-        destination = TripDestination(
-            city="Sydney",
-            country="Australia",
-            country_code="AU"
-        )
+        destination = TripDestination(city="Sydney", country="Australia", country_code="AU")
 
         requirements = TripRequirements(
             budget=Decimal("2500.00"),
             start_date=date(2024, 9, 1),
             end_date=date(2024, 9, 7),
-            travelers=1
+            travelers=1,
         )
 
-        request = TripPlanRequest(
-            destination=destination,
-            requirements=requirements
-        )
+        request = TripPlanRequest(destination=destination, requirements=requirements)
 
         assert request.preferences is None
 
@@ -235,7 +218,7 @@ class TestFlightOption:
             price=Decimal("650.00"),
             currency="EUR",
             travel_class=TravelClass.ECONOMY,
-            stops=0
+            stops=0,
         )
 
         assert flight.airline == "Air France"
@@ -260,7 +243,7 @@ class TestFlightOption:
                 price=Decimal("100.00"),
                 currency="USD",
                 travel_class=TravelClass.ECONOMY,
-                stops=0
+                stops=0,
             )
 
         # Invalid price
@@ -276,7 +259,7 @@ class TestFlightOption:
                 price=Decimal("0.00"),  # Must be > 0
                 currency="USD",
                 travel_class=TravelClass.ECONOMY,
-                stops=0
+                stops=0,
             )
 
 
@@ -294,7 +277,7 @@ class TestHotelOption:
             currency="EUR",
             accommodation_type=AccommodationType.HOTEL,
             amenities=["wifi", "breakfast", "gym"],
-            distance_to_center=2.5
+            distance_to_center=2.5,
         )
 
         assert hotel.name == "Hotel Paris"
@@ -314,7 +297,7 @@ class TestHotelOption:
                 star_rating=6,  # Must be <= 5
                 price_per_night=Decimal("100.00"),
                 currency="USD",
-                accommodation_type=AccommodationType.HOTEL
+                accommodation_type=AccommodationType.HOTEL,
             )
 
         # Invalid guest rating
@@ -325,7 +308,7 @@ class TestHotelOption:
                 guest_rating=11.0,  # Must be <= 10
                 price_per_night=Decimal("100.00"),
                 currency="USD",
-                accommodation_type=AccommodationType.HOTEL
+                accommodation_type=AccommodationType.HOTEL,
             )
 
 
@@ -343,7 +326,7 @@ class TestActivityOption:
             currency="EUR",
             location="Champ de Mars, Paris",
             rating=9.2,
-            min_age=5
+            min_age=5,
         )
 
         assert activity.name == "Eiffel Tower Tour"
@@ -359,7 +342,7 @@ class TestActivityOption:
             name="Walking Tour",
             description="Free walking tour of the city",
             category="Culture",
-            location="City Center"
+            location="City Center",
         )
 
         assert activity.name == "Walking Tour"
@@ -386,7 +369,7 @@ class TestTripPlan:
                 price=Decimal("600.00"),
                 currency="USD",
                 travel_class=TravelClass.ECONOMY,
-                stops=0
+                stops=0,
             )
         ]
 
@@ -396,7 +379,7 @@ class TestTripPlan:
                 address="Test Address",
                 price_per_night=Decimal("120.00"),
                 currency="EUR",
-                accommodation_type=AccommodationType.HOTEL
+                accommodation_type=AccommodationType.HOTEL,
             )
         ]
 
@@ -405,7 +388,7 @@ class TestTripPlan:
             hotels=hotels,
             activities=[],
             total_estimated_cost=Decimal("1500.00"),
-            currency="EUR"
+            currency="EUR",
         )
 
         assert len(plan.flights) == 1
@@ -418,7 +401,7 @@ class TestTripPlan:
         """Test creating an empty trip plan."""
         plan = TripPlan(
             total_estimated_cost=Decimal("1.00"),  # Must be > 0
-            currency="USD"
+            currency="USD",
         )
 
         assert len(plan.flights) == 0
