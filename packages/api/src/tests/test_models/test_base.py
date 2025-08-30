@@ -132,6 +132,41 @@ class TestErrorResponse:
 
         assert response.success is False  # Should always be False
 
+    def test_error_response_with_data(self):
+        """Test error response with additional error details."""
+        error_details = {
+            "errors": [
+                {"field": "email", "message": "Invalid format"},
+                {"field": "password", "message": "Too short"}
+            ]
+        }
+
+        response = ErrorResponse(
+            error_code="VALIDATION_ERROR",
+            message="Validation failed for 2 field(s)",
+            data=error_details
+        )
+
+        assert response.success is False
+        assert response.data == error_details
+        assert response.error_code == "VALIDATION_ERROR"
+        assert "2 field(s)" in response.message
+
+    def test_error_response_edge_cases(self):
+        """Test error response edge cases."""
+        # None values for required fields should raise validation error
+        with pytest.raises(ValidationError):
+            ErrorResponse(error_code=None, message="Test")
+
+        with pytest.raises(ValidationError):
+            ErrorResponse(error_code="TEST", message=None)
+
+        # Empty strings are valid for error_code and message
+        response = ErrorResponse(error_code="", message="")
+        assert response.error_code == ""
+        assert response.message == ""
+        assert response.success is False
+
 
 class TestPaginationMeta:
     """Test PaginationMeta model."""

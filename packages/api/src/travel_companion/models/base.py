@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 # Type variable for generic response data
 T = TypeVar("T")
@@ -19,6 +19,11 @@ class BaseResponse(BaseModel, Generic[T]):
     error_code: str | None = Field(None, description="Error code for failed requests")
     timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
 
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, value: datetime) -> str:
+        """Serialize timestamp to ISO format string."""
+        return value.isoformat()
+
 
 class SuccessResponse(BaseResponse[T]):
     """Standardized success response."""
@@ -26,11 +31,11 @@ class SuccessResponse(BaseResponse[T]):
     success: bool = Field(default=True, description="Success flag")
 
 
-class ErrorResponse(BaseResponse[None]):
+class ErrorResponse(BaseResponse[dict]):
     """Standardized error response."""
 
     success: bool = Field(default=False, description="Success flag")
-    data: None = Field(default=None, description="No data for error responses")
+    data: dict | None = Field(default=None, description="Error details")
     error_code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
 
