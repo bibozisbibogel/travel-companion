@@ -11,6 +11,12 @@ from pydantic import ValidationError
 
 from travel_companion.api.v1 import router as api_v1_router
 from travel_companion.core.config import get_settings
+from travel_companion.middleware import add_error_handlers
+from travel_companion.middleware.logging import (
+    LoggingMiddleware,
+    PerformanceLoggingMiddleware,
+    SecurityLoggingMiddleware,
+)
 from travel_companion.models.base import ErrorResponse
 
 
@@ -95,6 +101,9 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(ValidationError, pydantic_validation_exception_handler)  # type: ignore[arg-type]
 
+    # Add comprehensive error handlers
+    add_error_handlers(app)
+
     # Configure CORS
     cors_origins = settings.get_cors_origins_for_environment()
     cors_methods = settings.get_cors_methods_for_environment()
@@ -114,6 +123,11 @@ def create_app() -> FastAPI:
         allow_headers=settings.allowed_headers,
         max_age=settings.max_age,
     )
+
+    # Add logging and monitoring middleware
+    app.add_middleware(PerformanceLoggingMiddleware, slow_request_threshold_ms=1000)
+    app.add_middleware(SecurityLoggingMiddleware)
+    app.add_middleware(LoggingMiddleware)
 
     # Include routers
     app.include_router(api_v1_router, prefix="/api/v1")
