@@ -155,9 +155,11 @@ run_web_tests() {
     # We'll add a simple test setup check for now
     if [ -f "package.json" ] && grep -q '"test"' package.json; then
         if [ "$WATCH" = true ]; then
+            print_status "Watch mode enabled for frontend tests"
             npm run test -- --watch
         else
-            npm run test
+            # Ensure Vitest runs once and exits (no watch)
+            npm run test -- --run
         fi
         TEST_RESULT=$?
     else

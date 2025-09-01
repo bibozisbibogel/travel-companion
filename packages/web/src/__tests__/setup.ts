@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
+import React from 'react'
 
 // Mock Next.js router
 const mockRouter = {
@@ -27,4 +28,10 @@ vi.mock('next/image', () => ({
     // Return a simple img element for testing
     return { src, alt, ...props }
   },
+}))
+
+// Mock Next.js Link to avoid prefetch/state updates during tests
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...props }: any) =>
+    React.createElement('a', { href, ...props }, children),
 }))
