@@ -13,12 +13,29 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     """Create a test client for the FastAPI application."""
-    # Set test environment variables to avoid pydantic parsing issues
-    os.environ["SECRET_KEY"] = "test-secret-key"
+    # Store original environment
+    original_env = {}
+    env_keys = [
+        "SECRET_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_KEY",
+        "ALLOWED_ORIGINS",
+        "REDIS_URL",
+        "ENVIRONMENT",
+    ]
+
+    for key in env_keys:
+        original_env[key] = os.environ.get(key)
+
+    # Set test environment variables
+    os.environ["SECRET_KEY"] = "test-secret-key-12345678901234567890"
     os.environ["SUPABASE_URL"] = "https://test.supabase.co"
     os.environ["SUPABASE_KEY"] = "test-key"
-    os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
+    os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'  # JSON format to avoid parsing issues
+    os.environ["REDIS_URL"] = "redis://localhost:6379"
+    os.environ["ENVIRONMENT"] = "test"
 
+    app = None
     try:
         # Import app after setting environment
         from unittest.mock import AsyncMock
@@ -30,9 +47,49 @@ def client():
         mock_service = AsyncMock()
         mock_service.create_user = AsyncMock()
         mock_service.authenticate_user = AsyncMock()
+        mock_service.get_user_by_id = AsyncMock()
 
         # Override the dependency globally for this test client
         app.dependency_overrides[get_user_service] = lambda: mock_service
+
+        with TestClient(app) as client:
+            yield client
+    finally:
+        # Restore original environment
+        for key, value in original_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+        # Clear all dependency overrides
+        if app and hasattr(app, "dependency_overrides"):
+            app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authenticated_client(sample_user):
+    """Create a test client with authenticated user."""
+    os.environ["SECRET_KEY"] = "test-secret-key"
+    os.environ["SUPABASE_URL"] = "https://test.supabase.co"
+    os.environ["SUPABASE_KEY"] = "test-key"
+    os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
+
+    try:
+        from unittest.mock import AsyncMock
+
+        from travel_companion.api.deps import get_current_user, get_user_service
+        from travel_companion.main import app
+
+        # Create a global mock for the user service to prevent database access
+        mock_service = AsyncMock()
+        mock_service.create_user = AsyncMock()
+        mock_service.authenticate_user = AsyncMock()
+        mock_service.get_user_by_id = AsyncMock()
+
+        # Override the dependencies with authenticated user
+        app.dependency_overrides[get_user_service] = lambda: mock_service
+        app.dependency_overrides[get_current_user] = lambda: sample_user
 
         with TestClient(app) as client:
             yield client

@@ -10,6 +10,10 @@ from travel_companion.core.config import Settings
 
 router = APIRouter()
 
+# Cache configuration
+HEALTH_CACHE_TTL = 30  # seconds
+HEALTH_CACHE_KEY = "health_check:detailed"
+
 
 @router.get("")
 async def health_check(settings: Settings = Depends(get_current_settings)) -> dict[str, Any]:
@@ -26,17 +30,43 @@ async def health_check(settings: Settings = Depends(get_current_settings)) -> di
 async def detailed_health_check(
     settings: Settings = Depends(get_current_settings),
 ) -> dict[str, Any]:
-    """Detailed health check with service dependencies."""
+    """Detailed health check with service dependencies and caching."""
     from travel_companion.core.database import get_database_manager
     from travel_companion.core.redis import get_redis_manager
 
-    # Basic service status
+    redis_manager = get_redis_manager()
+
+    # Try to get cached health status first
+    try:
+        cached_status = await redis_manager.get(HEALTH_CACHE_KEY, json_decode=True)
+        if cached_status is not None and isinstance(cached_status, dict):
+            # Type cast for MyPy - we've already validated it's a dict
+            cached_result: dict[str, Any] = cached_status
+            # Update timestamp but keep cached dependency checks
+            cached_result["timestamp"] = datetime.now(UTC).isoformat()
+            cached_result["cached"] = True
+            cached_result["cache_ttl_remaining"] = await redis_manager.ttl(HEALTH_CACHE_KEY)
+            return cached_result
+    except Exception:
+        # If cache fails, continue with fresh check
+        pass
+
+    # Basic service status with enhanced reporting
     health_status: dict[str, Any] = {
         "status": "healthy",
         "timestamp": datetime.now(UTC).isoformat(),
         "version": settings.version,
         "service": settings.app_name,
+        "environment": settings.environment,
+        "uptime_check": "running",
         "dependencies": {},
+        "cached": False,
+        "metrics": {
+            "dependencies_checked": 0,
+            "healthy_dependencies": 0,
+            "unhealthy_dependencies": 0,
+            "error_dependencies": 0,
+        },
     }
 
     # Check database connection
@@ -112,6 +142,30 @@ async def detailed_health_check(
             "edge_count": 0,
         }
 
+    # Calculate dependency metrics
+    dependencies = health_status["dependencies"]
+    total_deps = len(dependencies)
+    healthy_count = sum(
+        1
+        for dep in dependencies.values()
+        if isinstance(dep, dict) and dep.get("status") == "healthy"
+    )
+    unhealthy_count = sum(
+        1
+        for dep in dependencies.values()
+        if isinstance(dep, dict) and dep.get("status") == "unhealthy"
+    )
+    error_count = sum(
+        1 for dep in dependencies.values() if isinstance(dep, dict) and dep.get("status") == "error"
+    )
+
+    health_status["metrics"] = {
+        "dependencies_checked": total_deps,
+        "healthy_dependencies": healthy_count,
+        "unhealthy_dependencies": unhealthy_count,
+        "error_dependencies": error_count,
+    }
+
     # Overall status determination
     database_ok = health_status["dependencies"]["database"]["status"] in ["healthy", "unhealthy"]
     redis_ok = health_status["dependencies"]["redis"]["status"] in ["healthy", "unhealthy"]
@@ -122,5 +176,13 @@ async def detailed_health_check(
 
     if not (database_ok and redis_ok and workflow_ok):
         health_status["status"] = "degraded"
+
+    # Cache the health status for performance (only if Redis is working)
+    if redis_ok:
+        try:
+            await redis_manager.set(HEALTH_CACHE_KEY, health_status, expire=HEALTH_CACHE_TTL)
+        except Exception:
+            # Cache failure should not affect health check response
+            pass
 
     return health_status

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
@@ -89,7 +89,7 @@ class AuthLogFormatter(logging.Formatter):
 
         # Base log structure
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -377,7 +377,7 @@ class AuthLogger:
     def log_security_event(
         self,
         event_type: str,
-        level: SecurityLogLevel,
+        level: SecurityLogLevel | str,
         message: str,
         ip_address: str,
         error_code: str | None = None,
@@ -404,7 +404,13 @@ class AuthLogger:
         if details:
             extra_data["details"] = details
 
-        log_method = getattr(self.logger, level.value)
+        # Handle both enum and string levels
+        if isinstance(level, SecurityLogLevel):
+            log_level = level.value
+        else:
+            log_level = level
+
+        log_method = getattr(self.logger, log_level)
         log_method(message, extra=extra_data)
 
     def _sanitize_email(self, email: str) -> str:

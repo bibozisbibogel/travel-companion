@@ -1,6 +1,6 @@
 """Pydantic models for workflow API requests and responses."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -86,5 +86,5 @@ class WorkflowHealthResponse(BaseModel):
     total_workflows: int = Field(..., description="Total number of workflow types registered")
 
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow, description="Health check timestamp"
+        default_factory=lambda: datetime.now(UTC), description="Health check timestamp"
     )
