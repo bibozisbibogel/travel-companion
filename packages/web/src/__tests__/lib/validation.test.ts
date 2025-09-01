@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { 
   loginSchema, 
-  registerSchema, 
+  registerSchema,
+  travelRequestSchema,
   calculatePasswordStrength, 
   getPasswordStrengthColor, 
   getPasswordStrengthLabel 
@@ -27,7 +28,7 @@ describe('Login Schema Validation', () => {
     const result = loginSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues[0].message).toContain('valid email')
+      expect(result.error.issues[0]?.message).toContain('valid email')
     }
   })
 
@@ -244,6 +245,178 @@ describe('Password Strength Calculation', () => {
   it('should not set warning for strong passwords', () => {
     const result = calculatePasswordStrength('MyStrongPassword123!')
     expect(result.feedback.warning).toBeUndefined()
+  })
+})
+
+describe('Travel Request Schema Validation', () => {
+  it('should validate a correct travel request form', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() + 6)
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const validData = {
+      destination: 'Tokyo, Japan',
+      startDate,
+      endDate,
+      budget: 3000,
+      travelers: 2,
+      preferences: ['culture', 'food']
+    }
+    
+    const result = travelRequestSchema.safeParse(validData)
+    expect(result.success).toBe(true)
+  })
+
+  it('should reject empty destination', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() + 6)
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const invalidData = {
+      destination: '',
+      startDate,
+      endDate,
+      travelers: 2
+    }
+    
+    const result = travelRequestSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Destination is required')
+    }
+  })
+
+  it('should reject past start dates', () => {
+    const invalidData = {
+      destination: 'Paris',
+      startDate: '2020-01-01',
+      endDate: '2020-01-07',
+      travelers: 2
+    }
+    
+    const result = travelRequestSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('cannot be in the past')
+    }
+  })
+
+  it('should reject end date before start date', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() - 3) // End date before start date
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const invalidData = {
+      destination: 'London',
+      startDate,
+      endDate,
+      travelers: 2
+    }
+    
+    const result = travelRequestSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const errorMessage = result.error.issues.find(issue => issue.path.includes('endDate'))?.message
+      expect(errorMessage).toBe('End date must be after start date')
+    }
+  })
+
+  it('should reject budget below minimum', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() + 6)
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const invalidData = {
+      destination: 'Rome',
+      startDate,
+      endDate,
+      budget: 50,
+      travelers: 2
+    }
+    
+    const result = travelRequestSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const budgetError = result.error.issues.find(issue => issue.path.includes('budget'))
+      expect(budgetError?.message).toContain('at least $100')
+    }
+  })
+
+  it('should reject budget above maximum', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() + 6)
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const invalidData = {
+      destination: 'Dubai',
+      startDate,
+      endDate,
+      budget: 200000,
+      travelers: 2
+    }
+    
+    const result = travelRequestSchema.safeParse(invalidData)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const budgetError = result.error.issues.find(issue => issue.path.includes('budget'))
+      expect(budgetError?.message).toContain('cannot exceed $100,000')
+    }
+  })
+
+  it('should reject invalid traveler counts', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() + 6)
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const invalidDataZero = {
+      destination: 'Barcelona',
+      startDate,
+      endDate,
+      travelers: 0
+    }
+    
+    const resultZero = travelRequestSchema.safeParse(invalidDataZero)
+    expect(resultZero.success).toBe(false)
+
+    const invalidDataTooMany = {
+      destination: 'Barcelona',
+      startDate,
+      endDate,
+      travelers: 25
+    }
+    
+    const resultTooMany = travelRequestSchema.safeParse(invalidDataTooMany)
+    expect(resultTooMany.success).toBe(false)
+  })
+
+  it('should accept optional budget and preferences', () => {
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 2)
+    const startDate = futureDate.toISOString().split('T')[0]
+    futureDate.setDate(futureDate.getDate() + 6)
+    const endDate = futureDate.toISOString().split('T')[0]
+    
+    const validData = {
+      destination: 'Amsterdam',
+      startDate,
+      endDate,
+      travelers: 1
+    }
+    
+    const result = travelRequestSchema.safeParse(validData)
+    expect(result.success).toBe(true)
   })
 })
 

@@ -15,6 +15,25 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
 })
 
+// Mock AbortController for timeout tests
+class MockAbortController {
+  public signal: AbortSignal
+  private controller: AbortController
+
+  constructor() {
+    this.controller = new AbortController()
+    this.signal = this.controller.signal
+  }
+
+  abort() {
+    this.controller.abort()
+  }
+}
+
+if (!global.AbortController) {
+  global.AbortController = MockAbortController as any
+}
+
 describe('ApiClient', () => {
   let apiClient: ApiClient
   
@@ -23,7 +42,11 @@ describe('ApiClient', () => {
     localStorageMock.getItem.mockClear()
     localStorageMock.setItem.mockClear()
     localStorageMock.removeItem.mockClear()
-    apiClient = new ApiClient('http://localhost:8000')
+    apiClient = new ApiClient('http://localhost:8000', 5000, {
+      attempts: 2,
+      delay: 100,
+      retryOn: [500, 502, 503, 504]
+    })
   })
 
   afterEach(() => {
@@ -33,7 +56,7 @@ describe('ApiClient', () => {
   describe('Token Management', () => {
     it('should initialize token from localStorage', () => {
       localStorageMock.getItem.mockReturnValue('existing-token')
-      const client = new ApiClient()
+      new ApiClient()
       expect(localStorageMock.getItem).toHaveBeenCalledWith('auth_token')
     })
 
@@ -63,6 +86,24 @@ describe('ApiClient', () => {
         'Content-Type': 'application/json',
       })
     })
+
+    it('should merge additional headers correctly', () => {
+      const additionalHeaders = { 'X-Custom-Header': 'custom-value' }
+      const headers = apiClient.getHeaders(additionalHeaders)
+      expect(headers).toEqual({
+        'Content-Type': 'application/json',
+        'X-Custom-Header': 'custom-value',
+      })
+    })
+
+    it('should handle array format headers', () => {
+      const additionalHeaders: [string, string][] = [['X-Array-Header', 'array-value']]
+      const headers = apiClient.getHeaders(additionalHeaders)
+      expect(headers).toEqual({
+        'Content-Type': 'application/json',
+        'X-Array-Header': 'array-value',
+      })
+    })
   })
 
   describe('HTTP Methods', () => {
@@ -78,6 +119,7 @@ describe('ApiClient', () => {
       expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/test', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
+        signal: expect.any(AbortSignal),
       })
       expect(result).toEqual(mockData)
     })
@@ -96,6 +138,7 @@ describe('ApiClient', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(postData),
+        signal: expect.any(AbortSignal),
       })
       expect(result).toEqual(mockResponse)
     })
@@ -112,7 +155,6 @@ describe('ApiClient', () => {
     })
 
     it('should handle network errors gracefully', async () => {
-      const errorResponse = {}
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -120,6 +162,77 @@ describe('ApiClient', () => {
       })
 
       await expect(apiClient.get('/error')).rejects.toThrow(ApiError)
+    })
+
+    it('should retry failed requests with retryable status codes', async () => {
+      const mockData = { id: 1, name: 'Success after retry' }
+      
+      // First call fails with 500
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: 'Internal server error' }),
+      })
+      
+      // Second call succeeds
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockData,
+      })
+
+      const result = await apiClient.get('/test')
+      
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      expect(result).toEqual(mockData)
+    })
+
+    it('should not retry non-retryable status codes', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: 'Bad request' }),
+      })
+
+      await expect(apiClient.get('/test')).rejects.toThrow(ApiError)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('should handle timeout errors', async () => {
+      // Mock fetch to simulate AbortController timeout
+      mockFetch.mockImplementation(() => {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            const error = new Error('The operation was aborted.')
+            error.name = 'AbortError'
+            reject(error)
+          }, 10)
+        })
+      })
+
+      const shortTimeoutClient = new ApiClient('http://localhost:8000', 5)
+      
+      await expect(shortTimeoutClient.get('/test')).rejects.toThrow()
+    })
+
+    it('should support PUT and DELETE methods', async () => {
+      const putData = { id: 1, name: 'Updated' }
+      const deleteResponse = { success: true }
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => putData,
+      })
+      
+      const putResult = await apiClient.put('/items/1', putData)
+      expect(putResult).toEqual(putData)
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => deleteResponse,
+      })
+      
+      const deleteResult = await apiClient.delete('/items/1')
+      expect(deleteResult).toEqual(deleteResponse)
     })
   })
 
@@ -142,6 +255,7 @@ describe('ApiClient', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginData),
+        signal: expect.any(AbortSignal),
       })
       expect(result).toEqual(mockResponse)
     })
@@ -176,6 +290,7 @@ describe('ApiClient', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expectedData),
+        signal: expect.any(AbortSignal),
       })
       expect(result).toEqual(mockResponse)
     })
@@ -218,6 +333,105 @@ describe('ApiClient', () => {
       await expect(apiClient.register(registerData)).rejects.toThrow(ApiError)
     })
   })
+
+  describe('Travel Planning Methods', () => {
+    it('should plan trip successfully', async () => {
+      const tripRequest = {
+        destination: 'Tokyo, Japan',
+        startDate: '2024-12-01',
+        endDate: '2024-12-07',
+        budget: 3000,
+        travelers: 2,
+        preferences: ['culture', 'food']
+      }
+      const mockResponse = {
+        success: true,
+        data: {
+          tripId: 'trip-123',
+          destination: 'Tokyo, Japan',
+          itinerary: { days: [] },
+          estimatedCost: 2800
+        }
+      }
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      })
+
+      const result = await apiClient.planTrip(tripRequest)
+      
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/v1/trips/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripRequest),
+        signal: expect.any(AbortSignal),
+      })
+      expect(result).toEqual(mockResponse)
+    })
+
+    it('should search destinations successfully', async () => {
+      const mockDestinations = [
+        { id: 'tokyo', name: 'Tokyo', country: 'Japan', type: 'city' },
+        { id: 'kyoto', name: 'Kyoto', country: 'Japan', type: 'city' }
+      ]
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDestinations,
+      })
+
+      const result = await apiClient.searchDestinations('Japan')
+      
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/destinations/search?q=Japan',
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: expect.any(AbortSignal),
+        }
+      )
+      expect(result).toEqual(mockDestinations)
+    })
+
+    it('should get popular destinations successfully', async () => {
+      const mockDestinations = [
+        { id: 'paris', name: 'Paris', country: 'France', type: 'city' },
+        { id: 'london', name: 'London', country: 'UK', type: 'city' }
+      ]
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDestinations,
+      })
+
+      const result = await apiClient.getPopularDestinations()
+      
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/destinations/popular',
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: expect.any(AbortSignal),
+        }
+      )
+      expect(result).toEqual(mockDestinations)
+    })
+
+    it('should handle trip planning errors', async () => {
+      const tripRequest = {
+        destination: 'Invalid',
+        startDate: '2024-12-01',
+        endDate: '2024-12-07',
+        travelers: 2
+      }
+      const errorResponse = { message: 'Invalid destination' }
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => errorResponse,
+      })
+
+      await expect(apiClient.planTrip(tripRequest)).rejects.toThrow(ApiError)
+    })
+  })
 })
 
 describe('ApiError', () => {
@@ -227,10 +441,38 @@ describe('ApiError', () => {
     expect(error.status).toBe(404)
     expect(error.message).toBe('Not found')
     expect(error.data).toEqual({ detail: 'Resource not found' })
+    expect(error.timestamp).toBeInstanceOf(Date)
+    expect(error.isRetryable).toBe(false)
   })
 
   it('should be instanceof Error', () => {
     const error = new ApiError(500, 'Server error')
     expect(error instanceof Error).toBe(true)
+  })
+
+  it('should identify retryable errors correctly', () => {
+    const retryableError = new ApiError(500, 'Server error')
+    expect(retryableError.isRetryable).toBe(true)
+
+    const nonRetryableError = new ApiError(404, 'Not found')
+    expect(nonRetryableError.isRetryable).toBe(false)
+  })
+
+  it('should override toString method correctly', () => {
+    const error = new ApiError(400, 'Bad request')
+    const stringified = error.toString()
+    expect(stringified).toContain('ApiError [400]: Bad request')
+    expect(stringified).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+  })
+
+  it('should serialize to JSON correctly', () => {
+    const error = new ApiError(500, 'Server error', { code: 'INTERNAL_ERROR' })
+    const json = error.toJSON()
+    expect(json).toHaveProperty('name', 'ApiError')
+    expect(json).toHaveProperty('status', 500)
+    expect(json).toHaveProperty('message', 'Server error')
+    expect(json).toHaveProperty('data', { code: 'INTERNAL_ERROR' })
+    expect(json).toHaveProperty('timestamp')
+    expect(json).toHaveProperty('isRetryable', true)
   })
 })

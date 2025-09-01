@@ -44,8 +44,48 @@ export const registerSchema = z.object({
   path: ["confirmPassword"],
 })
 
+// Travel request validation schema
+export const travelRequestSchema = z.object({
+  destination: z
+    .string()
+    .min(1, 'Destination is required')
+    .min(2, 'Please enter a valid destination'),
+  startDate: z
+    .string()
+    .min(1, 'Start date is required')
+    .refine((date) => {
+      const selected = new Date(date)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      return selected >= today
+    }, 'Start date cannot be in the past'),
+  endDate: z
+    .string()
+    .min(1, 'End date is required'),
+  budget: z
+    .number()
+    .min(100, 'Budget must be at least $100')
+    .max(100000, 'Budget cannot exceed $100,000')
+    .optional(),
+  travelers: z
+    .number()
+    .min(1, 'At least 1 traveler is required')
+    .max(20, 'Cannot exceed 20 travelers'),
+  preferences: z
+    .array(z.string())
+    .optional(),
+}).refine((data) => {
+  const start = new Date(data.startDate)
+  const end = new Date(data.endDate)
+  return end > start
+}, {
+  message: "End date must be after start date",
+  path: ["endDate"],
+})
+
 export type LoginFormData = z.infer<typeof loginSchema>
 export type RegisterFormData = z.infer<typeof registerSchema>
+export type TravelRequestFormData = z.infer<typeof travelRequestSchema>
 
 /**
  * Calculate password strength score based on various criteria
@@ -98,12 +138,17 @@ export function calculatePasswordStrength(password: string): IPasswordStrength {
   if (score < 2) warning = 'This password is too weak'
   else if (score < 3) warning = 'This password could be stronger'
 
+  const feedbackObj: { warning?: string; suggestions: string[] } = {
+    suggestions: feedback,
+  }
+  
+  if (warning) {
+    feedbackObj.warning = warning
+  }
+
   return {
     score,
-    feedback: {
-      warning,
-      suggestions: feedback,
-    },
+    feedback: feedbackObj,
     isValid,
   }
 }
