@@ -78,15 +78,15 @@ describe('Header Component', () => {
     expect(screen.queryByText('Open main menu')).toBeInTheDocument()
     
     // Click hamburger button
-    const menuButton = screen.getByLabelText('Toggle navigation menu')
+    const menuButton = screen.getByLabelText('Open navigation menu')
     fireEvent.click(menuButton)
     
     // Mobile menu should be visible
-    const mobileMenu = screen.getByRole('navigation')
+    const mobileMenu = screen.getByRole('navigation', { name: 'Mobile navigation' })
     expect(within(mobileMenu).getByText('Home')).toBeInTheDocument()
   })
 
-  it('should render navigation links with proper structure', () => {
+  it('should render all navigation links with proper structure', () => {
     render(<Header />)
     
     const planTripLink = screen.getByRole('link', { name: /✈️ Plan Trip/i })
@@ -96,12 +96,20 @@ describe('Header Component', () => {
     const homeLink = screen.getByRole('link', { name: /🏠 Home/i })
     expect(homeLink).toBeInTheDocument()
     expect(homeLink).toHaveAttribute('href', '/')
+    
+    const destinationsLink = screen.getByRole('link', { name: /🌍 Destinations/i })
+    expect(destinationsLink).toBeInTheDocument()
+    expect(destinationsLink).toHaveAttribute('href', '/destinations')
+    
+    const guidesLink = screen.getByRole('link', { name: /📚 Travel Guides/i })
+    expect(guidesLink).toBeInTheDocument()
+    expect(guidesLink).toHaveAttribute('href', '/guides')
   })
 
   it('should have proper accessibility attributes', () => {
     render(<Header />)
     
-    const menuButton = screen.getByLabelText('Toggle navigation menu')
+    const menuButton = screen.getByLabelText('Open navigation menu')
     expect(menuButton).toHaveAttribute('aria-expanded', 'false')
     
     fireEvent.click(menuButton)
@@ -112,7 +120,7 @@ describe('Header Component', () => {
     render(<Header />)
     
     // Open mobile menu
-    const menuButton = screen.getByLabelText('Toggle navigation menu')
+    const menuButton = screen.getByLabelText('Open navigation menu')
     fireEvent.click(menuButton)
     expect(menuButton).toHaveAttribute('aria-expanded', 'true')
     
@@ -133,5 +141,60 @@ describe('Header Component', () => {
     const nav = screen.getByRole('navigation')
     expect(within(nav).getByText('🏠')).toBeInTheDocument()
     expect(within(nav).getByText('✈️')).toBeInTheDocument()
+    expect(within(nav).getByText('🌍')).toBeInTheDocument()
+    expect(within(nav).getByText('📚')).toBeInTheDocument()
+  })
+
+  it('should handle keyboard navigation for mobile menu', () => {
+    render(<Header />)
+    
+    const menuButton = screen.getByLabelText('Open navigation menu')
+    
+    // Open menu with Enter key
+    fireEvent.keyDown(menuButton, { key: 'Enter' })
+    fireEvent.click(menuButton)
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true')
+    
+    // Close menu with Escape key
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('should have proper ARIA attributes for mobile menu', () => {
+    render(<Header />)
+    
+    const menuButton = screen.getByLabelText('Open navigation menu')
+    expect(menuButton).toHaveAttribute('aria-controls', 'mobile-navigation-menu')
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+    
+    fireEvent.click(menuButton)
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true')
+    expect(menuButton).toHaveAttribute('aria-label', 'Close navigation menu')
+    
+    const mobileMenu = screen.getByRole('navigation', { name: 'Mobile navigation' })
+    expect(mobileMenu).toHaveAttribute('id', 'mobile-navigation-menu')
+  })
+
+  it('should filter navigation links based on authentication status', () => {
+    // Test without user - should not show "My Trips"
+    const { rerender } = render(<Header />)
+    expect(screen.queryByText('My Trips')).not.toBeInTheDocument()
+    
+    // Test with user - should show "My Trips"
+    const mockUser = { id: '1', email: 'test@example.com', name: 'Test User' }
+    rerender(<Header user={mockUser} />)
+    expect(screen.getByText('My Trips')).toBeInTheDocument()
+  })
+
+  it('should support responsive design across viewports', () => {
+    render(<Header />)
+    
+    // Desktop navigation should be visible
+    const desktopNav = screen.getByRole('navigation')
+    expect(desktopNav).toHaveClass('hidden', 'md:flex')
+    
+    // Mobile menu button should be hidden on desktop
+    const mobileButton = screen.getByLabelText('Open navigation menu')
+    expect(mobileButton.parentElement).toHaveClass('md:hidden')
   })
 })

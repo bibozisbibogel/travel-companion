@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -18,11 +18,71 @@ interface IHeaderProps {
 export default function Header({ user, onLogout }: IHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Handle escape key to close mobile menu
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false)
+        menuButtonRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscapeKey)
+    return () => document.removeEventListener('keydown', handleEscapeKey)
+  }, [isMobileMenuOpen])
+
+  // Handle click outside to close mobile menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setIsMobileMenuOpen(false)
+      }
+    }
+
+    if (isMobileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isMobileMenuOpen])
+
+  // Focus trap for mobile menu
+  useEffect(() => {
+    if (isMobileMenuOpen && mobileMenuRef.current) {
+      const focusableElements = mobileMenuRef.current.querySelectorAll(
+        'a, button, [tabindex]:not([tabindex="-1"])'
+      )
+      const firstElement = focusableElements[0] as HTMLElement
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+
+      const handleTabKey = (event: KeyboardEvent) => {
+        if (event.key === 'Tab') {
+          if (event.shiftKey && document.activeElement === firstElement) {
+            event.preventDefault()
+            lastElement.focus()
+          } else if (!event.shiftKey && document.activeElement === lastElement) {
+            event.preventDefault()
+            firstElement.focus()
+          }
+        }
+      }
+
+      document.addEventListener('keydown', handleTabKey)
+      firstElement?.focus()
+
+      return () => document.removeEventListener('keydown', handleTabKey)
+    }
+  }, [isMobileMenuOpen])
 
   const navigationLinks = [
     { href: '/', label: 'Home', icon: '🏠' },
     { href: '/trips/new', label: 'Plan Trip', icon: '✈️' },
     { href: '/trips', label: 'My Trips', icon: '🗺️', requiresAuth: true },
+    { href: '/destinations', label: 'Destinations', icon: '🌍' },
+    { href: '/guides', label: 'Travel Guides', icon: '📚' },
   ]
 
   const isActiveLink = (href: string) => {
@@ -113,10 +173,12 @@ export default function Header({ user, onLogout }: IHeaderProps) {
           {/* Mobile Menu Button */}
           <div className="md:hidden">
             <button
+              ref={menuButtonRef}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 transition-colors duration-200"
               aria-expanded={isMobileMenuOpen}
-              aria-label="Toggle navigation menu"
+              aria-controls="mobile-navigation-menu"
+              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             >
               <span className="sr-only">Open main menu</span>
               {!isMobileMenuOpen ? (
@@ -134,8 +196,14 @@ export default function Header({ user, onLogout }: IHeaderProps) {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden animate-slide-down">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200 bg-white">
+          <div 
+            ref={mobileMenuRef}
+            id="mobile-navigation-menu"
+            className="md:hidden animate-slide-down"
+            role="navigation"
+            aria-label="Mobile navigation"
+          >
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200 bg-white shadow-lg">
               {filteredLinks.map((link) => (
                 <Link
                   key={link.href}
