@@ -28,3 +28,39 @@ export interface IFlightOption {
   price: number;
   duration: string;
 }
+
+// Authentication Types
+export interface ILoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface IRegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface IAuthResponse {
+  success: boolean;
+  user?: IUser;
+  token?: string;
+  message?: string;
+  errors?: Record<string, string[]>;
+}
+
+// Form validation types
+export interface IPasswordStrength {
+  score: number; // 0-4
+  feedback: {
+    warning?: string;
+    suggestions: string[];
+  };
+  isValid: boolean;
+}
+
+export interface IFormError {
+  field: string;
+  message: string;
+}
