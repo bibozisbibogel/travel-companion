@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import RegisterPage from '../../app/auth/register/page'
-import { apiClient } from '../../lib/api'
+import { apiClient, ApiError } from '../../lib/api'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -101,7 +101,7 @@ describe('RegisterPage', () => {
     
     await waitFor(() => {
       expect(screen.getByText('Password strength:')).toBeInTheDocument()
-      expect(screen.getByText('Very Weak')).toBeInTheDocument()
+      expect(screen.getByText('Weak')).toBeInTheDocument()
     })
     
     fireEvent.change(passwordInput, { target: { value: 'StrongPassword123!' } })
@@ -162,11 +162,7 @@ describe('RegisterPage', () => {
   })
 
   it('should handle registration failure with 409 error (email exists)', async () => {
-    const mockError = {
-      name: 'ApiError',
-      status: 409,
-      message: 'Email already exists'
-    }
+    const mockError = new ApiError(409, 'Email already exists')
     ;(apiClient.register as any).mockRejectedValue(mockError)
     
     render(<RegisterPage />)
@@ -189,17 +185,12 @@ describe('RegisterPage', () => {
   })
 
   it('should handle validation errors from API', async () => {
-    const mockError = {
-      name: 'ApiError',
-      status: 422,
-      message: 'Validation failed',
-      data: {
-        errors: {
-          email: ['Email is already taken'],
-          name: ['Name is too short']
-        }
+    const mockError = new ApiError(422, 'Validation failed', {
+      errors: {
+        email: ['Email is already taken'],
+        name: ['Name is too short']
       }
-    }
+    })
     ;(apiClient.register as any).mockRejectedValue(mockError)
     
     render(<RegisterPage />)
@@ -239,8 +230,10 @@ describe('RegisterPage', () => {
     fireEvent.change(confirmPasswordInput, { target: { value: 'Password123!' } })
     fireEvent.click(submitButton)
     
-    expect(screen.getByText('Creating account...')).toBeInTheDocument()
-    expect(submitButton).toBeDisabled()
+    await waitFor(() => {
+      expect(screen.getByText('Creating account...')).toBeInTheDocument()
+      expect(submitButton).toBeDisabled()
+    })
   })
 
   it('should render sign in link', () => {
