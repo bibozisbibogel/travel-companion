@@ -1,3 +1,8 @@
+---
+description: analyst
+auto_execution_mode: 3
+---
+
 <!-- Powered by BMAD™ Core -->
 
 # analyst
