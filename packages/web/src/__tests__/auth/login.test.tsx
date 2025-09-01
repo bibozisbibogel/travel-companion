@@ -1,27 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act } from 'react'
 import { useRouter } from 'next/navigation'
 import LoginPage from '../../app/auth/login/page'
-import { apiClient } from '../../lib/api'
+import { apiClient, ApiError } from '../../lib/api'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
 }))
 
-// Mock API client
-vi.mock('../../lib/api', () => ({
-  apiClient: {
-    login: vi.fn(),
-    setToken: vi.fn(),
-  },
-  ApiError: class ApiError extends Error {
+// Mock API client with proper ApiError implementation
+vi.mock('../../lib/api', () => {
+  class MockApiError extends Error {
+    public readonly timestamp: Date
+    public readonly isRetryable: boolean
+
     constructor(public status: number, message: string, public data?: any) {
       super(message)
       this.name = 'ApiError'
+      this.timestamp = new Date()
+      this.isRetryable = [408, 429, 500, 502, 503, 504].includes(status)
     }
-  },
-}))
+  }
+
+  return {
+    apiClient: {
+      login: vi.fn(),
+      setToken: vi.fn(),
+    },
+    ApiError: MockApiError,
+  }
+})
 
 // Mock CenteredLayout
 vi.mock('../../components/layouts', () => ({
@@ -105,17 +115,22 @@ describe('LoginPage', () => {
     const submitButton = screen.getByRole('button', { name: /sign in/i })
     
     // Submit with short password
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'short' } })
-    fireEvent.click(submitButton)
+    await act(async () => {
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
+      fireEvent.change(passwordInput, { target: { value: 'short' } })
+      fireEvent.click(submitButton)
+    })
     
-    // Wait and verify API was not called (validation should prevent submission)
-    await new Promise(resolve => setTimeout(resolve, 100))
-    expect(apiClient.login).not.toHaveBeenCalled()
+    // Verify API was not called (validation should prevent submission)
+    await waitFor(() => {
+      expect(apiClient.login).not.toHaveBeenCalled()
+    })
     
     // Test with valid password to confirm form works
-    fireEvent.change(passwordInput, { target: { value: 'ValidPassword123!' } })
-    fireEvent.click(submitButton)
+    await act(async () => {
+      fireEvent.change(passwordInput, { target: { value: 'ValidPassword123!' } })
+      fireEvent.click(submitButton)
+    })
     
     // API should be called with valid data
     await waitFor(() => {
@@ -155,11 +170,7 @@ describe('LoginPage', () => {
   })
 
   it('should handle login failure with 401 error', async () => {
-    const mockError = {
-      name: 'ApiError',
-      status: 401,
-      message: 'Unauthorized'
-    }
+    const mockError = new (ApiError as any)(401, 'Unauthorized')
     ;(apiClient.login as any).mockRejectedValue(mockError)
     
     render(<LoginPage />)
@@ -178,17 +189,12 @@ describe('LoginPage', () => {
   })
 
   it('should handle validation errors from API', async () => {
-    const mockError = {
-      name: 'ApiError',
-      status: 422,
-      message: 'Validation failed',
-      data: {
-        errors: {
-          email: ['Email format is invalid'],
-          password: ['Password is too weak']
-        }
+    const mockError = new (ApiError as any)(422, 'Validation failed', {
+      errors: {
+        email: ['Email format is invalid'],
+        password: ['Password is too weak']
       }
-    }
+    })
     ;(apiClient.login as any).mockRejectedValue(mockError)
     
     render(<LoginPage />)
@@ -220,17 +226,21 @@ describe('LoginPage', () => {
     const passwordInput = screen.getByLabelText('Password')
     const submitButton = screen.getByRole('button', { name: /sign in/i })
     
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'Password123!' } })
-    fireEvent.click(submitButton)
+    await act(async () => {
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
+      fireEvent.change(passwordInput, { target: { value: 'Password123!' } })
+      fireEvent.click(submitButton)
+    })
     
     await waitFor(() => {
       expect(screen.getByText('Signing in...')).toBeInTheDocument()
       expect(submitButton).toBeDisabled()
     })
 
-    // Resolve the promise to clean up
-    resolvePromise!({ success: true, token: 'test' })
+    // Resolve the promise to clean up and flush state updates
+    await act(async () => {
+      resolvePromise!({ success: true, token: 'test' })
+    })
   })
 
   it('should render forgot password and sign up links', () => {

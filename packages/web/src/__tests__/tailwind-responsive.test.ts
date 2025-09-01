@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import tailwindConfig from '../../tailwind.config.ts'
 
 describe('Tailwind CSS Responsive Design', () => {
   it('should have custom breakpoints defined', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     
     const expectedBreakpoints = {
       xs: '475px',
@@ -17,7 +17,6 @@ describe('Tailwind CSS Responsive Design', () => {
   })
 
   it('should have custom color palette with CSS variables', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     
     // Verify primary colors are defined
     expect(tailwindConfig.theme.extend.colors.primary).toBeDefined()
@@ -34,7 +33,6 @@ describe('Tailwind CSS Responsive Design', () => {
   })
 
   it('should have custom spacing scale', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     
     expect(tailwindConfig.theme.extend.spacing).toEqual({
       '18': '4.5rem',
@@ -44,7 +42,6 @@ describe('Tailwind CSS Responsive Design', () => {
   })
 
   it('should have enhanced animation keyframes', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     const keyframes = tailwindConfig.theme.extend.keyframes
     
     expect(keyframes.fadeIn).toBeDefined()
@@ -55,7 +52,6 @@ describe('Tailwind CSS Responsive Design', () => {
   })
 
   it('should have travel-specific animations', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     const animations = tailwindConfig.theme.extend.animation
     
     expect(animations['fade-in']).toBe('fadeIn 0.3s ease-in-out')
@@ -65,7 +61,6 @@ describe('Tailwind CSS Responsive Design', () => {
   })
 
   it('should have custom grid templates for responsive layouts', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     const gridTemplates = tailwindConfig.theme.extend.gridTemplateColumns
     
     expect(gridTemplates['auto-fit-xs']).toBe('repeat(auto-fit, minmax(16rem, 1fr))')
@@ -74,7 +69,6 @@ describe('Tailwind CSS Responsive Design', () => {
   })
 
   it('should have travel-specific background gradients', () => {
-    const tailwindConfig = require('../../tailwind.config.js')
     const backgroundImage = tailwindConfig.theme.extend.backgroundImage
     
     expect(backgroundImage['gradient-travel']).toBe(
