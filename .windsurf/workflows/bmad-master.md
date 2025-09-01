@@ -1,6 +1,7 @@
-# /bmad-master Command
-
-When this command is used, adopt the following agent persona:
+---
+description: bmad-master
+auto_execution_mode: 3
+---
 
 <!-- Powered by BMAD™ Core -->
 

@@ -1,40 +1,48 @@
-version: 4.40.0
-installed_at: '2025-08-22T07:45:14.385Z'
+version: 4.42.1
+installed_at: '2025-09-01T18:19:13.491Z'
 install_type: full
 agent: null
 ides_setup:
+  - cursor
   - claude-code
+  - windsurf
 expansion_packs: []
 files:
   - path: .bmad-core/working-in-the-brownfield.md
     hash: 2bf3551cbc498b47
     modified: false
+  - path: .bmad-core/user-guide.md.bak
+    hash: f992b58b7f4ba5d7
+    modified: false
   - path: .bmad-core/user-guide.md
-    hash: e633affe88d4ff20
+    hash: fa8776b4e0bfa3f7
+    modified: false
+  - path: .bmad-core/install-manifest.yaml
+    hash: f8670f0c66e85229
     modified: false
   - path: .bmad-core/enhanced-ide-development-workflow.md
     hash: 39beb3516c070e2b
     modified: false
   - path: .bmad-core/core-config.yaml
-    hash: 073cf6d2527c545d
+    hash: 94ce5b2faad48235
     modified: false
   - path: .bmad-core/workflows/greenfield-ui.yaml
-    hash: defde5d6bdcedd49
+    hash: 2b595f235c095790
     modified: false
   - path: .bmad-core/workflows/greenfield-service.yaml
-    hash: adf12981103693fb
+    hash: 1ea8b8d218f8caef
     modified: false
   - path: .bmad-core/workflows/greenfield-fullstack.yaml
-    hash: ba1bca46aae0486f
+    hash: df34e60ccfac2624
     modified: false
   - path: .bmad-core/workflows/brownfield-ui.yaml
-    hash: d8d63286af13181c
+    hash: 8a8068093272d00f
     modified: false
   - path: .bmad-core/workflows/brownfield-service.yaml
-    hash: e3e8029216c47391
+    hash: a3cd68897852876e
     modified: false
   - path: .bmad-core/workflows/brownfield-fullstack.yaml
-    hash: 60a703d65da43d27
+    hash: 9716ad5956a37037
     modified: false
   - path: .bmad-core/utils/workflow-management.md
     hash: c2196880f2281f84
@@ -189,6 +197,9 @@ files:
   - path: .bmad-core/agents/ux-expert.md
     hash: a99c4d3c839db162
     modified: false
+  - path: .bmad-core/agents/sm.md.bak
+    hash: bd6543412a550438
+    modified: false
   - path: .bmad-core/agents/sm.md
     hash: b72ae96e97959772
     modified: false
@@ -201,17 +212,26 @@ files:
   - path: .bmad-core/agents/pm.md
     hash: f72074f1f1354871
     modified: false
+  - path: .bmad-core/agents/dev.md.bak
+    hash: 5c956e7b279d7a84
+    modified: false
   - path: .bmad-core/agents/dev.md
-    hash: 15aba110e47a73f0
+    hash: 3e87f6291e5525ff
     modified: false
   - path: .bmad-core/agents/bmad-orchestrator.md
     hash: 374701173ce61d73
     modified: false
   - path: .bmad-core/agents/bmad-master.md
-    hash: 4fb18b343f59ce3e
+    hash: 8f42dc6208abccab
+    modified: false
+  - path: .bmad-core/agents/architect.md.bak
+    hash: f5d211e80b8e160d
     modified: false
   - path: .bmad-core/agents/architect.md
     hash: 4e7b28055a522dea
+    modified: false
+  - path: .bmad-core/agents/analyst.md.bak
+    hash: 220103a5b3af7eb1
     modified: false
   - path: .bmad-core/agents/analyst.md
     hash: 4b50870da75956b0
