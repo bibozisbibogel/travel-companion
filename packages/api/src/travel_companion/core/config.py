@@ -163,21 +163,29 @@ class Settings(BaseSettings):
 
     def get_cors_origins_for_environment(self) -> list[str]:
         """Get CORS origins based on environment."""
-        # Check if origins were explicitly set (not default)
-        default_dev_origins = [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3001",
-        ]
+        # Check if current origins are development-like (contain localhost)
+        has_localhost = any(
+            "localhost" in origin or "127.0.0.1" in origin
+            for origin in (
+                self.allowed_origins
+                if isinstance(self.allowed_origins, list)
+                else [self.allowed_origins]
+            )
+        )
 
-        # If custom origins are set (different from default), always use them
-        if self.allowed_origins != default_dev_origins:
-            return self.allowed_origins
+        # Ensure origins is always a list
+        origins_list = (
+            self.allowed_origins
+            if isinstance(self.allowed_origins, list)
+            else [self.allowed_origins]
+        )
 
+        # Environment-specific behavior
         if self.environment.lower() == "production":
-            # Production should have explicit origins set via environment variables
-            # Never use wildcard in production
+            # If origins don't contain localhost, assume they are production-specific
+            if not has_localhost:
+                return origins_list
+            # Otherwise, use production defaults (no localhost)
             return [
                 "https://travel-companion.com",
                 "https://www.travel-companion.com",
@@ -185,7 +193,10 @@ class Settings(BaseSettings):
             ]
 
         elif self.environment.lower() == "staging":
-            # Staging environment origins
+            # If origins don't contain localhost, assume they are staging-specific
+            if not has_localhost:
+                return origins_list
+            # Otherwise, use staging defaults (localhost + staging domains)
             return [
                 "https://staging.travel-companion.com",
                 "https://test.travel-companion.com",
@@ -194,8 +205,8 @@ class Settings(BaseSettings):
             ]
 
         else:
-            # Development environment - use configured origins or defaults
-            return self.allowed_origins
+            # Development environment - always use configured origins
+            return origins_list
 
     def get_cors_methods_for_environment(self) -> list[str]:
         """Get CORS methods based on environment."""
@@ -204,7 +215,11 @@ class Settings(BaseSettings):
             return ["GET", "POST", "PUT", "DELETE", "PATCH"]
         else:
             # Development/Staging - allow all methods for easier debugging
-            return self.allowed_methods
+            return (
+                self.allowed_methods
+                if isinstance(self.allowed_methods, list)
+                else [self.allowed_methods]
+            )
 
     def is_cors_debug_enabled(self) -> bool:
         """Check if CORS debug logging should be enabled."""
