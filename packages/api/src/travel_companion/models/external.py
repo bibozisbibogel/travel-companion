@@ -190,3 +190,119 @@ class FlightComparisonResult(BaseModel):
         use_enum_values=True,
         populate_by_name=True,
     )
+
+
+# Hotel-related models
+
+class HotelSearchRequest(BaseModel):
+    """Request model for hotel search operations."""
+
+    location: str = Field(..., min_length=1, description="Hotel search location")
+    check_in_date: datetime = Field(..., description="Check-in date")
+    check_out_date: datetime = Field(..., description="Check-out date")
+    guest_count: int = Field(..., ge=1, le=20, description="Number of guests")
+    room_count: int = Field(default=1, ge=1, le=10, description="Number of rooms")
+    budget_per_night: Decimal | None = Field(None, gt=0, description="Budget per night")
+    currency: str = Field(
+        default="USD", min_length=3, max_length=3, description="Preferred currency"
+    )
+    max_results: int = Field(default=50, ge=1, le=250, description="Maximum results to return")
+
+    @field_validator("check_out_date")
+    @classmethod
+    def validate_checkout_after_checkin(cls, v: datetime, info) -> datetime:
+        """Validate check-out date is after check-in date."""
+        if hasattr(info, 'data') and 'check_in_date' in info.data:
+            if v <= info.data['check_in_date']:
+                raise ValueError("Check-out date must be after check-in date")
+        return v
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency_code(cls, v: str) -> str:
+        """Validate currency code format."""
+        if not v.isupper():
+            raise ValueError("Currency code must be uppercase")
+        return v
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+    )
+
+
+class HotelLocation(BaseModel):
+    """Hotel location information."""
+
+    latitude: float = Field(..., ge=-90, le=90, description="Latitude coordinate")
+    longitude: float = Field(..., ge=-180, le=180, description="Longitude coordinate")
+    address: str | None = Field(None, description="Hotel address")
+    city: str | None = Field(None, description="City name")
+    country: str | None = Field(None, description="Country name")
+    postal_code: str | None = Field(None, description="Postal code")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class HotelOption(BaseModel):
+    """Standardized hotel option model for internal use."""
+
+    hotel_id: UUID = Field(default_factory=uuid4, description="Internal hotel ID")
+    trip_id: UUID | None = Field(None, description="Associated trip ID")
+    external_id: str = Field(..., description="External provider ID")
+    name: str = Field(..., min_length=1, description="Hotel name")
+    location: HotelLocation = Field(..., description="Hotel location")
+    price_per_night: Decimal = Field(..., gt=0, description="Price per night")
+    currency: str = Field(default="USD", description="Price currency")
+    rating: float | None = Field(None, ge=1, le=5, description="Hotel rating (1-5)")
+    amenities: list[str] = Field(default_factory=list, description="Available amenities")
+    photos: list[str] = Field(default_factory=list, description="Photo URLs")
+    booking_url: str | None = Field(None, description="Booking URL")
+    created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
+
+    @field_validator("price_per_night")
+    @classmethod
+    def validate_price(cls, v: Decimal) -> Decimal:
+        """Validate price is positive with max 2 decimal places."""
+        if v <= 0:
+            raise ValueError("Price must be positive")
+        return v.quantize(Decimal("0.01"))
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+
+class HotelSearchResponse(BaseModel):
+    """Hotel search response model."""
+
+    hotels: list[HotelOption] = Field(default_factory=list, description="Hotel options")
+    search_metadata: dict[str, Any] = Field(default_factory=dict, description="Search metadata")
+    total_results: int = Field(default=0, ge=0, description="Total number of results")
+    search_time_ms: int = Field(default=0, ge=0, description="Search time in milliseconds")
+    cached: bool = Field(default=False, description="Whether result was cached")
+    cache_expires_at: datetime | None = Field(None, description="Cache expiration timestamp")
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+    )
+
+
+class HotelComparisonResult(BaseModel):
+    """Hotel comparison and ranking result model."""
+
+    hotel: HotelOption = Field(..., description="Hotel option")
+    score: float = Field(..., ge=0, le=100, description="Ranking score (0-100)")
+    price_rank: int = Field(..., ge=1, description="Price ranking (1=cheapest)")
+    location_rank: int = Field(..., ge=1, description="Location ranking (1=closest)")
+    rating_rank: int = Field(..., ge=1, description="Rating ranking (1=highest)")
+    value_score: float = Field(..., ge=0, le=1, description="Price-to-rating value score")
+    reasons: list[str] = Field(default_factory=list, description="Ranking reasons")
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+    )
