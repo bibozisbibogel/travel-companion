@@ -1,7 +1,8 @@
 """Tests for base agent functionality."""
 
-from unittest.mock import AsyncMock, Mock, patch
 from typing import Any
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
 
 from travel_companion.agents.base import BaseAgent
@@ -156,9 +157,9 @@ class TestBaseAgent:
     async def test_cache_key_generation(self, test_agent):
         """Test cache key generation."""
         request_data = {"origin": "NYC", "destination": "LAX", "date": "2024-01-01"}
-        
+
         cache_key = await test_agent._cache_key(request_data)
-        
+
         assert cache_key.startswith("TestAgent:")
         assert len(cache_key) == len("TestAgent:") + 32  # MD5 hash length
 
@@ -205,7 +206,7 @@ class TestBaseAgent:
     async def test_set_cached_result_success(self, test_agent, mock_redis):
         """Test successful cache set."""
         test_data = {"test": "data"}
-        
+
         await test_agent._set_cached_result("test_key", test_data, expire_seconds=300)
 
         mock_redis.set.assert_called_once_with("test_key", test_data, expire=300)
@@ -225,9 +226,9 @@ class TestBaseAgent:
     async def test_process_method(self, test_agent):
         """Test the abstract process method implementation."""
         test_data = {"input": "test"}
-        
+
         result = await test_agent.process(test_data)
-        
+
         assert result["result"] == "processed"
         assert result["data"] == test_data
 

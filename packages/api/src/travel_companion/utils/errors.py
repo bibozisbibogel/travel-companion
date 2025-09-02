@@ -184,7 +184,7 @@ class ExternalAPIError(TravelCompanionError):
     def __init__(
         self,
         message: str,
-        service: str,
+        service: str | None = None,
         status_code: int | None = None,
         error_code: str | None = None,
         details: dict[str, Any] | None = None,
@@ -197,6 +197,22 @@ class ExternalAPIError(TravelCompanionError):
             }
         )
         super().__init__(message, error_code, enhanced_details)
+
+
+class RateLimitError(ExternalAPIError):
+    """Raised when API rate limits are exceeded."""
+
+    def __init__(
+        self,
+        message: str,
+        service: str | None = None,
+        retry_after: int | None = None,
+        details: dict[str, Any] | None = None,
+    ):
+        enhanced_details = details or {}
+        if retry_after:
+            enhanced_details["retry_after"] = retry_after
+        super().__init__(message, service, 429, "RATE_LIMIT_EXCEEDED", enhanced_details)
 
 
 class DatabaseError(TravelCompanionError):

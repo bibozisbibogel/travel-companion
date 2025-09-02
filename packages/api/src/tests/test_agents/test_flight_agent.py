@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
+
 import pytest
 
 from travel_companion.agents.flight_agent import FlightAgent
@@ -76,7 +77,7 @@ class TestFlightAgent:
         """Create sample flight options for testing."""
         base_time = datetime(2024, 6, 15, 10, 0, 0)
         flights = []
-        
+
         for i in range(3):
             flight = FlightOption(
                 flight_id=uuid4(),
@@ -94,7 +95,7 @@ class TestFlightAgent:
                 travel_class=TravelClass.ECONOMY,
             )
             flights.append(flight)
-        
+
         return flights
 
     def test_agent_properties(self, flight_agent):
@@ -112,7 +113,7 @@ class TestFlightAgent:
 
             mock_cache_get.return_value = None
             mock_search.return_value = sample_flights
-            
+
             # Create comparison results
             comparison_results = [
                 FlightComparisonResult(
@@ -133,10 +134,10 @@ class TestFlightAgent:
             assert result.total_results == 3
             assert result.cached is False
             assert result.search_time_ms >= 0
-            
+
             # Verify flights are returned in the order from comparison
             assert result.flights[0] == sample_flights[0]
-            
+
             mock_search.assert_called_once()
             mock_compare.assert_called_once_with(sample_flights)
             mock_cache_set.assert_called_once()
@@ -187,7 +188,7 @@ class TestFlightAgent:
     async def test_search_flights(self, flight_agent, sample_flight_request):
         """Test flight search functionality."""
         request = FlightSearchRequest(**sample_flight_request)
-        
+
         with patch.object(flight_agent, '_get_mock_flight_data', new_callable=AsyncMock) as mock_data:
             mock_flights = [Mock() for _ in range(5)]
             mock_data.return_value = mock_flights
@@ -210,15 +211,15 @@ class TestFlightAgent:
 
         assert len(result) == 3
         assert all(isinstance(r, FlightComparisonResult) for r in result)
-        
+
         # Results should be sorted by score (highest first)
         scores = [r.score for r in result]
         assert scores == sorted(scores, reverse=True)
-        
+
         # Check price rankings
         price_ranks = [r.price_rank for r in result]
         assert set(price_ranks) == {1, 2, 3}
-        
+
         # Check duration rankings
         duration_ranks = [r.duration_rank for r in result]
         assert set(duration_ranks) == {1, 2, 3}
@@ -227,7 +228,7 @@ class TestFlightAgent:
     async def test_compare_flights_direct_flight_bonus(self, flight_agent):
         """Test that direct flights get preference in comparison."""
         base_time = datetime(2024, 6, 15, 10, 0, 0)
-        
+
         # Create flights with same price and duration, but different stops
         direct_flight = FlightOption(
             flight_id=uuid4(),
@@ -267,7 +268,7 @@ class TestFlightAgent:
         # Direct flight should get direct flight bonus
         direct_result = next(r for r in result if r.flight.stops == 0)
         connecting_result = next(r for r in result if r.flight.stops == 1)
-        
+
         # Direct flight should score higher in the stops component
         # Direct: (100 - 0*20) * 0.1 = 10.0, Connecting: (100 - 1*20) * 0.1 = 8.0
         # Since they have same price/duration/departure time, the 2-point difference should make direct flight win
@@ -278,7 +279,7 @@ class TestFlightAgent:
     async def test_departure_time_preference(self, flight_agent):
         """Test departure time preference scoring."""
         base_time = datetime(2024, 6, 15, 8, 0, 0)  # 8 AM - preferred morning time
-        
+
         morning_flight = FlightOption(
             flight_id=uuid4(),
             external_id="morning",
@@ -315,7 +316,7 @@ class TestFlightAgent:
 
         morning_result = next(r for r in result if r.flight.departure_time.hour == 8)
         late_result = next(r for r in result if r.flight.departure_time.hour == 2)
-        
+
         assert morning_result.departure_preference_score > late_result.departure_preference_score
         assert morning_result.score > late_result.score
 
@@ -323,12 +324,12 @@ class TestFlightAgent:
     async def test_get_mock_flight_data(self, flight_agent, sample_flight_request):
         """Test mock flight data generation."""
         request = FlightSearchRequest(**sample_flight_request)
-        
+
         result = await flight_agent._get_mock_flight_data(request)
 
         assert len(result) <= request.max_results
         assert len(result) > 0
-        
+
         for flight in result:
             assert isinstance(flight, FlightOption)
             assert flight.origin == request.origin
@@ -344,7 +345,7 @@ class TestFlightAgent:
         """Test mock flight data with limited max results."""
         request_data = {
             "origin": "NYC",
-            "destination": "LAX", 
+            "destination": "LAX",
             "departure_date": "2024-06-15T10:00:00",
             "passengers": 1,
             "travel_class": "economy",
@@ -352,7 +353,7 @@ class TestFlightAgent:
             "max_results": 5,  # Limited to 5 results
         }
         request = FlightSearchRequest(**request_data)
-        
+
         result = await flight_agent._get_mock_flight_data(request)
 
         assert len(result) == 5
