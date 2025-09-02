@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     """Application settings with validation."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=["../../.env", ".env"],  # Look in project root first, then current dir
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",  # Ignore extra environment variables not defined in the model
     )
 
     # Application
@@ -23,14 +24,14 @@ class Settings(BaseSettings):
     environment: str = "development"  # development, staging, production
 
     # CORS Configuration
-    allowed_origins: list[str] = [
+    allowed_origins: str | list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",  # Additional dev port
         "http://127.0.0.1:3001",
     ]
-    allowed_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"]
-    allowed_headers: list[str] = [
+    allowed_methods: str | list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"]
+    allowed_headers: str | list[str] = [
         "Accept",
         "Accept-Language",
         "Content-Language",
