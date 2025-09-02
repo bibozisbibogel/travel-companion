@@ -24,6 +24,7 @@ class TestFlightAgent:
     def mock_settings(self):
         """Create mock settings for testing."""
         from travel_companion.core.config import Settings
+
         return Settings(
             app_name="Test Travel Companion API",
             debug=True,
@@ -36,6 +37,7 @@ class TestFlightAgent:
     def mock_database(self):
         """Create mock database manager for testing."""
         from travel_companion.core.database import DatabaseManager
+
         mock_db = Mock(spec=DatabaseManager)
         mock_db.health_check = AsyncMock(return_value=True)
         return mock_db
@@ -44,6 +46,7 @@ class TestFlightAgent:
     def mock_redis(self):
         """Create mock Redis manager for testing."""
         from travel_companion.core.redis import RedisManager
+
         mock_redis = Mock(spec=RedisManager)
         mock_redis.ping = AsyncMock(return_value=True)
         mock_redis.get = AsyncMock(return_value=None)
@@ -83,14 +86,14 @@ class TestFlightAgent:
                 flight_id=uuid4(),
                 external_id=f"test_{i}",
                 airline=f"Airline {i}",
-                flight_number=f"FL{100+i}",
+                flight_number=f"FL{100 + i}",
                 origin="NYC",
                 destination="LAX",
-                departure_time=base_time + timedelta(hours=i*2),
-                arrival_time=base_time + timedelta(hours=i*2+5),
-                duration_minutes=300 + i*30,
+                departure_time=base_time + timedelta(hours=i * 2),
+                arrival_time=base_time + timedelta(hours=i * 2 + 5),
+                duration_minutes=300 + i * 30,
                 stops=i % 2,
-                price=Decimal(str(300 + i*50)),
+                price=Decimal(str(300 + i * 50)),
                 currency="USD",
                 travel_class=TravelClass.ECONOMY,
             )
@@ -106,11 +109,16 @@ class TestFlightAgent:
     @pytest.mark.asyncio
     async def test_process_valid_request(self, flight_agent, sample_flight_request, sample_flights):
         """Test processing a valid flight search request."""
-        with patch.object(flight_agent, 'search_flights', new_callable=AsyncMock) as mock_search, \
-             patch.object(flight_agent, 'compare_flights', new_callable=AsyncMock) as mock_compare, \
-             patch.object(flight_agent, '_get_cached_result', new_callable=AsyncMock) as mock_cache_get, \
-             patch.object(flight_agent, '_set_cached_result', new_callable=AsyncMock) as mock_cache_set:
-
+        with (
+            patch.object(flight_agent, "search_flights", new_callable=AsyncMock) as mock_search,
+            patch.object(flight_agent, "compare_flights", new_callable=AsyncMock) as mock_compare,
+            patch.object(
+                flight_agent, "_get_cached_result", new_callable=AsyncMock
+            ) as mock_cache_get,
+            patch.object(
+                flight_agent, "_set_cached_result", new_callable=AsyncMock
+            ) as mock_cache_set,
+        ):
             mock_cache_get.return_value = None
             mock_search.return_value = sample_flights
 
@@ -118,12 +126,13 @@ class TestFlightAgent:
             comparison_results = [
                 FlightComparisonResult(
                     flight=flight,
-                    score=80 - i*10,
-                    price_rank=i+1,
-                    duration_rank=i+1,
+                    score=80 - i * 10,
+                    price_rank=i + 1,
+                    duration_rank=i + 1,
                     departure_preference_score=0.8,
-                    reasons=[f"Reason {i}"]
-                ) for i, flight in enumerate(sample_flights)
+                    reasons=[f"Reason {i}"],
+                )
+                for i, flight in enumerate(sample_flights)
             ]
             mock_compare.return_value = comparison_results
 
@@ -151,7 +160,9 @@ class TestFlightAgent:
             cached=True,
         )
 
-        with patch.object(flight_agent, '_get_cached_result', new_callable=AsyncMock) as mock_cache_get:
+        with patch.object(
+            flight_agent, "_get_cached_result", new_callable=AsyncMock
+        ) as mock_cache_get:
             mock_cache_get.return_value = cached_response.model_dump()
 
             result = await flight_agent.process(sample_flight_request)
@@ -171,9 +182,12 @@ class TestFlightAgent:
     @pytest.mark.asyncio
     async def test_process_search_failure(self, flight_agent, sample_flight_request):
         """Test processing request when search fails."""
-        with patch.object(flight_agent, 'search_flights', new_callable=AsyncMock) as mock_search, \
-             patch.object(flight_agent, '_get_cached_result', new_callable=AsyncMock) as mock_cache_get:
-
+        with (
+            patch.object(flight_agent, "search_flights", new_callable=AsyncMock) as mock_search,
+            patch.object(
+                flight_agent, "_get_cached_result", new_callable=AsyncMock
+            ) as mock_cache_get,
+        ):
             mock_cache_get.return_value = None
             mock_search.side_effect = Exception("API Error")
 
@@ -189,7 +203,9 @@ class TestFlightAgent:
         """Test flight search functionality."""
         request = FlightSearchRequest(**sample_flight_request)
 
-        with patch.object(flight_agent, '_get_mock_flight_data', new_callable=AsyncMock) as mock_data:
+        with patch.object(
+            flight_agent, "_get_mock_flight_data", new_callable=AsyncMock
+        ) as mock_data:
             mock_flights = [Mock() for _ in range(5)]
             mock_data.return_value = mock_flights
 
@@ -272,7 +288,9 @@ class TestFlightAgent:
         # Direct flight should score higher in the stops component
         # Direct: (100 - 0*20) * 0.1 = 10.0, Connecting: (100 - 1*20) * 0.1 = 8.0
         # Since they have same price/duration/departure time, the 2-point difference should make direct flight win
-        assert direct_result.score > connecting_result.score, f"Direct flight score ({direct_result.score}) should be higher than connecting ({connecting_result.score})"
+        assert direct_result.score > connecting_result.score, (
+            f"Direct flight score ({direct_result.score}) should be higher than connecting ({connecting_result.score})"
+        )
         assert "Direct flight" in direct_result.reasons
 
     @pytest.mark.asyncio

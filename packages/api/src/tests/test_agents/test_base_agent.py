@@ -11,7 +11,7 @@ from travel_companion.core.database import DatabaseManager
 from travel_companion.core.redis import RedisManager
 
 
-class TestableAgent(BaseAgent[dict]):
+class _TestableAgent(BaseAgent[dict]):
     """Testable implementation of BaseAgent for testing."""
 
     @property
@@ -62,7 +62,7 @@ class TestBaseAgent:
     @pytest.fixture
     def test_agent(self, mock_settings, mock_database, mock_redis):
         """Create a test agent instance."""
-        return TestableAgent(
+        return _TestableAgent(
             settings=mock_settings,
             database=mock_database,
             redis=mock_redis,
@@ -78,11 +78,12 @@ class TestBaseAgent:
 
     def test_agent_initialization_with_defaults(self):
         """Test agent initialization with default dependencies."""
-        with patch("travel_companion.agents.base.get_settings") as mock_get_settings, \
-             patch("travel_companion.agents.base.get_database_manager") as mock_get_db, \
-             patch("travel_companion.agents.base.get_redis_manager") as mock_get_redis, \
-             patch("logging.getLogger") as mock_get_logger:
-
+        with (
+            patch("travel_companion.agents.base.get_settings") as mock_get_settings,
+            patch("travel_companion.agents.base.get_database_manager") as mock_get_db,
+            patch("travel_companion.agents.base.get_redis_manager") as mock_get_redis,
+            patch("logging.getLogger") as mock_get_logger,
+        ):
             mock_settings = Mock()
             mock_database = Mock()
             mock_redis = Mock()
@@ -93,13 +94,13 @@ class TestBaseAgent:
             mock_get_redis.return_value = mock_redis
             mock_get_logger.return_value = mock_logger
 
-            agent = TestableAgent()
+            agent = _TestableAgent()
 
             assert agent.settings == mock_settings
             assert agent.database == mock_database
             assert agent.redis == mock_redis
             assert agent.logger == mock_logger
-            mock_get_logger.assert_called_once_with("travel_companion.agents.testableagent")
+            mock_get_logger.assert_called_once_with("travel_companion.agents._testableagent")
 
     @pytest.mark.asyncio
     async def test_health_check_success(self, test_agent, mock_database, mock_redis):

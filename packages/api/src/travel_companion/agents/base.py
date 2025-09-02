@@ -31,7 +31,9 @@ class BaseAgent(ABC, Generic[T]):
         self.settings = settings or get_settings()
         self.database = database or get_database_manager()
         self.redis = redis or get_redis_manager()
-        self.logger = logging.getLogger(f"travel_companion.agents.{self.__class__.__name__.lower()}")
+        self.logger = logging.getLogger(
+            f"travel_companion.agents.{self.__class__.__name__.lower()}"
+        )
 
         self.logger.info(f"Initialized {self.__class__.__name__} agent")
 
@@ -65,7 +67,7 @@ class BaseAgent(ABC, Generic[T]):
         Returns:
             Health status dictionary
         """
-        status = {
+        status: dict[str, Any] = {
             "agent": self.agent_name,
             "version": self.agent_version,
             "status": "healthy",
@@ -103,9 +105,16 @@ class BaseAgent(ABC, Generic[T]):
         """
         import hashlib
         import json
+        from datetime import datetime
+
+        def json_serializer(obj: Any) -> str:
+            """Custom JSON serializer for datetime objects."""
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
         # Create deterministic hash from request data
-        sorted_data = json.dumps(request_data, sort_keys=True)
+        sorted_data = json.dumps(request_data, sort_keys=True, default=json_serializer)
         hash_obj = hashlib.md5(sorted_data.encode())
         return f"{self.agent_name}:{hash_obj.hexdigest()}"
 
@@ -122,14 +131,15 @@ class BaseAgent(ABC, Generic[T]):
             cached_data = await self.redis.get(cache_key, json_decode=True)
             if cached_data:
                 self.logger.debug(f"Cache hit for {self.agent_name}: {cache_key}")
-                return cached_data
+                result_data: T = cached_data
+                return result_data
         except Exception as e:
             self.logger.warning(f"Failed to get cached result: {e}")
 
         return None
 
     async def _set_cached_result(
-        self, cache_key: str, result: T, expire_seconds: int = 300
+        self, cache_key: str, result: Any, expire_seconds: int = 300
     ) -> None:
         """Cache result in Redis.
 
@@ -143,4 +153,3 @@ class BaseAgent(ABC, Generic[T]):
             self.logger.debug(f"Cached result for {self.agent_name}: {cache_key}")
         except Exception as e:
             self.logger.warning(f"Failed to cache result: {e}")
-

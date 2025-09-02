@@ -1,7 +1,10 @@
 """Flight agent for searching and comparing flight options."""
 
+import asyncio
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from travel_companion.agents.base import BaseAgent
 from travel_companion.models.external import (
@@ -10,10 +13,26 @@ from travel_companion.models.external import (
     FlightSearchRequest,
     FlightSearchResponse,
 )
+from travel_companion.services.external_apis.amadeus import AmadeusClient, FlightSearchParams
+from travel_companion.utils.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
+from travel_companion.utils.errors import ExternalAPIError
 
 
 class FlightAgent(BaseAgent[FlightSearchResponse]):
     """Agent responsible for flight search and comparison operations."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize FlightAgent with Amadeus client and circuit breaker."""
+        super().__init__(**kwargs)
+        self._amadeus_client: AmadeusClient | None = None
+
+        # Circuit breaker for Amadeus API calls
+        self._amadeus_circuit_breaker = CircuitBreaker(
+            failure_threshold=3,  # Open after 3 failures
+            recovery_timeout=30,  # Wait 30s before retry
+            expected_exception=ExternalAPIError,
+            name="AmadeusAPI",
+        )
 
     @property
     def agent_name(self) -> str:
@@ -24,6 +43,12 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
     def agent_version(self) -> str:
         """Version of the flight agent."""
         return "1.0.0"
+
+    async def _get_amadeus_client(self) -> AmadeusClient:
+        """Get or create Amadeus client."""
+        if self._amadeus_client is None:
+            self._amadeus_client = AmadeusClient()
+        return self._amadeus_client
 
     async def process(self, request_data: dict[str, Any]) -> FlightSearchResponse:
         """Process flight search request.
@@ -51,7 +76,7 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         # Check cache first
         cached_result = await self._get_cached_result(cache_key)
         if cached_result:
-            return FlightSearchResponse(**cached_result)
+            return FlightSearchResponse.model_validate(cached_result)
 
         # Start timing
         start_time = datetime.now()
@@ -89,9 +114,7 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
             )
 
             # Cache the result
-            await self._set_cached_result(
-                cache_key, response.model_dump(), expire_seconds=300
-            )
+            await self._set_cached_result(cache_key, response.model_dump(), expire_seconds=300)
 
             self.logger.info(
                 f"Flight search completed: {len(compared_flights)} results in {search_time_ms}ms"
@@ -112,6 +135,7 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
                 total_results=0,
                 search_time_ms=search_time_ms,
                 cached=False,
+                cache_expires_at=datetime.now() + timedelta(minutes=15),
             )
 
     async def search_flights(self, request: FlightSearchRequest) -> list[FlightOption]:
@@ -125,15 +149,30 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         """
         self.logger.debug(f"Searching flights for request: {request}")
 
-        # For now, return mock data - will be replaced with actual API integration
-        mock_flights = await self._get_mock_flight_data(request)
+        try:
+            # Try to use Amadeus API first with circuit breaker and timeout
+            flights = await self._search_flights_with_resilience(request)
+            self.logger.debug(f"Found {len(flights)} flight options from Amadeus API")
+            return flights
 
-        self.logger.debug(f"Found {len(mock_flights)} flight options")
-        return mock_flights
+        except CircuitBreakerOpenError as e:
+            self.logger.warning(f"Amadeus circuit breaker is open: {e}. Using mock data.")
+            mock_flights = await self._get_mock_flight_data(request)
+            return mock_flights
+        except TimeoutError:
+            self.logger.warning("Amadeus API timeout. Falling back to mock data.")
+            mock_flights = await self._get_mock_flight_data(request)
+            return mock_flights
+        except ExternalAPIError as e:
+            self.logger.warning(f"Amadeus API failed: {e}. Falling back to mock data.")
+            mock_flights = await self._get_mock_flight_data(request)
+            return mock_flights
+        except Exception as e:
+            self.logger.error(f"Unexpected error in flight search: {e}. Using mock data.")
+            mock_flights = await self._get_mock_flight_data(request)
+            return mock_flights
 
-    async def compare_flights(
-        self, flights: list[FlightOption]
-    ) -> list[FlightComparisonResult]:
+    async def compare_flights(self, flights: list[FlightOption]) -> list[FlightComparisonResult]:
         """Compare and rank flight options.
 
         Args:
@@ -176,10 +215,10 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
 
             # Weighted average (price: 40%, duration: 30%, departure time: 20%, stops: 10%)
             overall_score = (
-                price_score * 0.4 +
-                duration_score * 0.3 +
-                departure_score * 0.2 +
-                (100 - flight.stops * 20) * 0.1  # Fewer stops is better
+                price_score * 0.4
+                + duration_score * 0.3
+                + departure_score * 0.2
+                + (100 - flight.stops * 20) * 0.1  # Fewer stops is better
             )
 
             # Generate reasons
@@ -207,9 +246,155 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         # Sort by score (highest first)
         comparison_results.sort(key=lambda r: r.score, reverse=True)
 
-        self.logger.debug(f"Flight comparison completed, best score: {comparison_results[0].score:.1f}")
+        self.logger.debug(
+            f"Flight comparison completed, best score: {comparison_results[0].score:.1f}"
+        )
 
         return comparison_results
+
+    async def _search_flights_with_resilience(
+        self, request: FlightSearchRequest
+    ) -> list[FlightOption]:
+        """Search flights using Amadeus API with circuit breaker and timeout.
+
+        Args:
+            request: Flight search request parameters
+
+        Returns:
+            List of flight options from Amadeus API
+
+        Raises:
+            CircuitBreakerOpenError: If circuit breaker is open
+            asyncio.TimeoutError: If request times out
+            ExternalAPIError: If API request fails
+        """
+
+        async def _api_call() -> list[FlightOption]:
+            amadeus_client = await self._get_amadeus_client()
+
+            # Convert request to Amadeus format
+            search_params = FlightSearchParams(
+                origin=request.origin,
+                destination=request.destination,
+                departure_date=request.departure_date.strftime("%Y-%m-%d"),
+                return_date=request.return_date.strftime("%Y-%m-%d")
+                if request.return_date
+                else None,
+                adults=request.passengers,
+                children=0,  # Default to 0 children
+                infants=0,  # Default to 0 infants
+                max_results=min(request.max_results, 100),  # Amadeus limit
+                currency=request.currency,
+            )
+
+            async with amadeus_client:
+                amadeus_offers = await amadeus_client.search_flights(search_params)
+                return self._convert_amadeus_offers_to_flights(amadeus_offers, request)
+
+        # Use circuit breaker with 30-second timeout
+        try:
+
+            async def _wrapped_call() -> list[FlightOption]:
+                return await asyncio.wait_for(_api_call(), timeout=30.0)
+
+            result: list[FlightOption] = await self._amadeus_circuit_breaker.call(_wrapped_call)
+            return result
+        except TimeoutError:
+            self.logger.warning("Flight search timed out after 30 seconds")
+            raise
+        except CircuitBreakerOpenError:
+            self.logger.warning("Circuit breaker is open for Amadeus API")
+            raise
+        except Exception as e:
+            self.logger.error(f"Flight search failed: {e}")
+            if isinstance(e, ExternalAPIError):
+                raise
+            raise ExternalAPIError(f"Flight search failed: {str(e)}") from e
+
+    def _convert_amadeus_offers_to_flights(
+        self, amadeus_offers: list[Any], request: FlightSearchRequest
+    ) -> list[FlightOption]:
+        """Convert Amadeus flight offers to FlightOption models.
+
+        Args:
+            amadeus_offers: List of Amadeus flight offers
+            request: Original search request for context
+
+        Returns:
+            List of FlightOption models
+        """
+        flights = []
+
+        for offer in amadeus_offers:
+            try:
+                # Extract price information
+                price = Decimal(offer.price.get("total", "0"))
+                currency = offer.price.get("currency", request.currency)
+
+                # Extract first itinerary (outbound)
+                if not offer.itineraries:
+                    continue
+
+                first_itinerary = offer.itineraries[0]
+                segments = first_itinerary.get("segments", [])
+
+                if not segments:
+                    continue
+
+                # Use first and last segments for departure/arrival
+                first_segment = segments[0]
+                last_segment = segments[-1]
+
+                # Extract departure info
+                departure_info = first_segment.get("departure", {})
+                departure_time = datetime.fromisoformat(
+                    departure_info.get("at", "").replace("Z", "+00:00")
+                )
+
+                # Extract arrival info
+                arrival_info = last_segment.get("arrival", {})
+                arrival_time = datetime.fromisoformat(
+                    arrival_info.get("at", "").replace("Z", "+00:00")
+                )
+
+                # Calculate duration
+                duration_minutes = int((arrival_time - departure_time).total_seconds() / 60)
+
+                # Extract airline info
+                carrier_code = first_segment.get("carrierCode", "XX")
+                flight_number = f"{carrier_code}{first_segment.get('number', '0000')}"
+
+                # Get airline name from dictionaries if available
+                airline = carrier_code  # Fallback to carrier code
+
+                # Calculate stops (segments - 1)
+                stops = max(0, len(segments) - 1)
+
+                flight = FlightOption(
+                    flight_id=uuid4(),
+                    trip_id=None,
+                    external_id=offer.id,
+                    airline=airline,
+                    flight_number=flight_number,
+                    origin=request.origin,
+                    destination=request.destination,
+                    departure_time=departure_time,
+                    arrival_time=arrival_time,
+                    duration_minutes=duration_minutes,
+                    stops=stops,
+                    price=price,
+                    currency=currency,
+                    travel_class=request.travel_class,
+                    booking_url=None,
+                )
+
+                flights.append(flight)
+
+            except Exception as e:
+                self.logger.warning(f"Failed to convert Amadeus offer {offer.id}: {e}")
+                continue
+
+        return flights
 
     async def _get_mock_flight_data(self, request: FlightSearchRequest) -> list[FlightOption]:
         """Generate mock flight data for development/testing.
@@ -247,13 +432,14 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
 
             # Random price variation
             price_multiplier = Decimal(str(random.uniform(0.8, 2.0)))
-            price = (base_price * price_multiplier).quantize(Decimal('0.01'))
+            price = (base_price * price_multiplier).quantize(Decimal("0.01"))
 
             # Random stops
             stops = random.choices([0, 1, 2], weights=[60, 30, 10])[0]
 
             flight = FlightOption(
                 flight_id=uuid4(),
+                trip_id=None,
                 external_id=f"mock_{i}_{flight_number}",
                 airline=airline,
                 flight_number=flight_number,
@@ -266,9 +452,9 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
                 price=price,
                 currency=request.currency,
                 travel_class=request.travel_class,
+                booking_url=None,
             )
 
             flights.append(flight)
 
         return flights
-

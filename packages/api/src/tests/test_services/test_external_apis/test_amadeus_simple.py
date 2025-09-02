@@ -4,7 +4,7 @@ Simplified unit tests for Amadeus API client.
 Tests core functionality without complex HTTP mocking.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -38,7 +38,7 @@ class TestAmadeusAuthToken:
             access_token="test_token",
             token_type="Bearer",
             expires_in=1800,
-            expires_at=datetime.utcnow() + timedelta(minutes=10),
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
         )
         assert not token.is_expired
 
@@ -48,7 +48,7 @@ class TestAmadeusAuthToken:
             access_token="test_token",
             token_type="Bearer",
             expires_in=1800,
-            expires_at=datetime.utcnow() - timedelta(minutes=10),
+            expires_at=datetime.now(UTC) - timedelta(minutes=10),
         )
         assert token.is_expired
 
@@ -171,7 +171,9 @@ class TestAmadeusClient:
             assert amadeus_client._client is not None
 
     @pytest.mark.asyncio
-    @patch("travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request")
+    @patch(
+        "travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request"
+    )
     async def test_search_flights_success(self, mock_request, amadeus_client, mock_flight_offer):
         """Test successful flight search."""
         # Mock the API response
@@ -208,8 +210,12 @@ class TestAmadeusClient:
             )
 
     @pytest.mark.asyncio
-    @patch("travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request")
-    async def test_search_flights_with_return_date(self, mock_request, amadeus_client, mock_flight_offer):
+    @patch(
+        "travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request"
+    )
+    async def test_search_flights_with_return_date(
+        self, mock_request, amadeus_client, mock_flight_offer
+    ):
         """Test flight search with return date."""
         mock_request.return_value = {"data": [mock_flight_offer]}
 
@@ -234,7 +240,9 @@ class TestAmadeusClient:
             assert params["children"] == 1
 
     @pytest.mark.asyncio
-    @patch("travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request")
+    @patch(
+        "travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request"
+    )
     async def test_search_flights_error(self, mock_request, amadeus_client):
         """Test flight search error handling."""
         mock_request.side_effect = ExternalAPIError("API request failed")
@@ -252,7 +260,9 @@ class TestAmadeusClient:
             assert "Flight search failed" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    @patch("travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request")
+    @patch(
+        "travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request"
+    )
     async def test_get_airport_info_success(self, mock_request, amadeus_client):
         """Test successful airport information retrieval."""
         mock_airport_data = {
@@ -270,7 +280,9 @@ class TestAmadeusClient:
             assert airport_info["name"] == "Los Angeles International Airport"
 
     @pytest.mark.asyncio
-    @patch("travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request")
+    @patch(
+        "travel_companion.services.external_apis.amadeus.AmadeusClient._make_authenticated_request"
+    )
     async def test_get_airport_info_not_found(self, mock_request, amadeus_client):
         """Test airport information not found."""
         mock_request.return_value = {"data": []}
@@ -318,6 +330,7 @@ class TestAmadeusClient:
 
         async with amadeus_client:
             import time
+
             start_time = time.time()
 
             # Make two rate-limited calls

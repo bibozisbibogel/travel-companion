@@ -6,7 +6,7 @@ Handles OAuth 2.0 authentication, rate limiting, and flight search operations.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -20,26 +20,30 @@ logger = logging.getLogger(__name__)
 
 class AmadeusAuthToken(BaseModel):
     """Amadeus OAuth 2.0 token model."""
+
     access_token: str
     token_type: str
     expires_in: int
     expires_at: datetime | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set expiration time after initialization."""
         if self.expires_at is None:
-            self.expires_at = datetime.utcnow() + timedelta(seconds=self.expires_in - 60)
+            self.expires_at = datetime.now(UTC) + timedelta(seconds=self.expires_in - 60)
 
     @property
     def is_expired(self) -> bool:
         """Check if token is expired."""
-        return self.expires_at is not None and datetime.utcnow() >= self.expires_at
+        return self.expires_at is not None and datetime.now(UTC) >= self.expires_at
 
 
 class FlightSearchParams(BaseModel):
     """Flight search parameters for Amadeus API."""
+
     origin: str = Field(..., description="Origin airport code", min_length=3, max_length=3)
-    destination: str = Field(..., description="Destination airport code", min_length=3, max_length=3)
+    destination: str = Field(
+        ..., description="Destination airport code", min_length=3, max_length=3
+    )
     departure_date: str = Field(..., description="Departure date (YYYY-MM-DD)")
     return_date: str | None = Field(None, description="Return date (YYYY-MM-DD)")
     adults: int = Field(1, ge=1, le=9, description="Number of adult passengers")
@@ -51,6 +55,7 @@ class FlightSearchParams(BaseModel):
 
 class AmadeusFlightOffer(BaseModel):
     """Flight offer response model from Amadeus API."""
+
     id: str
     source: str
     instant_ticketing_required: bool
@@ -110,12 +115,14 @@ class AmadeusClient:
         # HTTP client
         self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AmadeusClient":
         """Async context manager entry."""
         await self._ensure_client()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object
+    ) -> None:
         """Async context manager exit."""
         if self._client:
             await self._client.aclose()
@@ -143,10 +150,10 @@ class AmadeusClient:
     async def _get_access_token(self) -> str:
         """
         Authenticate with Amadeus API using OAuth 2.0 client credentials flow.
-        
+
         Returns:
             Access token string
-            
+
         Raises:
             ExternalAPIError: If authentication fails
         """
@@ -164,6 +171,9 @@ class AmadeusClient:
                 "client_secret": self.client_secret,
             }
 
+            # Ensure client is available after _ensure_client call
+            assert self._client is not None
+
             try:
                 response = await self._client.post(
                     f"{self.base_url}/v1/security/oauth2/token",
@@ -180,11 +190,13 @@ class AmadeusClient:
                 return self._auth_token.access_token
 
             except httpx.HTTPStatusError as e:
-                logger.error(f"Amadeus authentication failed: {e.response.status_code} {e.response.text}")
-                raise ExternalAPIError(f"Authentication failed: {e.response.status_code}")
+                logger.error(
+                    f"Amadeus authentication failed: {e.response.status_code} {e.response.text}"
+                )
+                raise ExternalAPIError(f"Authentication failed: {e.response.status_code}") from e
             except Exception as e:
                 logger.error(f"Amadeus authentication error: {str(e)}")
-                raise ExternalAPIError(f"Authentication error: {str(e)}")
+                raise ExternalAPIError(f"Authentication error: {str(e)}") from e
 
     async def _make_authenticated_request(
         self,
@@ -196,23 +208,26 @@ class AmadeusClient:
     ) -> dict[str, Any]:
         """
         Make authenticated request to Amadeus API with retry logic.
-        
+
         Args:
             method: HTTP method
             endpoint: API endpoint
             params: Query parameters
             json: JSON body
             max_retries: Maximum retry attempts (overrides default)
-            
+
         Returns:
             Response JSON data
-            
+
         Raises:
             RateLimitError: If rate limit is exceeded
             ExternalAPIError: If request fails
         """
         await self._ensure_client()
         max_retries = max_retries or self.max_retries
+
+        # Ensure client is available
+        assert self._client is not None
 
         for attempt in range(max_retries + 1):
             try:
@@ -240,7 +255,8 @@ class AmadeusClient:
                     continue
 
                 response.raise_for_status()
-                return response.json()
+                json_response: dict[str, Any] = response.json()
+                return json_response
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 401:
@@ -250,34 +266,36 @@ class AmadeusClient:
                         logger.info("Access token expired, re-authenticating")
                         continue
 
-                logger.error(f"Amadeus API request failed: {e.response.status_code} {e.response.text}")
+                logger.error(
+                    f"Amadeus API request failed: {e.response.status_code} {e.response.text}"
+                )
 
                 if attempt == max_retries:
-                    raise ExternalAPIError(f"API request failed: {e.response.status_code}")
+                    raise ExternalAPIError(f"API request failed: {e.response.status_code}") from e
 
                 # Exponential backoff
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
             except Exception as e:
                 logger.error(f"Amadeus API request error: {str(e)}")
 
                 if attempt == max_retries:
-                    raise ExternalAPIError(f"API request error: {str(e)}")
+                    raise ExternalAPIError(f"API request error: {str(e)}") from e
 
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
         raise ExternalAPIError("Maximum retry attempts exceeded")
 
     async def search_flights(self, search_params: FlightSearchParams) -> list[AmadeusFlightOffer]:
         """
         Search for flight offers using Amadeus Flight Offers Search API.
-        
+
         Args:
             search_params: Flight search parameters
-            
+
         Returns:
             List of flight offers
-            
+
         Raises:
             ExternalAPIError: If search fails
         """
@@ -318,18 +336,18 @@ class AmadeusClient:
 
         except Exception as e:
             logger.error(f"Flight search failed: {str(e)}")
-            raise ExternalAPIError(f"Flight search failed: {str(e)}")
+            raise ExternalAPIError(f"Flight search failed: {str(e)}") from e
 
     async def get_airport_info(self, location_code: str) -> dict[str, Any]:
         """
         Get airport information by IATA code.
-        
+
         Args:
             location_code: Airport IATA code
-            
+
         Returns:
             Airport information
-            
+
         Raises:
             ExternalAPIError: If request fails
         """
@@ -346,16 +364,17 @@ class AmadeusClient:
             if not locations:
                 raise ExternalAPIError(f"Airport not found: {location_code}")
 
-            return locations[0]
+            location_info: dict[str, Any] = locations[0]
+            return location_info
 
         except Exception as e:
             logger.error(f"Airport info request failed: {str(e)}")
-            raise ExternalAPIError(f"Airport info request failed: {str(e)}")
+            raise ExternalAPIError(f"Airport info request failed: {str(e)}") from e
 
     async def health_check(self) -> bool:
         """
         Perform health check by testing authentication.
-        
+
         Returns:
             True if API is accessible, False otherwise
         """

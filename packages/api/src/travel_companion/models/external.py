@@ -14,12 +14,18 @@ class FlightSearchRequest(BaseModel):
     """Request model for flight search operations."""
 
     origin: str = Field(..., min_length=3, max_length=4, description="Origin airport code")
-    destination: str = Field(..., min_length=3, max_length=4, description="Destination airport code")
+    destination: str = Field(
+        ..., min_length=3, max_length=4, description="Destination airport code"
+    )
     departure_date: datetime = Field(..., description="Departure date")
     return_date: datetime | None = Field(None, description="Return date for round trip")
     passengers: int = Field(default=1, ge=1, le=9, description="Number of passengers")
-    travel_class: TravelClass = Field(default=TravelClass.ECONOMY, description="Travel class preference")
-    currency: str = Field(default="USD", min_length=3, max_length=3, description="Preferred currency")
+    travel_class: TravelClass = Field(
+        default=TravelClass.ECONOMY, description="Travel class preference"
+    )
+    currency: str = Field(
+        default="USD", min_length=3, max_length=3, description="Preferred currency"
+    )
     max_results: int = Field(default=50, ge=1, le=250, description="Maximum results to return")
 
     @field_validator("origin", "destination")
@@ -85,15 +91,21 @@ class AmadeusFlightOffer(BaseModel):
     id: str = Field(..., description="Offer ID from Amadeus")
     type: str = Field(..., description="Offer type")
     source: str = Field(..., description="Offer source")
-    instant_ticketing_required: bool = Field(default=False, description="Instant ticketing requirement")
+    instant_ticketing_required: bool = Field(
+        default=False, description="Instant ticketing requirement"
+    )
     non_homogeneous: bool = Field(default=False, description="Non-homogeneous booking")
     paymentCardRequired: bool = Field(default=False, description="Payment card requirement")
     last_ticketing_date: str | None = Field(None, description="Last ticketing date")
     itineraries: list[dict[str, Any]] = Field(..., description="Flight itineraries")
     price: AmadeusPrice = Field(..., description="Price information")
     pricing_options: dict[str, Any] = Field(default_factory=dict, description="Pricing options")
-    validating_airline_codes: list[str] = Field(default_factory=list, description="Validating airlines")
-    traveler_pricings: list[dict[str, Any]] = Field(default_factory=list, description="Traveler pricing")
+    validating_airline_codes: list[str] = Field(
+        default_factory=list, description="Validating airlines"
+    )
+    traveler_pricings: list[dict[str, Any]] = Field(
+        default_factory=list, description="Traveler pricing"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -137,7 +149,7 @@ class FlightOption(BaseModel):
         if v <= 0:
             raise ValueError("Price must be positive")
         # Round to 2 decimal places
-        return v.quantize(Decimal('0.01'))
+        return v.quantize(Decimal("0.01"))
 
     model_config = ConfigDict(
         use_enum_values=True,
@@ -169,11 +181,12 @@ class FlightComparisonResult(BaseModel):
     score: float = Field(..., ge=0, le=100, description="Ranking score (0-100)")
     price_rank: int = Field(..., ge=1, description="Price ranking (1=cheapest)")
     duration_rank: int = Field(..., ge=1, description="Duration ranking (1=shortest)")
-    departure_preference_score: float = Field(..., ge=0, le=1, description="Departure time preference score")
+    departure_preference_score: float = Field(
+        ..., ge=0, le=1, description="Departure time preference score"
+    )
     reasons: list[str] = Field(default_factory=list, description="Ranking reasons")
 
     model_config = ConfigDict(
         use_enum_values=True,
         populate_by_name=True,
     )
-
