@@ -48,7 +48,7 @@ export default function Home() {
                   Start Planning Your Trip
                 </h2>
                 <p className="text-lg text-gray-600">
-                  Tell us what you're looking for and we'll create a personalized travel plan just for you
+                  Tell us what you&apos;re looking for and we&apos;ll create a personalized travel plan just for you
                 </p>
               </div>
               
@@ -120,7 +120,7 @@ export default function Home() {
                 Popular Destinations
               </h2>
               <p className="text-xl text-gray-600">
-                Discover the world's most loved travel destinations
+                Discover the world&apos;s most loved travel destinations
               </p>
             </div>
             

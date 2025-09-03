@@ -1,0 +1,340 @@
+{
+  "amadeus_flight_response": {
+    "meta": {
+      "count": 3,
+      "links": {
+        "self": "https://api.amadeus.com/v2/shopping/flight-offers"
+      }
+    },
+    "data": [
+      {
+        "type": "flight-offer",
+        "id": "1",
+        "source": "GDS",
+        "instant_ticketing_required": false,
+        "non_homogeneous": false,
+        "one_way": true,
+        "last_ticketing_date": "2024-12-15",
+        "numberOfBookableSeats": 9,
+        "itineraries": [
+          {
+            "duration": "PT5H30M",
+            "segments": [
+              {
+                "departure": {
+                  "iataCode": "JFK",
+                  "terminal": "4",
+                  "at": "2024-12-15T08:00:00"
+                },
+                "arrival": {
+                  "iataCode": "LAX",
+                  "terminal": "7",
+                  "at": "2024-12-15T13:30:00"
+                },
+                "carrierCode": "AA",
+                "number": "123",
+                "aircraft": {
+                  "code": "321"
+                },
+                "operating": {
+                  "carrierCode": "AA"
+                },
+                "duration": "PT5H30M",
+                "id": "1",
+                "numberOfStops": 0
+              }
+            ]
+          }
+        ],
+        "price": {
+          "currency": "USD",
+          "total": "299.99",
+          "base": "249.99",
+          "fees": [
+            {
+              "amount": "25.00",
+              "type": "SUPPLIER"
+            },
+            {
+              "amount": "25.00",
+              "type": "TICKETING"
+            }
+          ],
+          "grandTotal": "299.99"
+        },
+        "pricing_options": {
+          "fareType": [
+            "PUBLISHED"
+          ],
+          "includedCheckedBagsOnly": true
+        },
+        "validating_airline_codes": [
+          "AA"
+        ],
+        "traveler_pricings": [
+          {
+            "travelerId": "1",
+            "fareOption": "STANDARD",
+            "travelerType": "ADULT",
+            "price": {
+              "currency": "USD",
+              "total": "299.99",
+              "base": "249.99"
+            }
+          }
+        ]
+      },
+      {
+        "type": "flight-offer",
+        "id": "2",
+        "source": "GDS",
+        "instant_ticketing_required": false,
+        "non_homogeneous": false,
+        "one_way": true,
+        "last_ticketing_date": "2024-12-15",
+        "numberOfBookableSeats": 4,
+        "itineraries": [
+          {
+            "duration": "PT7H15M",
+            "segments": [
+              {
+                "departure": {
+                  "iataCode": "JFK",
+                  "terminal": "2",
+                  "at": "2024-12-15T14:20:00"
+                },
+                "arrival": {
+                  "iataCode": "DEN",
+                  "at": "2024-12-15T16:45:00"
+                },
+                "carrierCode": "DL",
+                "number": "1452",
+                "aircraft": {
+                  "code": "739"
+                },
+                "duration": "PT4H25M",
+                "id": "2",
+                "numberOfStops": 0
+              },
+              {
+                "departure": {
+                  "iataCode": "DEN",
+                  "at": "2024-12-15T18:15:00"
+                },
+                "arrival": {
+                  "iataCode": "LAX",
+                  "terminal": "2",
+                  "at": "2024-12-15T19:35:00"
+                },
+                "carrierCode": "DL",
+                "number": "2378",
+                "aircraft": {
+                  "code": "739"
+                },
+                "duration": "PT2H20M",
+                "id": "3",
+                "numberOfStops": 0
+              }
+            ]
+          }
+        ],
+        "price": {
+          "currency": "USD",
+          "total": "235.50",
+          "base": "195.50",
+          "fees": [
+            {
+              "amount": "20.00",
+              "type": "SUPPLIER"
+            },
+            {
+              "amount": "20.00",
+              "type": "TICKETING"
+            }
+          ],
+          "grandTotal": "235.50"
+        },
+        "pricing_options": {
+          "fareType": [
+            "PUBLISHED"
+          ],
+          "includedCheckedBagsOnly": false
+        },
+        "validating_airline_codes": [
+          "DL"
+        ],
+        "traveler_pricings": [
+          {
+            "travelerId": "1",
+            "fareOption": "STANDARD",
+            "travelerType": "ADULT",
+            "price": {
+              "currency": "USD",
+              "total": "235.50",
+              "base": "195.50"
+            }
+          }
+        ]
+      },
+      {
+        "type": "flight-offer",
+        "id": "3",
+        "source": "GDS",
+        "instant_ticketing_required": true,
+        "non_homogeneous": false,
+        "one_way": true,
+        "last_ticketing_date": "2024-12-15",
+        "numberOfBookableSeats": 1,
+        "itineraries": [
+          {
+            "duration": "PT6H45M",
+            "segments": [
+              {
+                "departure": {
+                  "iataCode": "JFK",
+                  "terminal": "1",
+                  "at": "2024-12-15T22:30:00"
+                },
+                "arrival": {
+                  "iataCode": "LAX",
+                  "terminal": "6",
+                  "at": "2024-12-16T01:15:00"
+                },
+                "carrierCode": "B6",
+                "number": "615",
+                "aircraft": {
+                  "code": "321"
+                },
+                "operating": {
+                  "carrierCode": "B6"
+                },
+                "duration": "PT6H45M",
+                "id": "4",
+                "numberOfStops": 0
+              }
+            ]
+          }
+        ],
+        "price": {
+          "currency": "USD",
+          "total": "189.00",
+          "base": "159.00",
+          "fees": [
+            {
+              "amount": "15.00",
+              "type": "SUPPLIER"
+            },
+            {
+              "amount": "15.00",
+              "type": "TICKETING"
+            }
+          ],
+          "grandTotal": "189.00"
+        },
+        "pricing_options": {
+          "fareType": [
+            "PUBLISHED"
+          ],
+          "includedCheckedBagsOnly": false
+        },
+        "validating_airline_codes": [
+          "B6"
+        ],
+        "traveler_pricings": [
+          {
+            "travelerId": "1",
+            "fareOption": "STANDARD",
+            "travelerType": "ADULT",
+            "price": {
+              "currency": "USD",
+              "total": "189.00",
+              "base": "159.00"
+            }
+          }
+        ]
+      }
+    ],
+    "dictionaries": {
+      "locations": {
+        "JFK": {
+          "cityCode": "NYC",
+          "countryCode": "US"
+        },
+        "LAX": {
+          "cityCode": "LAX",
+          "countryCode": "US"
+        },
+        "DEN": {
+          "cityCode": "DEN",
+          "countryCode": "US"
+        }
+      },
+      "aircraft": {
+        "321": "AIRBUS A321",
+        "739": "BOEING 737-900"
+      },
+      "carriers": {
+        "AA": "American Airlines",
+        "DL": "Delta Air Lines",
+        "B6": "JetBlue Airways"
+      },
+      "currencies": {
+        "USD": "US DOLLAR"
+      }
+    }
+  },
+  "flight_search_request": {
+    "origin": "JFK",
+    "destination": "LAX",
+    "departure_date": "2024-12-15T00:00:00",
+    "return_date": null,
+    "passengers": 1,
+    "travel_class": "ECONOMY",
+    "currency": "USD",
+    "max_results": 50
+  },
+  "expected_flight_options": [
+    {
+      "external_id": "1",
+      "airline": "AA",
+      "flight_number": "AA123",
+      "origin": "JFK",
+      "destination": "LAX",
+      "departure_time": "2024-12-15T08:00:00+00:00",
+      "arrival_time": "2024-12-15T13:30:00+00:00",
+      "duration_minutes": 330,
+      "stops": 0,
+      "price": "299.99",
+      "currency": "USD",
+      "travel_class": "ECONOMY"
+    },
+    {
+      "external_id": "2",
+      "airline": "DL",
+      "flight_number": "DL1452",
+      "origin": "JFK",
+      "destination": "LAX",
+      "departure_time": "2024-12-15T14:20:00+00:00",
+      "arrival_time": "2024-12-15T19:35:00+00:00",
+      "duration_minutes": 435,
+      "stops": 1,
+      "price": "235.50",
+      "currency": "USD",
+      "travel_class": "ECONOMY"
+    },
+    {
+      "external_id": "3",
+      "airline": "B6",
+      "flight_number": "B6615",
+      "origin": "JFK",
+      "destination": "LAX",
+      "departure_time": "2024-12-15T22:30:00+00:00",
+      "arrival_time": "2024-12-16T01:15:00+00:00",
+      "duration_minutes": 405,
+      "stops": 0,
+      "price": "189.00",
+      "currency": "USD",
+      "travel_class": "ECONOMY"
+    }
+  ]
+}

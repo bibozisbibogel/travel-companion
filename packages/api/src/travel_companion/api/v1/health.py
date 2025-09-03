@@ -102,9 +102,9 @@ async def detailed_health_check(
     # Check external API keys configuration
     external_apis = {
         "amadeus": {
-            "configured": bool(settings.amadeus_api_key and settings.amadeus_api_secret),
-            "api_key_present": bool(settings.amadeus_api_key),
-            "api_secret_present": bool(settings.amadeus_api_secret),
+            "configured": bool(settings.amadeus_client_id and settings.amadeus_client_secret),
+            "api_key_present": bool(settings.amadeus_client_id),
+            "api_secret_present": bool(settings.amadeus_client_secret),
         },
         "booking": {
             "configured": bool(settings.booking_api_key),

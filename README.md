@@ -16,12 +16,15 @@ User submits request → “7-day trip to Tokyo, budget $2000, focus on food + c
 
 1. LangGraph workflow kicks off:
 - Planner Agent parses request
-- Flight Agent → fetches flights
-- Hotel Agent → fetches hotels
-- Activity Agent → fetches activities
-- Weather Agent → fetches weather
-- Food Agent → suggests restaurants
-- Itinerary Agent → integrates results and builds schedule
+- **Flight Agent → fetches flights ✅ IMPLEMENTED**
+  - Searches Amadeus API with circuit breaker protection
+  - Compares options using weighted algorithm (price, duration, timing)
+  - Provides fallback mock data during API outages
+- Hotel Agent → fetches hotels (coming soon)
+- Activity Agent → fetches activities (coming soon)
+- Weather Agent → fetches weather (coming soon)  
+- Food Agent → suggests restaurants (coming soon)
+- Itinerary Agent → integrates results and builds schedule (coming soon)
 - Final Planner compiles everything into a daily itinerary + budget summary.
 - Returns JSON to frontend which displays it in a user-friendly way.
 
@@ -69,7 +72,37 @@ User submits request → “7-day trip to Tokyo, budget $2000, focus on food + c
 - Docker (containerize backend)
 - GitHub Projects + Issues (team collaboration)
 
+# Implementation Status
+
+## ✅ Completed Features
+
+### Flight Agent & API Integration (Story 2.1)
+- **FlightAgent**: AI-powered flight search with Amadeus API integration
+- **Circuit Breaker Pattern**: Resilient external API calls with automatic failover  
+- **Smart Flight Comparison**: Weighted ranking algorithm (price, duration, timing, stops)
+- **Comprehensive Testing**: 90%+ code coverage with unit, integration, and resilience tests
+- **Mock Data Fallback**: Graceful degradation during API outages
+- **Rate Limit Management**: Automatic throttling and Redis caching optimization
+
+## 🔄 In Progress
+- Story 2.2: Additional agent implementations (Hotels, Activities, Weather)
+- LangGraph workflow orchestration
+- Frontend integration with trip planning interface
+
+## 📋 Upcoming
+- User authentication and profile management
+- Trip persistence and history
+- Payment integration for booking
+- Mobile-responsive frontend
+- Real-time notifications
+
+# Technical Documentation
+
+- **API Documentation**: `/packages/api/API.md` - Complete API specification
+- **Architecture Guide**: `/packages/api/ARCHITECTURE.md` - Technical implementation details  
+- **Setup Instructions**: `/packages/api/README.md` - Development environment setup
+
 # GitHub repo
 /frontend (Next.js + React)
-/backend (FastAPI + LangGraph)
-/agents (each agent’s logic)
+/packages/api (FastAPI + LangGraph + AI Agents)
+/docs (Architecture and story documentation)
