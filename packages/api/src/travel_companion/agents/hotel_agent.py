@@ -19,6 +19,15 @@ from travel_companion.services.external_apis.booking import (
     BookingClient,
     HotelSearchParams,
 )
+from travel_companion.services.external_apis.expedia import (
+    ExpediaClient,
+    ExpediaSearchParams,
+)
+from travel_companion.services.external_apis.airbnb import (
+    AirbnbClient,
+    AirbnbSearchParams,
+)
+from travel_companion.utils.errors import ExternalAPIError
 
 
 class HotelAgent(BaseAgent[HotelSearchResponse]):
@@ -50,8 +59,10 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             self.settings, 'hotel_api_timeout_seconds', 30
         )
 
-        # Initialize Booking.com API client
+        # Initialize API clients with fallback chain
         self._booking_client = BookingClient(timeout=self.timeout_seconds)
+        self._expedia_client = ExpediaClient()
+        self._airbnb_client = AirbnbClient()
 
         self.logger.info(
             f"Hotel agent initialized with cache_ttl={self.cache_ttl_seconds}s, "
@@ -176,8 +187,27 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             f"rooms={search_request.room_count}"
         )
 
+        # Implement API fallback chain: Booking.com → Expedia → Airbnb
+        hotels = []
+        search_metadata = {
+            "location": search_request.location,
+            "check_in_date": search_request.check_in_date.isoformat(),
+            "check_out_date": search_request.check_out_date.isoformat(),
+            "guest_count": search_request.guest_count,
+            "room_count": search_request.room_count,
+            "budget_per_night": float(search_request.budget_per_night) if search_request.budget_per_night else None,
+            "currency": search_request.currency,
+            "max_results": search_request.max_results,
+            "apis_attempted": [],
+            "successful_api": None,
+            "api_errors": {}
+        }
+        
+        # Try Booking.com first
         try:
-            # Create Booking.com API search parameters
+            self.logger.info("Attempting Booking.com API search")
+            search_metadata["apis_attempted"].append("booking.com")
+            
             booking_params = HotelSearchParams(
                 location=search_request.location,
                 check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
@@ -188,19 +218,18 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                 currency=search_request.currency,
                 language="en"
             )
-
-            # Search hotels via Booking.com API
+            
             booking_response = await self._booking_client.search_hotels(booking_params)
-
+            
             # Convert Booking.com results to internal HotelOption models
-            hotels = []
             for booking_hotel in booking_response.hotels:
                 try:
                     # Apply budget filter if specified
                     if (search_request.budget_per_night and
+                        booking_hotel.price_per_night and
                         Decimal(str(booking_hotel.price_per_night)) > search_request.budget_per_night):
                         continue
-
+                    
                     hotel_location = HotelLocation(
                         latitude=booking_hotel.latitude or 0.0,
                         longitude=booking_hotel.longitude or 0.0,
@@ -209,12 +238,12 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                         country=None,  # Extract from address if needed
                         postal_code=None
                     )
-
+                    
                     hotel_option = HotelOption(
-                        external_id=booking_hotel.hotel_id,
+                        external_id=f"booking_{booking_hotel.hotel_id}",
                         name=booking_hotel.name,
                         location=hotel_location,
-                        price_per_night=Decimal(str(booking_hotel.price_per_night)),
+                        price_per_night=Decimal(str(booking_hotel.price_per_night)) if booking_hotel.price_per_night else Decimal("0"),
                         currency=booking_hotel.currency,
                         rating=booking_hotel.rating,
                         amenities=booking_hotel.amenities,
@@ -223,60 +252,157 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                         created_at=datetime.now(UTC)
                     )
                     hotels.append(hotel_option)
-
+                    
                 except (ValueError, TypeError) as e:
-                    self.logger.warning(f"Failed to convert hotel result: {e}")
+                    self.logger.warning(f"Failed to convert Booking.com hotel result: {e}")
                     continue
-
-            # Calculate search time
-            end_time = time.time()
-            search_time_ms = int((end_time - start_time) * 1000)
-
-            # Create response with search metadata
-            response = HotelSearchResponse(
-                hotels=hotels,
-                search_metadata={
-                    "location": search_request.location,
-                    "check_in_date": search_request.check_in_date.isoformat(),
-                    "check_out_date": search_request.check_out_date.isoformat(),
-                    "guest_count": search_request.guest_count,
-                    "room_count": search_request.room_count,
-                    "budget_per_night": float(search_request.budget_per_night) if search_request.budget_per_night else None,
-                    "currency": search_request.currency,
-                    "max_results": search_request.max_results,
-                    "booking_api_response_time": booking_response.api_response_time_ms
-                },
-                total_results=booking_response.total_results,
-                search_time_ms=search_time_ms,
-                cached=False
-            )
-
-            self.logger.info(
-                f"Hotel search completed: found {len(hotels)} hotels "
-                f"(filtered from {booking_response.total_results} total) in {search_time_ms}ms"
-            )
-
-            return response
-
+            
+            search_metadata["successful_api"] = "booking.com"
+            search_metadata["booking_api_response_time"] = booking_response.api_response_time_ms
+            search_metadata["booking_total_results"] = booking_response.total_results
+            self.logger.info(f"Booking.com API returned {len(hotels)} hotels")
+            
         except Exception as e:
-            self.logger.error(f"Hotel search failed: {e}")
-            # Return empty results on error to maintain consistency
-            end_time = time.time()
-            search_time_ms = int((end_time - start_time) * 1000)
-
-            return HotelSearchResponse(
-                hotels=[],
-                search_metadata={
-                    "location": request_data.get("location"),
-                    "check_in_date": request_data.get("check_in_date"),
-                    "check_out_date": request_data.get("check_out_date"),
-                    "guest_count": request_data.get("guest_count"),
-                    "error": str(e)
-                },
-                total_results=0,
-                search_time_ms=search_time_ms,
-                cached=False
-            )
+            self.logger.warning(f"Booking.com API failed: {e}")
+            search_metadata["api_errors"]["booking.com"] = str(e)
+            
+            # Try Expedia as fallback
+            try:
+                self.logger.info("Attempting Expedia API search (fallback)")
+                search_metadata["apis_attempted"].append("expedia")
+                
+                expedia_params = ExpediaSearchParams(
+                    location=search_request.location,
+                    check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
+                    check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
+                    guest_count=search_request.guest_count,
+                    room_count=search_request.room_count,
+                    max_results=search_request.max_results,
+                    currency=search_request.currency,
+                    language="en"
+                )
+                
+                expedia_results = await self._expedia_client.search_hotels(expedia_params)
+                
+                # Convert Expedia results to internal HotelOption models
+                for expedia_hotel in expedia_results:
+                    try:
+                        # Apply budget filter if specified
+                        if (search_request.budget_per_night and
+                            expedia_hotel.price_per_night and
+                            Decimal(str(expedia_hotel.price_per_night)) > search_request.budget_per_night):
+                            continue
+                        
+                        hotel_location = HotelLocation(
+                            latitude=expedia_hotel.latitude or 0.0,
+                            longitude=expedia_hotel.longitude or 0.0,
+                            address=expedia_hotel.address,
+                            city=None,  # Extract from address if needed
+                            country=None,  # Extract from address if needed
+                            postal_code=None
+                        )
+                        
+                        hotel_option = HotelOption(
+                            external_id=f"expedia_{expedia_hotel.hotel_id}",
+                            name=expedia_hotel.name,
+                            location=hotel_location,
+                            price_per_night=Decimal(str(expedia_hotel.price_per_night)) if expedia_hotel.price_per_night else Decimal("0"),
+                            currency=expedia_hotel.currency,
+                            rating=expedia_hotel.rating,
+                            amenities=expedia_hotel.amenities,
+                            photos=expedia_hotel.photos,
+                            booking_url=expedia_hotel.booking_url,
+                            created_at=datetime.now(UTC)
+                        )
+                        hotels.append(hotel_option)
+                        
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"Failed to convert Expedia hotel result: {e}")
+                        continue
+                
+                search_metadata["successful_api"] = "expedia"
+                search_metadata["expedia_total_results"] = len(expedia_results)
+                self.logger.info(f"Expedia API returned {len(hotels)} hotels")
+                
+            except Exception as e:
+                self.logger.warning(f"Expedia API failed: {e}")
+                search_metadata["api_errors"]["expedia"] = str(e)
+                
+                # Try Airbnb as final fallback
+                try:
+                    self.logger.info("Attempting Airbnb API search (final fallback)")
+                    search_metadata["apis_attempted"].append("airbnb")
+                    
+                    airbnb_params = AirbnbSearchParams(
+                        location=search_request.location,
+                        check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
+                        check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
+                        guest_count=search_request.guest_count,
+                        max_results=search_request.max_results,
+                        currency=search_request.currency,
+                        language="en",
+                        max_price=float(search_request.budget_per_night) if search_request.budget_per_night else None
+                    )
+                    
+                    airbnb_results = await self._airbnb_client.search_listings(airbnb_params)
+                    
+                    # Convert Airbnb results to internal HotelOption models
+                    for airbnb_listing in airbnb_results:
+                        try:
+                            hotel_location = HotelLocation(
+                                latitude=airbnb_listing.latitude or 0.0,
+                                longitude=airbnb_listing.longitude or 0.0,
+                                address=airbnb_listing.address,
+                                city=None,  # Extract from address if needed
+                                country=None,  # Extract from address if needed
+                                postal_code=None
+                            )
+                            
+                            hotel_option = HotelOption(
+                                external_id=f"airbnb_{airbnb_listing.listing_id}",
+                                name=airbnb_listing.name,
+                                location=hotel_location,
+                                price_per_night=Decimal(str(airbnb_listing.price_per_night)) if airbnb_listing.price_per_night else Decimal("0"),
+                                currency=airbnb_listing.currency,
+                                rating=airbnb_listing.rating,
+                                amenities=airbnb_listing.amenities,
+                                photos=airbnb_listing.photos,
+                                booking_url=airbnb_listing.booking_url,
+                                created_at=datetime.now(UTC)
+                            )
+                            hotels.append(hotel_option)
+                            
+                        except (ValueError, TypeError) as e:
+                            self.logger.warning(f"Failed to convert Airbnb listing result: {e}")
+                            continue
+                    
+                    search_metadata["successful_api"] = "airbnb"
+                    search_metadata["airbnb_total_results"] = len(airbnb_results)
+                    self.logger.info(f"Airbnb API returned {len(hotels)} hotels")
+                    
+                except Exception as e:
+                    self.logger.error(f"All APIs failed. Last error (Airbnb): {e}")
+                    search_metadata["api_errors"]["airbnb"] = str(e)
+        
+        # Calculate search time
+        end_time = time.time()
+        search_time_ms = int((end_time - start_time) * 1000)
+        
+        # Create response with search metadata
+        response = HotelSearchResponse(
+            hotels=hotels,
+            search_metadata=search_metadata,
+            total_results=len(hotels),
+            search_time_ms=search_time_ms,
+            cached=False
+        )
+        
+        self.logger.info(
+            f"Hotel search completed using {search_metadata['successful_api'] or 'no APIs'}: "
+            f"found {len(hotels)} hotels in {search_time_ms}ms"
+        )
+        
+        return response
 
     async def search_hotels_by_location(
         self,

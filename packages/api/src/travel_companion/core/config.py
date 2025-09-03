@@ -147,6 +147,9 @@ class Settings(BaseSettings):
     amadeus_client_id: str = ""
     amadeus_client_secret: str = ""
     booking_api_key: str = ""
+    expedia_api_key: str = ""
+    expedia_secret_key: str = ""
+    airbnb_api_key: str = ""
     tripadvisor_api_key: str = ""
     openai_api_key: str = ""
 
