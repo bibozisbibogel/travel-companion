@@ -130,11 +130,11 @@ class BookingClient:
         """Close the HTTP client."""
         await self.client.aclose()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "BookingClient":
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: type, exc_val: Exception, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.close()
 
@@ -228,17 +228,18 @@ class BookingClient:
 
                     # Parse amenities
                     amenities_elem = hotel_element.find("amenities")
+                    amenities_list: list[str] = []
                     if amenities_elem is not None:
-                        hotel_data["amenities"] = [
+                        amenities_list = [
                             amenity.text
                             for amenity in amenities_elem.findall("amenity")
                             if amenity.text
                         ]
-
                     # Parse photos
                     photos_elem = hotel_element.find("photos")
+                    photos_list: list[str] = []
                     if photos_elem is not None:
-                        hotel_data["photos"] = [
+                        photos_list = [
                             photo.text for photo in photos_elem.findall("photo") if photo.text
                         ]
 
@@ -246,7 +247,38 @@ class BookingClient:
                     hotel_data["description"] = hotel_element.findtext("description")
                     hotel_data["booking_url"] = hotel_element.findtext("booking_url")
 
-                    hotels.append(BookingHotelResult(**hotel_data))
+                    booking_result = BookingHotelResult(
+                        hotel_id=str(hotel_data["hotel_id"]),
+                        name=str(hotel_data["name"]),
+                        address=str(hotel_data.get("address"))
+                        if hotel_data.get("address")
+                        else None,
+                        latitude=float(hotel_data["latitude"])
+                        if "latitude" in hotel_data and hotel_data["latitude"] is not None
+                        else None,
+                        longitude=float(hotel_data["longitude"])
+                        if "longitude" in hotel_data and hotel_data["longitude"] is not None
+                        else None,
+                        price_per_night=float(hotel_data["price_per_night"])
+                        if hotel_data["price_per_night"] is not None
+                        else 0.0,
+                        currency=str(hotel_data["currency"]),
+                        rating=float(hotel_data["rating"])
+                        if "rating" in hotel_data and hotel_data["rating"] is not None
+                        else None,
+                        review_score=float(hotel_data["review_score"])
+                        if "review_score" in hotel_data and hotel_data["review_score"] is not None
+                        else None,
+                        amenities=amenities_list,
+                        photos=photos_list,
+                        description=str(hotel_data.get("description"))
+                        if hotel_data.get("description")
+                        else None,
+                        booking_url=str(hotel_data.get("booking_url"))
+                        if hotel_data.get("booking_url")
+                        else None,
+                    )
+                    hotels.append(booking_result)
 
                 except (ValueError, TypeError) as e:
                     logger.warning(f"Failed to parse hotel element: {e}")

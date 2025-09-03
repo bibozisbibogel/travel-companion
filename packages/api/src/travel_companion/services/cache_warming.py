@@ -73,7 +73,7 @@ class CacheWarmingService:
 
         self.logger.info(f"Starting cache warming for {len(destinations)} destinations")
 
-        results = {
+        results: dict[str, Any] = {
             "started_at": datetime.now(UTC).isoformat(),
             "destinations_warmed": 0,
             "patterns_warmed": 0,
@@ -99,15 +99,21 @@ class CacheWarmingService:
             if isinstance(result, Exception):
                 error_msg = f"Failed to warm {destination}: {result}"
                 self.logger.error(error_msg)
-                results["errors"].append(error_msg)
+                errors_list = results["errors"]
+                if isinstance(errors_list, list):
+                    errors_list.append(error_msg)
                 results["destination_results"][destination] = {
                     "success": False,
                     "error": str(result),
                 }
-            else:
-                results["destinations_warmed"] += 1
-                results["patterns_warmed"] += result["patterns_warmed"]
-                results["total_cache_entries"] += result["cache_entries"]
+            elif isinstance(result, dict):
+                results["destinations_warmed"] = int(results["destinations_warmed"]) + 1
+                results["patterns_warmed"] = int(results["patterns_warmed"]) + result.get(
+                    "patterns_warmed", 0
+                )
+                results["total_cache_entries"] = int(results["total_cache_entries"]) + result.get(
+                    "cache_entries", 0
+                )
                 results["destination_results"][destination] = result
 
         results["completed_at"] = datetime.now(UTC).isoformat()
@@ -135,7 +141,7 @@ class CacheWarmingService:
             self.logger.info(f"Warming cache for destination: {destination}")
 
             hotel_agent = await self.get_hotel_agent()
-            result = {
+            result: dict[str, Any] = {
                 "success": True,
                 "patterns_warmed": 0,
                 "cache_entries": 0,
@@ -166,9 +172,11 @@ class CacheWarmingService:
                     end_time = datetime.now(UTC)
 
                     search_time_ms = int((end_time - start_time).total_seconds() * 1000)
-                    result["search_times"].append(search_time_ms)
-                    result["patterns_warmed"] += 1
-                    result["cache_entries"] += len(response.hotels)
+                    search_times_list = result["search_times"]
+                    if isinstance(search_times_list, list):
+                        search_times_list.append(search_time_ms)
+                    result["patterns_warmed"] = int(result["patterns_warmed"]) + 1
+                    result["cache_entries"] = int(result["cache_entries"]) + len(response.hotels)
 
                     self.logger.debug(
                         f"Warmed {destination} pattern (guests={pattern['guest_count']}, "
@@ -181,7 +189,9 @@ class CacheWarmingService:
                 except Exception as e:
                     error_msg = f"Failed to warm pattern {pattern} for {destination}: {e}"
                     self.logger.warning(error_msg)
-                    result["errors"].append(error_msg)
+                    errors_list = result["errors"]
+                    if isinstance(errors_list, list):
+                        errors_list.append(error_msg)
 
             return result
 
@@ -228,7 +238,7 @@ class CacheWarmingService:
         """
         self.logger.info(f"Warming cache for {len(recent_searches)} recent user searches")
 
-        results = {
+        results: dict[str, Any] = {
             "searches_warmed": 0,
             "cache_entries": 0,
             "errors": [],
@@ -258,18 +268,22 @@ class CacheWarmingService:
 
                             # Execute search to warm cache
                             response = await hotel_agent.process(future_search)
-                            results["cache_entries"] += len(response.hotels)
+                            results["cache_entries"] = int(results["cache_entries"]) + len(
+                                response.hotels
+                            )
 
                     except (ValueError, KeyError) as e:
                         self.logger.warning(f"Could not parse dates in search: {e}")
                         continue
 
-                results["searches_warmed"] += 1
+                results["searches_warmed"] = int(results["searches_warmed"]) + 1
 
             except Exception as e:
                 error_msg = f"Failed to warm cache for search {search}: {e}"
                 self.logger.warning(error_msg)
-                results["errors"].append(error_msg)
+                errors_list = results["errors"]
+                if isinstance(errors_list, list):
+                    errors_list.append(error_msg)
 
         return results
 

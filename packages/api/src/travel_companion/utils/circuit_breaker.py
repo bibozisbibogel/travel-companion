@@ -40,7 +40,7 @@ class CircuitBreaker:
         self,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
-        expected_exception: type[Exception] = Exception,
+        expected_exception: type[Exception] | tuple[type[Exception], ...] = Exception,
         name: str = "CircuitBreaker",
     ):
         """
@@ -49,7 +49,7 @@ class CircuitBreaker:
         Args:
             failure_threshold: Number of failures before opening circuit
             recovery_timeout: Seconds to wait before trying again (half-open)
-            expected_exception: Exception type that triggers circuit breaker
+            expected_exception: Exception type or tuple of types that trigger circuit breaker
             name: Name for logging purposes
         """
         self.failure_threshold = failure_threshold
