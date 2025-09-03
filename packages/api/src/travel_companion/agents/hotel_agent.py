@@ -146,13 +146,22 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         # Validate and parse search request
         try:
             # Convert string dates to datetime objects if needed
-            check_in_date = request_data.get("check_in_date")
-            check_out_date = request_data.get("check_out_date")
+            check_in_raw = request_data.get("check_in_date")
+            check_out_raw = request_data.get("check_out_date")
 
-            if isinstance(check_in_date, str):
-                check_in_date = datetime.fromisoformat(check_in_date)
-            if isinstance(check_out_date, str):
-                check_out_date = datetime.fromisoformat(check_out_date)
+            if isinstance(check_in_raw, str):
+                check_in_date = datetime.fromisoformat(check_in_raw)
+            elif isinstance(check_in_raw, datetime):
+                check_in_date = check_in_raw
+            else:
+                raise ValueError("Invalid check_in_date format")
+
+            if isinstance(check_out_raw, str):
+                check_out_date = datetime.fromisoformat(check_out_raw)
+            elif isinstance(check_out_raw, datetime):
+                check_out_date = check_out_raw
+            else:
+                raise ValueError("Invalid check_out_date format")
 
             # Create HotelSearchRequest for validation
             search_request = HotelSearchRequest(
@@ -184,8 +193,8 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         )
 
         # Implement API fallback chain: Booking.com → Expedia → Airbnb
-        hotels = []
-        search_metadata = {
+        hotels: list[HotelOption] = []
+        search_metadata: dict[str, Any] = {
             "location": search_request.location,
             "check_in_date": search_request.check_in_date.isoformat(),
             "check_out_date": search_request.check_out_date.isoformat(),
@@ -241,6 +250,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                     )
 
                     hotel_option = HotelOption(
+                        trip_id=None,
                         external_id=f"booking_{booking_hotel.hotel_id}",
                         name=booking_hotel.name,
                         location=hotel_location,
@@ -309,6 +319,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                         )
 
                         hotel_option = HotelOption(
+                            trip_id=None,
                             external_id=f"expedia_{expedia_hotel.hotel_id}",
                             name=expedia_hotel.name,
                             location=hotel_location,
@@ -349,6 +360,8 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                         max_results=search_request.max_results,
                         currency=search_request.currency,
                         language="en",
+                        property_type=None,
+                        min_price=None,
                         max_price=float(search_request.budget_per_night)
                         if search_request.budget_per_night
                         else None,
@@ -369,6 +382,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                             )
 
                             hotel_option = HotelOption(
+                                trip_id=None,
                                 external_id=f"airbnb_{airbnb_listing.listing_id}",
                                 name=airbnb_listing.name,
                                 location=hotel_location,
@@ -407,6 +421,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             total_results=len(hotels),
             search_time_ms=search_time_ms,
             cached=False,
+            cache_expires_at=None,
         )
 
         self.logger.info(

@@ -182,8 +182,10 @@ class AirbnbClient:
                         try:
                             error_data = response.json()
                             if isinstance(error_data, dict):
-                                error_detail = error_data.get(
-                                    "error_message", error_data.get("message", error_detail)
+                                error_detail = str(
+                                    error_data.get(
+                                        "error_message", error_data.get("message", error_detail)
+                                    )
                                 )
                         except Exception:
                             error_detail = response.text[:200] if response.text else error_detail
@@ -198,9 +200,11 @@ class AirbnbClient:
                         )
                         raise ExternalAPIError(f"Airbnb API error: {error_detail}")
 
-                    return response.json()
+                    response_data = response.json()
+                    return response_data if isinstance(response_data, dict) else {}
 
-                return await self.circuit_breaker.call(make_api_call)
+                result = await self.circuit_breaker.call(make_api_call)
+                return result if isinstance(result, dict) else {}
 
             except httpx.TimeoutException as e:
                 logger.error("Airbnb API timeout", extra={"url": url, "error": str(e)})

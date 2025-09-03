@@ -184,9 +184,11 @@ class ExpediaClient:
                         )
                         raise ExternalAPIError(f"Expedia API error: {error_detail}")
 
-                    return response.json()
+                    response_data = response.json()
+                    return response_data if isinstance(response_data, dict) else {}
 
-                return await self.circuit_breaker.call(make_api_call)
+                result = await self.circuit_breaker.call(make_api_call)
+                return result if isinstance(result, dict) else {}
 
             except httpx.TimeoutException as e:
                 logger.error("Expedia API timeout", extra={"url": url, "error": str(e)})

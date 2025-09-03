@@ -211,7 +211,7 @@ class HotelSearchRequest(BaseModel):
 
     @field_validator("check_out_date")
     @classmethod
-    def validate_checkout_after_checkin(cls, v: datetime, info) -> datetime:
+    def validate_checkout_after_checkin(cls, v: datetime, info: Any) -> datetime:
         """Validate check-out date is after check-in date."""
         if hasattr(info, "data") and "check_in_date" in info.data:
             if v <= info.data["check_in_date"]:

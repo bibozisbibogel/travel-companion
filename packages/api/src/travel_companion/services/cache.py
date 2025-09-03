@@ -228,7 +228,7 @@ class CacheManager:
             Dictionary with cache statistics
         """
         try:
-            stats = {
+            stats: dict[str, Any] = {
                 "total_hotel_cache_keys": 0,
                 "total_metadata_keys": 0,
                 "cache_memory_usage": 0,
@@ -242,9 +242,9 @@ class CacheManager:
             async for key in self.redis.client.scan_iter(match="hotel_agent:*"):
                 if not key.endswith(":meta"):
                     hotel_keys.append(key)
-                    stats["total_hotel_cache_keys"] += 1
+                    stats["total_hotel_cache_keys"] = int(stats["total_hotel_cache_keys"]) + 1
                 else:
-                    stats["total_metadata_keys"] += 1
+                    stats["total_metadata_keys"] = int(stats["total_metadata_keys"]) + 1
 
             # Analyze cache timestamps
             timestamps = []
@@ -262,7 +262,7 @@ class CacheManager:
 
             # Estimate memory usage (rough calculation)
             stats["cache_memory_usage"] = (
-                stats["total_hotel_cache_keys"] * 10240
+                int(stats["total_hotel_cache_keys"]) * 10240
             )  # ~10KB per entry estimate
 
             return stats
