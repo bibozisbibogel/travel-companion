@@ -162,7 +162,13 @@ class TestBaseAgent:
         cache_key = await test_agent._cache_key(request_data)
 
         assert cache_key.startswith("TestAgent:")
-        assert len(cache_key) == len("TestAgent:") + 32  # MD5 hash length
+        # New format: agent_name:location_part:date_part:hash
+        # Should have 4 parts separated by colons
+        parts = cache_key.split(":")
+        assert len(parts) == 4
+        assert parts[0] == "TestAgent"
+        assert parts[3]  # Should have a hash part
+        assert len(parts[3]) == 32  # MD5 hash length
 
         # Same data should generate same key
         cache_key2 = await test_agent._cache_key(request_data)

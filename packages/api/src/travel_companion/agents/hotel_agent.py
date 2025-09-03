@@ -17,6 +17,7 @@ from travel_companion.models.external import (
     HotelSearchRequest,
     HotelSearchResponse,
 )
+from travel_companion.services.cache import CacheManager
 from travel_companion.services.external_apis.airbnb import (
     AirbnbClient,
     AirbnbSearchParams,
@@ -60,6 +61,9 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         self._booking_client = BookingClient(timeout=self.timeout_seconds)
         self._expedia_client = ExpediaClient()
         self._airbnb_client = AirbnbClient()
+
+        # Initialize enhanced cache manager
+        self._cache_manager = CacheManager(self.redis)
 
         self.logger.info(
             f"Hotel agent initialized with cache_ttl={self.cache_ttl_seconds}s, "
@@ -106,22 +110,19 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         # Generate cache key
         cache_key = await self._cache_key(request_data)
 
-        # Try to get cached result
-        cached_result = await self._get_cached_result(cache_key)
+        # Try to get cached result using enhanced cache manager
+        cached_result = await self._cache_manager.get_hotel_search_cache(cache_key)
         if cached_result:
             self.logger.info("Returning cached hotel search results")
-            # Convert dict back to HotelSearchResponse if needed
-            if isinstance(cached_result, dict):
-                return HotelSearchResponse(**cached_result)
             return cached_result
 
         # Process new search request
         try:
             search_response = await self._search_hotels(request_data)
 
-            # Cache the result
-            await self._set_cached_result(
-                cache_key, search_response.model_dump(), expire_seconds=self.cache_ttl_seconds
+            # Cache the result using enhanced cache manager
+            await self._cache_manager.set_hotel_search_cache(
+                cache_key, search_response, ttl_seconds=self.cache_ttl_seconds
             )
 
             self.logger.info(f"Hotel search completed: found {len(search_response.hotels)} options")
@@ -826,3 +827,49 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         }
 
         return paginated_results, metadata
+
+    async def invalidate_location_cache(self, location: str) -> int:
+        """Invalidate all cached hotel results for a specific location.
+
+        Args:
+            location: Location identifier to invalidate
+
+        Returns:
+            Number of cache entries invalidated
+        """
+        return await self._cache_manager.invalidate_hotel_location_cache(location)
+
+    async def invalidate_outdated_cache(self, max_age_minutes: int = 30) -> int:
+        """Invalidate hotel cache entries older than specified age.
+
+        Args:
+            max_age_minutes: Maximum age in minutes before invalidation
+
+        Returns:
+            Number of cache entries invalidated
+        """
+        return await self._cache_manager.invalidate_outdated_hotel_cache(max_age_minutes)
+
+    async def warm_popular_destinations_cache(
+        self, destinations: list[str], search_params: dict[str, Any] | None = None
+    ) -> dict[str, bool]:
+        """Pre-warm cache for popular hotel destinations.
+
+        Args:
+            destinations: List of popular destination names/locations
+            search_params: Default search parameters for warming
+
+        Returns:
+            Dictionary mapping destination to warming success status
+        """
+        return await self._cache_manager.warm_popular_hotel_destinations(
+            destinations, search_params
+        )
+
+    async def get_cache_statistics(self) -> dict[str, Any]:
+        """Get hotel caching statistics and metrics.
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        return await self._cache_manager.get_cache_statistics()

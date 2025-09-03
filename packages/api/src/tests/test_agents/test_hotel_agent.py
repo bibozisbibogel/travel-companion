@@ -207,13 +207,16 @@ class TestHotelAgent:
             "guest_count": 2,
         }
 
-        result = await hotel_agent.process(request_data)
+        await hotel_agent.process(request_data)
 
-        # Should cache the new result
-        mock_redis.set.assert_called_once()
-        args, kwargs = mock_redis.set.call_args
-        assert args[1] == result.model_dump()
-        assert kwargs["expire"] == 1800  # cache_ttl_seconds
+        # Should cache the new result (main data + metadata = 2 calls)
+        assert mock_redis.set.call_count == 2
+        # First call should be for the main cache data
+        main_call_args, main_call_kwargs = mock_redis.set.call_args_list[0]
+        cached_data = main_call_args[1]
+        assert "cache_timestamp" in cached_data  # Enhanced cache format
+        assert cached_data["cached"]
+        assert main_call_kwargs["expire"] == 1800  # cache_ttl_seconds
 
     @pytest.mark.asyncio
     async def test_search_hotels_by_location(self, hotel_agent):
@@ -279,7 +282,13 @@ class TestHotelAgent:
 
         assert key1 == key2
         assert key1.startswith("hotel_agent:")
-        assert len(key1) == len("hotel_agent:") + 32  # MD5 hash length
+        # New format: agent_name:location_part:date_part:hash
+        # Should have 4 parts separated by colons
+        parts = key1.split(":")
+        assert len(parts) == 4
+        assert parts[0] == "hotel_agent"
+        assert parts[3]  # Should have a hash part
+        assert len(parts[3]) == 32  # MD5 hash length
 
     @pytest.mark.asyncio
     async def test_cache_key_different_for_different_requests(self, hotel_agent):
@@ -643,14 +652,17 @@ class TestHotelSearchFunctionality:
         ):
             await hotel_agent.process(request_data)
 
-        # Should cache the new result
-        mock_redis.set.assert_called_once()
-        args, kwargs = mock_redis.set.call_args
-        cached_data = args[1]
+        # Should cache the new result (main data + metadata = 2 calls)
+        assert mock_redis.set.call_count == 2
+        # First call should be for the main cache data
+        main_call_args, main_call_kwargs = mock_redis.set.call_args_list[0]
+        cached_data = main_call_args[1]
 
         assert cached_data["total_results"] == 2
         assert len(cached_data["hotels"]) == 2
-        assert kwargs["expire"] == 1800  # cache_ttl_seconds
+        assert "cache_timestamp" in cached_data  # Enhanced cache format
+        assert cached_data["cached"]
+        assert main_call_kwargs["expire"] == 1800  # cache_ttl_seconds
 
     @pytest.mark.asyncio
     async def test_search_hotels_returns_cached_results(self, hotel_agent, mock_redis):

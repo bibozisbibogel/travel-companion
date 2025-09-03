@@ -274,7 +274,7 @@ class BookingClient:
                 f"Failed to parse Booking.com response: {e}",
                 service="booking",
                 details={"xml_response": xml_response[:500]},  # First 500 chars for debugging
-            )
+            ) from e
 
     async def search_hotels(self, params: HotelSearchParams) -> BookingApiResponse:
         """
@@ -303,7 +303,7 @@ class BookingClient:
             datetime.strptime(params.check_in, "%Y-%m-%d")
             datetime.strptime(params.check_out, "%Y-%m-%d")
         except ValueError as e:
-            raise ValueError(f"Invalid date format: {e}")
+            raise ValueError(f"Invalid date format: {e}") from e
 
         logger.info(
             f"Searching hotels: location={params.location}, "
@@ -390,7 +390,7 @@ class BookingClient:
                 f"Failed to connect to Booking.com API: {e}",
                 service="booking",
                 details={"endpoint": endpoint, "error": str(e)},
-            )
+            ) from e
 
     async def get_hotel_details(self, hotel_id: str) -> BookingHotelResult | None:
         """

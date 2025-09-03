@@ -95,7 +95,7 @@ class BaseAgent(ABC, Generic[T]):
         return status
 
     async def _cache_key(self, request_data: dict[str, Any]) -> str:
-        """Generate cache key for request data.
+        """Generate cache key for request data with enhanced strategy.
 
         Args:
             request_data: Request data to generate key from
@@ -106,17 +106,63 @@ class BaseAgent(ABC, Generic[T]):
         import hashlib
         import json
         from datetime import datetime
+        from decimal import Decimal
 
         def json_serializer(obj: Any) -> str:
-            """Custom JSON serializer for datetime objects."""
+            """Custom JSON serializer for datetime and Decimal objects."""
             if isinstance(obj, datetime):
                 return obj.isoformat()
+            elif isinstance(obj, Decimal):
+                return str(obj)
             raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
-        # Create deterministic hash from request data
-        sorted_data = json.dumps(request_data, sort_keys=True, default=json_serializer)
+        # Create normalized copy of request data for consistent caching
+        normalized_data = {}
+
+        # Normalize location (lowercase, strip spaces)
+        if "location" in request_data:
+            normalized_data["location"] = request_data["location"].lower().strip()
+
+        # Keep dates as strings for consistency
+        for date_field in ["check_in_date", "check_out_date"]:
+            if date_field in request_data:
+                if isinstance(request_data[date_field], datetime):
+                    normalized_data[date_field] = request_data[date_field].date().isoformat()
+                else:
+                    # Try to parse and normalize date format
+                    try:
+                        parsed_date = datetime.fromisoformat(str(request_data[date_field]))
+                        normalized_data[date_field] = parsed_date.date().isoformat()
+                    except (ValueError, TypeError):
+                        normalized_data[date_field] = str(request_data[date_field])
+
+        # Keep numeric values as consistent types
+        for numeric_field in ["guest_count", "room_count", "max_results"]:
+            if numeric_field in request_data:
+                normalized_data[numeric_field] = int(request_data[numeric_field])
+
+        # Handle budget with consistent decimal precision
+        if "budget" in request_data and request_data["budget"] is not None:
+            normalized_data["budget"] = f"{float(request_data['budget']):.2f}"
+
+        # Keep currency uppercase for consistency
+        if "currency" in request_data:
+            normalized_data["currency"] = request_data["currency"].upper()
+
+        # Add any remaining fields
+        for key, value in request_data.items():
+            if key not in normalized_data:
+                normalized_data[key] = value
+
+        # Create deterministic hash from normalized data
+        sorted_data = json.dumps(normalized_data, sort_keys=True, default=json_serializer)
         hash_obj = hashlib.md5(sorted_data.encode())
-        return f"{self.agent_name}:{hash_obj.hexdigest()}"
+
+        # Create hierarchical cache key structure for better organization
+        location_part = normalized_data.get("location", "unknown").replace(" ", "_")[:20]
+        date_part = normalized_data.get("check_in_date", "no_date").replace("-", "")
+
+        return f"{self.agent_name}:{location_part}:{date_part}:{hash_obj.hexdigest()}"
 
     async def _get_cached_result(self, cache_key: str) -> T | None:
         """Get cached result from Redis.

@@ -277,7 +277,7 @@ class TestExpediaClient:
 
         with patch.object(expedia_client.client, "request", return_value=mock_response):
             # Make multiple requests to trigger circuit breaker
-            for i in range(6):  # Circuit breaker threshold is 5
+            for _i in range(6):  # Circuit breaker threshold is 5
                 with pytest.raises(ExternalAPIError):
                     await expedia_client.search_hotels(expedia_search_params)
 
@@ -321,7 +321,7 @@ class TestExpediaClient:
         with patch.object(
             expedia_client.client, "request", return_value=mock_response
         ) as mock_request:
-            results = await expedia_client.search_hotels(params_with_high_max_results)
+            await expedia_client.search_hotels(params_with_high_max_results)
 
             # Verify that the request was made with corrected parameters
             call_args = mock_request.call_args

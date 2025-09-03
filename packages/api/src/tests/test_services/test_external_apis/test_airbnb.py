@@ -277,7 +277,7 @@ class TestAirbnbClient:
 
         with patch.object(airbnb_client.client, "request", return_value=mock_response):
             # Make multiple requests to trigger circuit breaker (threshold is 3 for Airbnb)
-            for i in range(4):
+            for _i in range(4):
                 with pytest.raises(ExternalAPIError):
                     await airbnb_client.search_listings(airbnb_search_params)
 
@@ -322,7 +322,7 @@ class TestAirbnbClient:
         with patch.object(
             airbnb_client.client, "request", return_value=mock_response
         ) as mock_request:
-            results = await airbnb_client.search_listings(params)
+            await airbnb_client.search_listings(params)
 
             # Verify that the request was made with all parameters including filters
             call_args = mock_request.call_args
