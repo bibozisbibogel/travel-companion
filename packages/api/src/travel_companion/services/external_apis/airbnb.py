@@ -66,7 +66,7 @@ class AirbnbListingResult(BaseModel):
 class AirbnbClient:
     """
     Airbnb API client for accommodation search operations.
-    
+
     Implements rate limiting, circuit breaker pattern, and comprehensive error handling.
     """
 
@@ -155,6 +155,7 @@ class AirbnbClient:
                 request_headers.update(headers)
 
             try:
+
                 async def make_api_call() -> dict[str, Any]:
                     """Make the actual API call."""
                     response = await self.client.request(
@@ -181,8 +182,9 @@ class AirbnbClient:
                         try:
                             error_data = response.json()
                             if isinstance(error_data, dict):
-                                error_detail = error_data.get("error_message",
-                                                              error_data.get("message", error_detail))
+                                error_detail = error_data.get(
+                                    "error_message", error_data.get("message", error_detail)
+                                )
                         except Exception:
                             error_detail = response.text[:200] if response.text else error_detail
 
@@ -263,7 +265,7 @@ class AirbnbClient:
             # Parse response
             listings = []
             if "search_results" in response_data:
-                for listing_data in response_data["search_results"][:params.max_results]:
+                for listing_data in response_data["search_results"][: params.max_results]:
                     try:
                         listing = self._parse_listing_result(listing_data)
                         listings.append(listing)
@@ -340,8 +342,7 @@ class AirbnbClient:
         amenities = []
         if "listing" in listing_data and "amenities" in listing_data["listing"]:
             amenities = [
-                amenity.get("name", "")
-                for amenity in listing_data["listing"]["amenities"]
+                amenity.get("name", "") for amenity in listing_data["listing"]["amenities"]
             ]
 
         # Extract photos
@@ -423,4 +424,3 @@ class AirbnbClient:
     async def close(self) -> None:
         """Close the HTTP client."""
         await self.client.aclose()
-

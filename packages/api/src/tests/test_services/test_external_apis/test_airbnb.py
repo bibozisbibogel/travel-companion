@@ -35,7 +35,7 @@ def airbnb_search_params():
         currency="USD",
         language="en",
         min_price=50.0,
-        max_price=300.0
+        max_price=300.0,
     )
 
 
@@ -57,27 +57,16 @@ def sample_airbnb_response():
                     "bedrooms": 2,
                     "bathrooms": 1.5,
                     "person_capacity": 4,
-                    "amenities": [
-                        {"name": "WiFi"},
-                        {"name": "Kitchen"},
-                        {"name": "Washer"}
-                    ],
+                    "amenities": [{"name": "WiFi"}, {"name": "Kitchen"}, {"name": "Washer"}],
                     "pictures": [
                         {"large": "https://example.com/large1.jpg"},
-                        {"medium": "https://example.com/medium1.jpg"}
+                        {"medium": "https://example.com/medium1.jpg"},
                     ],
                     "description": "Beautiful apartment in Brooklyn",
                     "instant_book": True,
-                    "user": {
-                        "first_name": "Sarah"
-                    }
+                    "user": {"first_name": "Sarah"},
                 },
-                "pricing_quote": {
-                    "rate": {
-                        "amount": 120.0,
-                        "currency": "USD"
-                    }
-                }
+                "pricing_quote": {"rate": {"amount": 120.0, "currency": "USD"}},
             }
         ]
     }
@@ -96,32 +85,34 @@ class TestAirbnbClient:
         client = AirbnbClient(credentials=airbnb_credentials)
         assert client.credentials.api_key == "test_airbnb_key"
         assert client.base_url == "https://api.airbnb.com/v2"
-        
+
         # Cleanup
         await client.close()
 
-    @patch('travel_companion.services.external_apis.airbnb.get_settings')
+    @patch("travel_companion.services.external_apis.airbnb.get_settings")
     async def test_init_with_default_credentials(self, mock_settings):
         """Test AirbnbClient initialization with default credentials from settings."""
         mock_settings_instance = AsyncMock()
         mock_settings_instance.airbnb_api_key = "settings_airbnb_key"
         mock_settings.return_value = mock_settings_instance
-        
+
         client = AirbnbClient()
         assert client.credentials.api_key == "settings_airbnb_key"
-        
+
         # Cleanup
         await client.close()
 
-    async def test_successful_listing_search(self, airbnb_client, airbnb_search_params, sample_airbnb_response):
+    async def test_successful_listing_search(
+        self, airbnb_client, airbnb_search_params, sample_airbnb_response
+    ):
         """Test successful listing search via Airbnb API."""
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = sample_airbnb_response
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             results = await airbnb_client.search_listings(airbnb_search_params)
-            
+
             assert len(results) == 1
             listing = results[0]
             assert isinstance(listing, AirbnbListingResult)
@@ -149,8 +140,8 @@ class TestAirbnbClient:
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_results": []}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             results = await airbnb_client.search_listings(airbnb_search_params)
             assert results == []
 
@@ -158,19 +149,28 @@ class TestAirbnbClient:
         """Test handling of rate limit errors (429)."""
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 429
-        
+
         # Mock the circuit breaker call to bypass it and test the specific error handling
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response), \
-             patch.object(airbnb_client.circuit_breaker, 'call', side_effect=RateLimitError("Airbnb API rate limit exceeded")):
-            with pytest.raises(ExternalAPIError, match="Airbnb listing search failed: Airbnb API rate limit exceeded"):
+        with (
+            patch.object(airbnb_client.client, "request", return_value=mock_response),
+            patch.object(
+                airbnb_client.circuit_breaker,
+                "call",
+                side_effect=RateLimitError("Airbnb API rate limit exceeded"),
+            ),
+        ):
+            with pytest.raises(
+                ExternalAPIError,
+                match="Airbnb listing search failed: Airbnb API rate limit exceeded",
+            ):
                 await airbnb_client.search_listings(airbnb_search_params)
 
     async def test_authentication_error(self, airbnb_client, airbnb_search_params):
         """Test handling of authentication errors (401)."""
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 401
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             with pytest.raises(ExternalAPIError, match="Airbnb API authentication failed"):
                 await airbnb_client.search_listings(airbnb_search_params)
 
@@ -179,9 +179,11 @@ class TestAirbnbClient:
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 500
         mock_response.json.return_value = {"error_message": "Service temporarily unavailable"}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
-            with pytest.raises(ExternalAPIError, match="Airbnb API error: Service temporarily unavailable"):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
+            with pytest.raises(
+                ExternalAPIError, match="Airbnb API error: Service temporarily unavailable"
+            ):
                 await airbnb_client.search_listings(airbnb_search_params)
 
     async def test_server_error_without_message(self, airbnb_client, airbnb_search_params):
@@ -190,20 +192,24 @@ class TestAirbnbClient:
         mock_response.status_code = 404
         mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "response", 0)
         mock_response.text = "Page not found"
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             with pytest.raises(ExternalAPIError, match="Airbnb API error: Page not found"):
                 await airbnb_client.search_listings(airbnb_search_params)
 
     async def test_request_timeout(self, airbnb_client, airbnb_search_params):
         """Test handling of request timeouts."""
-        with patch.object(airbnb_client.client, 'request', side_effect=httpx.TimeoutException("Request timed out")):
+        with patch.object(
+            airbnb_client.client, "request", side_effect=httpx.TimeoutException("Request timed out")
+        ):
             with pytest.raises(ExternalAPIError, match="Airbnb API timeout"):
                 await airbnb_client.search_listings(airbnb_search_params)
 
     async def test_connection_error(self, airbnb_client, airbnb_search_params):
         """Test handling of connection errors."""
-        with patch.object(airbnb_client.client, 'request', side_effect=httpx.ConnectError("Connection failed")):
+        with patch.object(
+            airbnb_client.client, "request", side_effect=httpx.ConnectError("Connection failed")
+        ):
             with pytest.raises(ExternalAPIError, match="Airbnb API request error"):
                 await airbnb_client.search_listings(airbnb_search_params)
 
@@ -215,22 +221,17 @@ class TestAirbnbClient:
                     # Missing required 'listing' field
                     "invalid_field": "invalid_value"
                 },
-                {
-                    "listing": {
-                        "id": "valid_id",
-                        "name": "Valid Listing"
-                    }
-                }
+                {"listing": {"id": "valid_id", "name": "Valid Listing"}},
             ]
         }
-        
+
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = malformed_response
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             results = await airbnb_client.search_listings(airbnb_search_params)
-            
+
             # Should return results, including ones with missing fields (they get default values)
             assert len(results) == 2
             # The valid one should have proper data
@@ -246,14 +247,14 @@ class TestAirbnbClient:
         listing_details_response = {
             "listing": sample_airbnb_response["search_results"][0]["listing"]
         }
-        
+
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = listing_details_response
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             result = await airbnb_client.get_listing_details("67890")
-            
+
             assert result is not None
             assert result.listing_id == "67890"
             assert result.name == "Cozy Brooklyn Apartment"
@@ -263,8 +264,8 @@ class TestAirbnbClient:
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = {}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             result = await airbnb_client.get_listing_details("nonexistent")
             assert result is None
 
@@ -273,8 +274,8 @@ class TestAirbnbClient:
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 500
         mock_response.json.return_value = {"error_message": "Server error"}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             # Make multiple requests to trigger circuit breaker (threshold is 3 for Airbnb)
             for i in range(4):
                 with pytest.raises(ExternalAPIError):
@@ -285,19 +286,19 @@ class TestAirbnbClient:
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_results": []}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             # Make multiple concurrent requests
             start_time = asyncio.get_event_loop().time()
-            
+
             tasks = []
             for _ in range(3):
                 task = airbnb_client.search_listings(airbnb_search_params)
                 tasks.append(task)
-            
+
             await asyncio.gather(*tasks)
             end_time = asyncio.get_event_loop().time()
-            
+
             # Should take some time due to rate limiting
             duration = end_time - start_time
             assert duration >= 1.0  # At least 1 second due to rate limiting
@@ -311,51 +312,59 @@ class TestAirbnbClient:
             guest_count=6,
             property_type="house",
             min_price=100.0,
-            max_price=400.0
+            max_price=400.0,
         )
-        
+
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_results": []}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response) as mock_request:
+
+        with patch.object(
+            airbnb_client.client, "request", return_value=mock_response
+        ) as mock_request:
             results = await airbnb_client.search_listings(params)
-            
+
             # Verify that the request was made with all parameters including filters
             call_args = mock_request.call_args
-            request_params = call_args[1]['params']
-            
-            assert request_params['location'] == "San Francisco, CA"
-            assert request_params['guests'] == 6
-            assert request_params['property_type_id'] == "house"
-            assert request_params['price_min'] == 100
-            assert request_params['price_max'] == 400
+            request_params = call_args[1]["params"]
+
+            assert request_params["location"] == "San Francisco, CA"
+            assert request_params["guests"] == 6
+            assert request_params["property_type_id"] == "house"
+            assert request_params["price_min"] == 100
+            assert request_params["price_max"] == 400
 
     async def test_request_headers_and_auth(self, airbnb_client, airbnb_search_params):
         """Test that proper headers and authentication are set."""
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_results": []}
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response) as mock_request:
+
+        with patch.object(
+            airbnb_client.client, "request", return_value=mock_response
+        ) as mock_request:
             await airbnb_client.search_listings(airbnb_search_params)
-            
+
             call_args = mock_request.call_args
-            headers = call_args[1]['headers']
-            
-            assert headers['X-Airbnb-API-Key'] == "test_airbnb_key"
-            assert headers['Content-Type'] == "application/json"
-            assert headers['Accept'] == "application/json"
-            assert headers['User-Agent'] == "TravelCompanion/1.0"
+            headers = call_args[1]["headers"]
+
+            assert headers["X-Airbnb-API-Key"] == "test_airbnb_key"
+            assert headers["Content-Type"] == "application/json"
+            assert headers["Accept"] == "application/json"
+            assert headers["User-Agent"] == "TravelCompanion/1.0"
 
     async def test_close_client(self, airbnb_client):
         """Test that the HTTP client is properly closed."""
-        with patch.object(airbnb_client.client, 'aclose') as mock_close:
+        with patch.object(airbnb_client.client, "aclose") as mock_close:
             await airbnb_client.close()
             mock_close.assert_called_once()
 
-    @pytest.mark.parametrize("missing_field", ["lat", "lng", "star_rating", "reviews_count", "bedrooms"])
-    async def test_partial_listing_data_handling(self, airbnb_client, airbnb_search_params, missing_field):
+    @pytest.mark.parametrize(
+        "missing_field", ["lat", "lng", "star_rating", "reviews_count", "bedrooms"]
+    )
+    async def test_partial_listing_data_handling(
+        self, airbnb_client, airbnb_search_params, missing_field
+    ):
         """Test handling of partial listing data with missing optional fields."""
         listing_data = {
             "id": "12345",
@@ -364,33 +373,28 @@ class TestAirbnbClient:
             "lng": -74.0060,
             "star_rating": 4.5,
             "reviews_count": 100,
-            "bedrooms": 1
+            "bedrooms": 1,
         }
-        
+
         # Remove the specified field to test partial data handling
         del listing_data[missing_field]
-        
+
         response_data = {
             "search_results": [
                 {
                     "listing": listing_data,
-                    "pricing_quote": {
-                        "rate": {
-                            "amount": 100.0,
-                            "currency": "USD"
-                        }
-                    }
+                    "pricing_quote": {"rate": {"amount": 100.0, "currency": "USD"}},
                 }
             ]
         }
-        
+
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = response_data
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             results = await airbnb_client.search_listings(airbnb_search_params)
-            
+
             # Should still return results even with missing optional fields
             assert len(results) == 1
             listing = results[0]
@@ -402,22 +406,19 @@ class TestAirbnbClient:
         response_data = {
             "search_results": [
                 {
-                    "listing": {
-                        "id": "12345",
-                        "name": "Free Listing"
-                    }
+                    "listing": {"id": "12345", "name": "Free Listing"}
                     # No pricing_quote field
                 }
             ]
         }
-        
+
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = response_data
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             results = await airbnb_client.search_listings(airbnb_search_params)
-            
+
             assert len(results) == 1
             listing = results[0]
             assert listing.listing_id == "12345"
@@ -430,30 +431,25 @@ class TestAirbnbClient:
         # Create a large response
         large_response = {
             "search_results": [
-                {
-                    "listing": {
-                        "id": f"listing_{i}",
-                        "name": f"Listing {i}"
-                    }
-                }
+                {"listing": {"id": f"listing_{i}", "name": f"Listing {i}"}}
                 for i in range(150)  # More than the max limit
             ]
         }
-        
+
         mock_response = AsyncMock(spec=Response)
         mock_response.status_code = 200
         mock_response.json.return_value = large_response
-        
+
         params = AirbnbSearchParams(
             location="Test City",
             check_in="2024-03-15",
             check_out="2024-03-18",
             guest_count=2,
-            max_results=50
+            max_results=50,
         )
-        
-        with patch.object(airbnb_client.client, 'request', return_value=mock_response):
+
+        with patch.object(airbnb_client.client, "request", return_value=mock_response):
             results = await airbnb_client.search_listings(params)
-            
+
             # Should be limited to max_results
             assert len(results) == 50

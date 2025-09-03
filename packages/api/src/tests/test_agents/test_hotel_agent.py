@@ -48,11 +48,7 @@ class TestHotelAgent:
     @pytest.fixture
     def hotel_agent(self, mock_settings, mock_database, mock_redis) -> HotelAgent:
         """Create HotelAgent instance for testing."""
-        return HotelAgent(
-            settings=mock_settings,
-            database=mock_database,
-            redis=mock_redis
-        )
+        return HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
 
     def test_hotel_agent_initialization(self, hotel_agent, mock_settings):
         """Test HotelAgent initializes correctly with configurations."""
@@ -67,11 +63,7 @@ class TestHotelAgent:
         # Create settings without hotel-specific attributes
         settings = MagicMock(spec=Settings)
 
-        agent = HotelAgent(
-            settings=settings,
-            database=mock_database,
-            redis=mock_redis
-        )
+        agent = HotelAgent(settings=settings, database=mock_database, redis=mock_redis)
 
         # Should use default values when settings don't have hotel-specific attributes
         assert agent.cache_ttl_seconds == 1800  # Default
@@ -132,12 +124,23 @@ class TestHotelAgent:
         }
 
         # Mock all API clients to raise exception (no credentials configured)
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         side_effect=Exception("API credentials not configured")), \
-             patch.object(hotel_agent._expedia_client, 'search_hotels',
-                         side_effect=Exception("API credentials not configured")), \
-             patch.object(hotel_agent._airbnb_client, 'search_listings',
-                         side_effect=Exception("API credentials not configured")):
+        with (
+            patch.object(
+                hotel_agent._booking_client,
+                "search_hotels",
+                side_effect=Exception("API credentials not configured"),
+            ),
+            patch.object(
+                hotel_agent._expedia_client,
+                "search_hotels",
+                side_effect=Exception("API credentials not configured"),
+            ),
+            patch.object(
+                hotel_agent._airbnb_client,
+                "search_listings",
+                side_effect=Exception("API credentials not configured"),
+            ),
+        ):
             result = await hotel_agent.process(request_data)
 
         assert isinstance(result, HotelSearchResponse)
@@ -221,7 +224,7 @@ class TestHotelAgent:
             check_out_date="2024-07-03",
             guest_count=4,
             budget=200.0,
-            max_results=25
+            max_results=25,
         )
 
         assert isinstance(result, HotelSearchResponse)
@@ -240,7 +243,7 @@ class TestHotelAgent:
             check_in_date="2024-07-01",
             check_out_date="2024-07-03",
             guest_count=2,
-            max_results=150  # Greater than max_results_per_request (100)
+            max_results=150,  # Greater than max_results_per_request (100)
         )
 
         # Since APIs will fail due to missing credentials, check errors exist
@@ -254,7 +257,7 @@ class TestHotelAgent:
             location="Sydney",
             check_in_date="2024-08-01",
             check_out_date="2024-08-03",
-            guest_count=2
+            guest_count=2,
         )
 
         # Since APIs will fail due to missing credentials, check errors exist
@@ -396,7 +399,7 @@ class TestHotelSearchFunctionality:
                 amenities=["wifi", "pool", "gym"],
                 photos=["photo1.jpg", "photo2.jpg"],
                 description="Luxury hotel in downtown",
-                booking_url="https://booking.com/hotel/12345"
+                booking_url="https://booking.com/hotel/12345",
             ),
             BookingHotelResult(
                 hotel_id="67890",
@@ -409,25 +412,18 @@ class TestHotelSearchFunctionality:
                 rating=3.5,
                 amenities=["wifi"],
                 photos=["photo3.jpg"],
-                booking_url="https://booking.com/hotel/67890"
-            )
+                booking_url="https://booking.com/hotel/67890",
+            ),
         ]
 
         return BookingApiResponse(
-            hotels=hotels,
-            total_results=2,
-            search_time_ms=250,
-            api_response_time_ms=180
+            hotels=hotels, total_results=2, search_time_ms=250, api_response_time_ms=180
         )
 
     @pytest.fixture
     def hotel_agent(self, mock_settings, mock_database, mock_redis) -> HotelAgent:
         """Create HotelAgent instance for testing."""
-        return HotelAgent(
-            settings=mock_settings,
-            database=mock_database,
-            redis=mock_redis
-        )
+        return HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
 
     @pytest.mark.asyncio
     async def test_search_hotels_success(self, hotel_agent, mock_booking_response):
@@ -439,13 +435,16 @@ class TestHotelSearchFunctionality:
             "guest_count": 2,
             "room_count": 1,
             "currency": "USD",
-            "max_results": 50
+            "max_results": 50,
         }
 
         # Mock time to ensure measurable search time
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response), \
-             patch('time.time', side_effect=[1000.0, 1000.1]):  # 100ms difference
+        with (
+            patch.object(
+                hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+            ),
+            patch("time.time", side_effect=[1000.0, 1000.1]),
+        ):  # 100ms difference
             result = await hotel_agent.process(request_data)
 
         assert isinstance(result, HotelSearchResponse)
@@ -473,11 +472,12 @@ class TestHotelSearchFunctionality:
             "check_out_date": "2024-06-17",
             "guest_count": 2,
             "budget": 100.0,  # Should filter out hotels over $100/night
-            "currency": "USD"
+            "currency": "USD",
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response):
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+        ):
             result = await hotel_agent.process(request_data)
 
         # Should only include Budget Inn (80.0) and exclude Grand Hotel (150.0)
@@ -495,8 +495,9 @@ class TestHotelSearchFunctionality:
             "guest_count": 2,
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response) as mock_search:
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+        ) as mock_search:
             await hotel_agent.process(request_data)
 
         # Verify Booking.com API was called with correct date format
@@ -529,8 +530,9 @@ class TestHotelSearchFunctionality:
             "guest_count": 2,
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         side_effect=Exception("API timeout")):
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", side_effect=Exception("API timeout")
+        ):
             result = await hotel_agent.process(request_data)
 
         # Should return empty results with error info from all APIs
@@ -549,14 +551,11 @@ class TestHotelSearchFunctionality:
                 hotel_id="invalid",
                 name="",  # Empty name should cause validation error
                 price_per_night=-50.0,  # Negative price should cause error
-                currency="USD"
+                currency="USD",
             )
         ]
 
-        malformed_response = BookingApiResponse(
-            hotels=malformed_hotels,
-            total_results=1
-        )
+        malformed_response = BookingApiResponse(hotels=malformed_hotels, total_results=1)
 
         request_data = {
             "location": "Madrid",
@@ -565,8 +564,9 @@ class TestHotelSearchFunctionality:
             "guest_count": 1,
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=malformed_response):
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", return_value=malformed_response
+        ):
             result = await hotel_agent.process(request_data)
 
         # Should handle malformed hotels (might include or filter them depending on validation)
@@ -582,11 +582,12 @@ class TestHotelSearchFunctionality:
             "check_in_date": "2024-10-01",
             "check_out_date": "2024-10-03",
             "guest_count": 2,
-            "max_results": 150  # Above configured limit
+            "max_results": 150,  # Above configured limit
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response) as mock_search:
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+        ) as mock_search:
             await hotel_agent.process(request_data)
 
         # Should be limited to hotel_agent max_results_per_request (100)
@@ -604,11 +605,12 @@ class TestHotelSearchFunctionality:
             "room_count": 2,
             "budget": 200.0,
             "currency": "AUD",
-            "max_results": 25
+            "max_results": 25,
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response):
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+        ):
             result = await hotel_agent.process(request_data)
 
         metadata = result.search_metadata
@@ -623,7 +625,9 @@ class TestHotelSearchFunctionality:
         assert metadata["booking_api_response_time"] == 180
 
     @pytest.mark.asyncio
-    async def test_search_hotels_caches_results(self, hotel_agent, mock_redis, mock_booking_response):
+    async def test_search_hotels_caches_results(
+        self, hotel_agent, mock_redis, mock_booking_response
+    ):
         """Test hotel search results are properly cached."""
         request_data = {
             "location": "Barcelona",
@@ -634,8 +638,9 @@ class TestHotelSearchFunctionality:
 
         mock_redis.get.return_value = None  # No cached result initially
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response):
+        with patch.object(
+            hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+        ):
             await hotel_agent.process(request_data)
 
         # Should cache the new result
@@ -659,24 +664,26 @@ class TestHotelSearchFunctionality:
 
         # Setup cached response
         cached_response = {
-            "hotels": [{
-                "hotel_id": "12345678-1234-5678-9abc-123456789abc",
-                "external_id": "cached-hotel",
-                "name": "Cached Hotel",
-                "location": {"latitude": 41.9028, "longitude": 12.4964, "address": "Rome"},
-                "price_per_night": "120.00",
-                "currency": "EUR",
-                "rating": 4.0,
-                "amenities": [],
-                "photos": [],
-                "booking_url": None,
-                "created_at": "2024-01-01T12:00:00Z",
-                "trip_id": None
-            }],
+            "hotels": [
+                {
+                    "hotel_id": "12345678-1234-5678-9abc-123456789abc",
+                    "external_id": "cached-hotel",
+                    "name": "Cached Hotel",
+                    "location": {"latitude": 41.9028, "longitude": 12.4964, "address": "Rome"},
+                    "price_per_night": "120.00",
+                    "currency": "EUR",
+                    "rating": 4.0,
+                    "amenities": [],
+                    "photos": [],
+                    "booking_url": None,
+                    "created_at": "2024-01-01T12:00:00Z",
+                    "trip_id": None,
+                }
+            ],
             "search_metadata": {"location": "Rome"},
             "total_results": 1,
             "search_time_ms": 50,
-            "cached": True
+            "cached": True,
         }
         mock_redis.get.return_value = cached_response
 
@@ -698,9 +705,12 @@ class TestHotelSearchFunctionality:
             "guest_count": 2,
         }
 
-        with patch.object(hotel_agent._booking_client, 'search_hotels',
-                         return_value=mock_booking_response), \
-             patch('time.time', side_effect=[1000.0, 1000.05]):  # 50ms difference
+        with (
+            patch.object(
+                hotel_agent._booking_client, "search_hotels", return_value=mock_booking_response
+            ),
+            patch("time.time", side_effect=[1000.0, 1000.05]),
+        ):  # 50ms difference
             result = await hotel_agent.process(request_data)
 
         # Should track search performance

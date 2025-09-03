@@ -58,7 +58,7 @@ class ExpediaHotelResult(BaseModel):
 class ExpediaClient:
     """
     Expedia API client for hotel search operations.
-    
+
     Implements rate limiting, circuit breaker pattern, and comprehensive error handling.
     """
 
@@ -148,6 +148,7 @@ class ExpediaClient:
                 request_headers.update(headers)
 
             try:
+
                 async def make_api_call() -> dict[str, Any]:
                     """Make the actual API call."""
                     response = await self.client.request(
@@ -242,7 +243,7 @@ class ExpediaClient:
             # Parse response
             hotels = []
             if "properties" in response_data:
-                for property_data in response_data["properties"][:params.max_results]:
+                for property_data in response_data["properties"][: params.max_results]:
                     try:
                         hotel = self._parse_hotel_result(property_data)
                         hotels.append(hotel)
@@ -325,7 +326,9 @@ class ExpediaClient:
         # Extract photos
         photos = []
         if "images" in property_data:
-            photos = [img.get("url", "") for img in property_data["images"][:5]]  # Limit to 5 photos
+            photos = [
+                img.get("url", "") for img in property_data["images"][:5]
+            ]  # Limit to 5 photos
 
         # Extract booking URL
         booking_url = property_data.get("booking_url")
@@ -384,4 +387,3 @@ class ExpediaClient:
     async def close(self) -> None:
         """Close the HTTP client."""
         await self.client.aclose()
-

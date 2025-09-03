@@ -220,7 +220,12 @@ class TestBookingClient:
         """Test rate limiting mechanism."""
         # Mock the semaphore and timing
         with patch("asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value.time.side_effect = [0.0, 0.3, 0.3, 1.0]  # Simulate time progression
+            mock_loop.return_value.time.side_effect = [
+                0.0,
+                0.3,
+                0.3,
+                1.0,
+            ]  # Simulate time progression
 
             # First call should not sleep
             await booking_client._rate_limit()
@@ -304,7 +309,9 @@ class TestBookingClient:
             await booking_client.search_hotels(params)
 
     @pytest.mark.asyncio
-    async def test_search_hotels_success(self, booking_client, hotel_search_params, sample_xml_response):
+    async def test_search_hotels_success(
+        self, booking_client, hotel_search_params, sample_xml_response
+    ):
         """Test successful hotel search."""
         with patch.object(booking_client, "_rate_limit", return_value=None):
             with patch.object(booking_client._circuit_breaker, "call") as mock_circuit:

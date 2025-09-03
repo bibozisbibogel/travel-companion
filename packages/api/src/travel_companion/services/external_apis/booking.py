@@ -155,10 +155,10 @@ class BookingClient:
     def _create_hotel_search_xml(self, params: HotelSearchParams) -> str:
         """
         Create XML payload for hotel availability search.
-        
+
         Args:
             params: Hotel search parameters
-            
+
         Returns:
             XML payload string
         """
@@ -182,10 +182,10 @@ class BookingClient:
     def _parse_hotel_response(self, xml_response: str) -> BookingApiResponse:
         """
         Parse XML response from Booking.com hotel search.
-        
+
         Args:
             xml_response: XML response string
-            
+
         Returns:
             Parsed BookingApiResponse
         """
@@ -209,8 +209,12 @@ class BookingClient:
                     # Parse coordinates if available
                     location_elem = hotel_element.find("location")
                     if location_elem is not None:
-                        hotel_data["latitude"] = float(location_elem.findtext("latitude", "0") or "0")
-                        hotel_data["longitude"] = float(location_elem.findtext("longitude", "0") or "0")
+                        hotel_data["latitude"] = float(
+                            location_elem.findtext("latitude", "0") or "0"
+                        )
+                        hotel_data["longitude"] = float(
+                            location_elem.findtext("longitude", "0") or "0"
+                        )
 
                     # Parse rating if available
                     rating_text = hotel_element.findtext("rating")
@@ -226,7 +230,8 @@ class BookingClient:
                     amenities_elem = hotel_element.find("amenities")
                     if amenities_elem is not None:
                         hotel_data["amenities"] = [
-                            amenity.text for amenity in amenities_elem.findall("amenity")
+                            amenity.text
+                            for amenity in amenities_elem.findall("amenity")
                             if amenity.text
                         ]
 
@@ -234,8 +239,7 @@ class BookingClient:
                     photos_elem = hotel_element.find("photos")
                     if photos_elem is not None:
                         hotel_data["photos"] = [
-                            photo.text for photo in photos_elem.findall("photo")
-                            if photo.text
+                            photo.text for photo in photos_elem.findall("photo") if photo.text
                         ]
 
                     # Additional fields
@@ -269,19 +273,19 @@ class BookingClient:
             raise ExternalAPIError(
                 f"Failed to parse Booking.com response: {e}",
                 service="booking",
-                details={"xml_response": xml_response[:500]}  # First 500 chars for debugging
+                details={"xml_response": xml_response[:500]},  # First 500 chars for debugging
             )
 
     async def search_hotels(self, params: HotelSearchParams) -> BookingApiResponse:
         """
         Search for hotel availability using Booking.com API.
-        
+
         Args:
             params: Hotel search parameters
-            
+
         Returns:
             BookingApiResponse with hotel results
-            
+
         Raises:
             ExternalAPIError: For API errors
             RateLimitError: For rate limit exceeded
@@ -291,7 +295,7 @@ class BookingClient:
             raise ExternalAPIError(
                 "Booking.com API credentials not configured",
                 service="booking",
-                error_code="CREDENTIALS_MISSING"
+                error_code="CREDENTIALS_MISSING",
             )
 
         # Validate search parameters
@@ -316,9 +320,7 @@ class BookingClient:
         # Make API request through circuit breaker
         try:
             response = await self._circuit_breaker.call(
-                self._make_api_request,
-                "/json/bookings.getHotelAvailabilityV2",
-                xml_payload
+                self._make_api_request, "/json/bookings.getHotelAvailabilityV2", xml_payload
             )
 
             # Parse and return response
@@ -331,14 +333,14 @@ class BookingClient:
     async def _make_api_request(self, endpoint: str, xml_payload: str) -> str:
         """
         Make HTTP request to Booking.com API.
-        
+
         Args:
             endpoint: API endpoint
             xml_payload: XML payload
-            
+
         Returns:
             Response text
-            
+
         Raises:
             ExternalAPIError: For API errors
             RateLimitError: For rate limit exceeded
@@ -352,11 +354,7 @@ class BookingClient:
         start_time = datetime.now(UTC)
 
         try:
-            response = await self.client.post(
-                url,
-                content=xml_payload,
-                headers=headers
-            )
+            response = await self.client.post(url, content=xml_payload, headers=headers)
 
             # Calculate API response time
             end_time = datetime.now(UTC)
@@ -369,7 +367,7 @@ class BookingClient:
                 raise RateLimitError(
                     "Booking.com API rate limit exceeded",
                     service="booking",
-                    retry_after=retry_after
+                    retry_after=retry_after,
                 )
 
             # Handle other HTTP errors
@@ -380,7 +378,7 @@ class BookingClient:
                     error_msg,
                     service="booking",
                     status_code=response.status_code,
-                    details={"response_text": response.text}
+                    details={"response_text": response.text},
                 )
 
             logger.info(f"Booking.com API request completed in {response_time_ms}ms")
@@ -391,16 +389,16 @@ class BookingClient:
             raise ExternalAPIError(
                 f"Failed to connect to Booking.com API: {e}",
                 service="booking",
-                details={"endpoint": endpoint, "error": str(e)}
+                details={"endpoint": endpoint, "error": str(e)},
             )
 
     async def get_hotel_details(self, hotel_id: str) -> BookingHotelResult | None:
         """
         Get detailed information for a specific hotel.
-        
+
         Args:
             hotel_id: Booking.com hotel ID
-            
+
         Returns:
             Detailed hotel information or None if not found
         """
@@ -420,9 +418,7 @@ class BookingClient:
 
         try:
             response = await self._circuit_breaker.call(
-                self._make_api_request,
-                "/json/bookings.getHotelDescriptionPhotosV2",
-                xml_payload
+                self._make_api_request, "/json/bookings.getHotelDescriptionPhotosV2", xml_payload
             )
 
             # Parse hotel details response
@@ -436,7 +432,7 @@ class BookingClient:
     def get_health_status(self) -> dict[str, Any]:
         """
         Get health status of the Booking.com API client.
-        
+
         Returns:
             Health status dictionary
         """

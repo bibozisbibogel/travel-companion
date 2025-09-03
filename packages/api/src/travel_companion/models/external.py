@@ -194,6 +194,7 @@ class FlightComparisonResult(BaseModel):
 
 # Hotel-related models
 
+
 class HotelSearchRequest(BaseModel):
     """Request model for hotel search operations."""
 
@@ -212,8 +213,8 @@ class HotelSearchRequest(BaseModel):
     @classmethod
     def validate_checkout_after_checkin(cls, v: datetime, info) -> datetime:
         """Validate check-out date is after check-in date."""
-        if hasattr(info, 'data') and 'check_in_date' in info.data:
-            if v <= info.data['check_in_date']:
+        if hasattr(info, "data") and "check_in_date" in info.data:
+            if v <= info.data["check_in_date"]:
                 raise ValueError("Check-out date must be after check-in date")
         return v
 
