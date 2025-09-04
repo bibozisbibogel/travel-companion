@@ -4,7 +4,7 @@
 class TestValidationErrorHandling:
     """Test validation error handling middleware."""
 
-    def test_request_validation_error_handling(self, authenticated_client):
+    def test_request_validation_error_handling(self, authenticated_client) -> None:
         """Test handling of FastAPI RequestValidationError."""
 
         # Send invalid data to a validated endpoint - missing required fields
@@ -32,7 +32,7 @@ class TestValidationErrorHandling:
         assert "message" in error_detail
         assert "type" in error_detail
 
-    def test_request_validation_error_with_field_details(self, authenticated_client):
+    def test_request_validation_error_with_field_details(self, authenticated_client) -> None:
         """Test validation error with specific field validation failures."""
 
         # Send data with invalid field types/values
@@ -69,7 +69,7 @@ class TestValidationErrorHandling:
         field_paths = [error["field"] for error in errors]
         assert any("name" in path for path in field_paths)
 
-    def test_request_validation_error_with_nested_fields(self, authenticated_client):
+    def test_request_validation_error_with_nested_fields(self, authenticated_client) -> None:
         """Test validation errors in nested model structures."""
 
         response = authenticated_client.post(
@@ -104,7 +104,7 @@ class TestValidationErrorHandling:
         # Should have nested path for currency error
         assert any("requirements" in path and "currency" in path for path in field_paths)
 
-    def test_validation_error_response_format(self, authenticated_client):
+    def test_validation_error_response_format(self, authenticated_client) -> None:
         """Test that validation error response follows standardized format."""
 
         response = authenticated_client.post("/api/v1/trips/", json={"invalid": "data"})
@@ -124,7 +124,7 @@ class TestValidationErrorHandling:
         assert isinstance(data["data"], dict)
         assert "errors" in data["data"]
 
-    def test_validation_error_message_count(self, authenticated_client):
+    def test_validation_error_message_count(self, authenticated_client) -> None:
         """Test that error message includes correct error count."""
 
         # Create request with multiple validation errors
@@ -152,7 +152,7 @@ class TestValidationErrorHandling:
         error_count = len(data["data"]["errors"])
         assert f"{error_count} field(s)" in data["message"]
 
-    def test_valid_request_no_validation_error(self, authenticated_client):
+    def test_valid_request_no_validation_error(self, authenticated_client) -> None:
         """Test that valid requests don't trigger validation errors."""
 
         # This might fail due to other business logic, but shouldn't have validation errors
@@ -175,7 +175,7 @@ class TestValidationErrorHandling:
         # Should not be a validation error (422), might be auth error (401) or other
         assert response.status_code != 422
 
-    def test_validation_error_field_paths(self, authenticated_client):
+    def test_validation_error_field_paths(self, authenticated_client) -> None:
         """Test that field paths in validation errors are properly formatted."""
 
         response = authenticated_client.post(

@@ -19,7 +19,7 @@ from travel_companion.models.external import (
 
 class TripAdvisorLocation(BaseModel):
     """TripAdvisor location search result model."""
-    
+
     location_id: str = Field(..., description="TripAdvisor location ID")
     name: str = Field(..., description="Location name")
     address_obj: dict[str, Any] = Field(default_factory=dict, description="Address information")
@@ -29,7 +29,7 @@ class TripAdvisorLocation(BaseModel):
 
 class TripAdvisorAttraction(BaseModel):
     """TripAdvisor attraction/activity model."""
-    
+
     location_id: str = Field(..., description="TripAdvisor location ID")
     name: str = Field(..., description="Attraction name")
     description: str | None = Field(None, description="Attraction description")
@@ -53,16 +53,16 @@ class TripAdvisorAPIClient:
         self.settings = get_settings()
         self.logger = logging.getLogger("travel_companion.services.tripadvisor")
         self.base_url = "https://api.content.tripadvisor.com/api/v1"
-        
+
         # Circuit breaker state
         self.failure_count = 0
         self.last_failure_time: float = 0
         self.circuit_open = False
-        
+
         # Rate limiting
         self.request_count = 0
         self.rate_limit_reset_time: float = 0
-        
+
         self.logger.info("TripAdvisor API client initialized")
 
     async def search_activities(self, request: ActivitySearchRequest) -> list[ActivityOption]:
@@ -87,7 +87,7 @@ class TripAdvisorAPIClient:
 
             # Then search for attractions at that location
             attractions = await self._search_attractions(location_id, request)
-            
+
             # Convert to our internal format
             activities = []
             for attraction in attractions:
@@ -101,7 +101,7 @@ class TripAdvisorAPIClient:
 
             self.logger.info(f"TripAdvisor returned {len(activities)} activities")
             self._reset_circuit_breaker()
-            
+
             return activities
 
         except Exception as e:
@@ -119,11 +119,11 @@ class TripAdvisorAPIClient:
             TripAdvisor location ID or None if not found
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "accept": "application/json",
         }
-        
+
         params = {
             "key": self.settings.tripadvisor_api_key,
             "searchQuery": location,
@@ -133,32 +133,28 @@ class TripAdvisorAPIClient:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{self.base_url}/location/search",
-                headers=headers,
-                params=params
+                f"{self.base_url}/location/search", headers=headers, params=params
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 locations = data.get("data", [])
-                
+
                 if locations:
                     # Return the first location ID
                     location_data = TripAdvisorLocation(**locations[0])
                     self.logger.debug(f"Found TripAdvisor location ID: {location_data.location_id}")
                     return location_data.location_id
-                    
+
             elif response.status_code == 429:
                 await self._handle_rate_limit(response)
-                
+
             response.raise_for_status()
-            
+
         return None
 
     async def _search_attractions(
-        self, 
-        location_id: str, 
-        request: ActivitySearchRequest
+        self, location_id: str, request: ActivitySearchRequest
     ) -> list[TripAdvisorAttraction]:
         """Search for attractions at a specific location.
 
@@ -170,16 +166,16 @@ class TripAdvisorAPIClient:
             List of TripAdvisor attractions
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "accept": "application/json",
         }
-        
+
         params = {
             "key": self.settings.tripadvisor_api_key,
             "language": "en",
         }
-        
+
         # Add category filter if specified
         if request.category:
             tripadvisor_category = self._map_category_to_tripadvisor(request.category)
@@ -188,30 +184,24 @@ class TripAdvisorAPIClient:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{self.base_url}/location/{location_id}/details",
-                headers=headers,
-                params=params
+                f"{self.base_url}/location/{location_id}/details", headers=headers, params=params
             )
-            
+
             if response.status_code == 200:
-                data = response.json()
-                
                 # TripAdvisor returns location details, we need nearby attractions
                 # Try the nearby search endpoint instead
                 return await self._search_nearby_attractions(location_id, request)
-                
+
             elif response.status_code == 429:
                 await self._handle_rate_limit(response)
                 return []
-                
+
             response.raise_for_status()
-            
+
         return []
 
     async def _search_nearby_attractions(
-        self, 
-        location_id: str, 
-        request: ActivitySearchRequest
+        self, location_id: str, request: ActivitySearchRequest
     ) -> list[TripAdvisorAttraction]:
         """Search for nearby attractions using the nearby search endpoint.
 
@@ -223,11 +213,11 @@ class TripAdvisorAPIClient:
             List of TripAdvisor attractions
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "accept": "application/json",
         }
-        
+
         params = {
             "key": self.settings.tripadvisor_api_key,
             "latLong": await self._get_location_coordinates(location_id),
@@ -240,35 +230,33 @@ class TripAdvisorAPIClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/location/nearby_search",
-                    headers=headers,
-                    params=params
+                    f"{self.base_url}/location/nearby_search", headers=headers, params=params
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     attractions_data = data.get("data", [])
-                    
+
                     attractions = []
-                    for attraction_data in attractions_data[:request.max_results]:
+                    for attraction_data in attractions_data[: request.max_results]:
                         try:
                             attraction = TripAdvisorAttraction(**attraction_data)
                             attractions.append(attraction)
                         except Exception as e:
                             self.logger.debug(f"Failed to parse TripAdvisor attraction: {e}")
                             continue
-                    
+
                     return attractions
-                    
+
                 elif response.status_code == 429:
                     await self._handle_rate_limit(response)
                     return []
-                    
+
                 response.raise_for_status()
-                
+
         except Exception as e:
             self.logger.warning(f"TripAdvisor nearby search failed: {e}")
-            
+
         return []
 
     async def _get_location_coordinates(self, location_id: str) -> str:
@@ -284,7 +272,9 @@ class TripAdvisorAPIClient:
         # For now, return a default that will work for testing
         return "40.7128,-74.0060"  # NYC coordinates as fallback
 
-    async def _convert_to_activity(self, attraction: TripAdvisorAttraction) -> ActivityOption | None:
+    async def _convert_to_activity(
+        self, attraction: TripAdvisorAttraction
+    ) -> ActivityOption | None:
         """Convert TripAdvisor attraction to our internal ActivityOption model.
 
         Args:
@@ -297,7 +287,7 @@ class TripAdvisorAPIClient:
             # Extract location information
             lat = float(attraction.latitude) if attraction.latitude else 40.7128
             lng = float(attraction.longitude) if attraction.longitude else -74.0060
-            
+
             location = ActivityLocation(
                 latitude=lat,
                 longitude=lng,
@@ -378,10 +368,12 @@ class TripAdvisorAPIClient:
             ActivityCategory.FOOD: "food",
             ActivityCategory.RELAXATION: "spas",
         }
-        
+
         return category_mapping.get(category)
 
-    def _map_tripadvisor_category_to_internal(self, attraction: TripAdvisorAttraction) -> ActivityCategory:
+    def _map_tripadvisor_category_to_internal(
+        self, attraction: TripAdvisorAttraction
+    ) -> ActivityCategory:
         """Map TripAdvisor category to our internal category.
 
         Args:
@@ -394,23 +386,30 @@ class TripAdvisorAPIClient:
         category_name = ""
         if attraction.category:
             category_name = attraction.category.get("name", "").lower()
-        
+
         subcategory_names = []
         for subcat in attraction.subcategory:
             subcategory_names.append(subcat.get("name", "").lower())
-        
+
         combined_categories = f"{category_name} {' '.join(subcategory_names)}"
 
         # Map based on keywords
-        if any(keyword in combined_categories for keyword in ["museum", "historic", "cultural", "heritage"]):
+        if any(
+            keyword in combined_categories
+            for keyword in ["museum", "historic", "cultural", "heritage"]
+        ):
             return ActivityCategory.CULTURAL
         elif any(keyword in combined_categories for keyword in ["adventure", "outdoor", "sports"]):
             return ActivityCategory.ADVENTURE
         elif any(keyword in combined_categories for keyword in ["restaurant", "food", "dining"]):
             return ActivityCategory.FOOD
-        elif any(keyword in combined_categories for keyword in ["entertainment", "theater", "show"]):
+        elif any(
+            keyword in combined_categories for keyword in ["entertainment", "theater", "show"]
+        ):
             return ActivityCategory.ENTERTAINMENT
-        elif any(keyword in combined_categories for keyword in ["nature", "park", "garden", "wildlife"]):
+        elif any(
+            keyword in combined_categories for keyword in ["nature", "park", "garden", "wildlife"]
+        ):
             return ActivityCategory.NATURE
         elif any(keyword in combined_categories for keyword in ["shopping", "mall", "market"]):
             return ActivityCategory.SHOPPING
@@ -440,7 +439,7 @@ class TripAdvisorAPIClient:
             ActivityCategory.RELAXATION: Decimal("120.00"),
             ActivityCategory.NIGHTLIFE: Decimal("30.00"),
         }
-        
+
         return price_estimates.get(category, Decimal("25.00"))
 
     def _estimate_duration(self, category: ActivityCategory) -> int | None:
@@ -462,7 +461,7 @@ class TripAdvisorAPIClient:
             ActivityCategory.RELAXATION: 240,  # 4 hours
             ActivityCategory.NIGHTLIFE: 180,  # 3 hours
         }
-        
+
         return duration_estimates.get(category, 120)
 
     def _is_circuit_open(self) -> bool:
@@ -472,25 +471,25 @@ class TripAdvisorAPIClient:
             True if circuit is open (should not make requests)
         """
         import time
-        
+
         if not self.circuit_open:
             return False
-            
+
         # Auto-reset after 5 minutes
         if time.time() - self.last_failure_time > 300:
             self.circuit_open = False
             self.failure_count = 0
             self.logger.info("TripAdvisor circuit breaker reset")
-            
+
         return self.circuit_open
 
     async def _handle_api_failure(self) -> None:
         """Handle API failure for circuit breaker."""
         import time
-        
+
         self.failure_count += 1
         self.last_failure_time = time.time()
-        
+
         if self.failure_count >= 3:
             self.circuit_open = True
             self.logger.warning("TripAdvisor circuit breaker opened due to repeated failures")
@@ -504,19 +503,19 @@ class TripAdvisorAPIClient:
     async def _check_rate_limit(self) -> None:
         """Check and enforce rate limits."""
         import time
-        
+
         current_time = time.time()
-        
+
         # Reset counter every hour
         if current_time > self.rate_limit_reset_time:
             self.request_count = 0
             self.rate_limit_reset_time = current_time + 3600  # 1 hour
-        
+
         # TripAdvisor free tier: 500 requests/day, so ~20 requests/hour
         if self.request_count >= 20:
             self.logger.warning("TripAdvisor rate limit reached, waiting...")
             await asyncio.sleep(10)  # Wait 10 seconds
-        
+
         self.request_count += 1
 
     async def _handle_rate_limit(self, response: httpx.Response) -> None:
@@ -527,6 +526,6 @@ class TripAdvisorAPIClient:
         """
         retry_after = response.headers.get("Retry-After", "60")
         wait_time = min(int(retry_after), 300)  # Max 5 minutes
-        
+
         self.logger.warning(f"TripAdvisor rate limited, waiting {wait_time} seconds")
         await asyncio.sleep(wait_time)

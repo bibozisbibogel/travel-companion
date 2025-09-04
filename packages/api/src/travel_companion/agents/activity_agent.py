@@ -11,11 +11,11 @@ from travel_companion.models.external import (
     ActivitySearchRequest,
     ActivitySearchResponse,
 )
+from travel_companion.services.activity_cache import ActivityCacheManager
+from travel_companion.services.activity_repository import ActivityRepository
 from travel_companion.services.external_apis.getyourguide import GetYourGuideAPIClient
 from travel_companion.services.external_apis.tripadvisor import TripAdvisorAPIClient
 from travel_companion.services.external_apis.viator import ViatorAPIClient
-from travel_companion.services.activity_repository import ActivityRepository
-from travel_companion.services.activity_cache import ActivityCacheManager
 
 
 class ActivityAgent(BaseAgent[ActivitySearchResponse]):
@@ -28,7 +28,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         self.tripadvisor_client = TripAdvisorAPIClient()
         self.viator_client = ViatorAPIClient()
         self.getyourguide_client = GetYourGuideAPIClient()
-        
+
         # Initialize database repository and cache manager
         self.repository = ActivityRepository(self.database)
         self.cache_manager = ActivityCacheManager(self.redis)
@@ -65,9 +65,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
             if cached_result:
                 return cached_result
 
-            self.logger.info(
-                f"Processing activity search request for {search_request.location}"
-            )
+            self.logger.info(f"Processing activity search request for {search_request.location}")
 
             # Search activities from all providers with fallback chain
             activities = await self._search_all_providers(search_request)
@@ -85,12 +83,12 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
                     "location": search_request.location,
                     "category": search_request.category,
                     "guest_count": search_request.guest_count,
-                }
+                },
             )
 
             # Cache the result with advanced caching
             await self.cache_manager.cache_search_results(search_request, response)
-            
+
             # Persist activities to database if trip_id is provided
             if "trip_id" in request_data and ranked_activities:
                 try:
@@ -143,9 +141,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         # Remove duplicates based on name and location similarity
         unique_activities = await self._deduplicate_activities(activities)
 
-        self.logger.info(
-            f"Total activities after deduplication: {len(unique_activities)}"
-        )
+        self.logger.info(f"Total activities after deduplication: {len(unique_activities)}")
 
         return unique_activities
 
@@ -194,7 +190,9 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
             self.logger.warning(f"GetYourGuide search failed: {e}")
             return []
 
-    async def _deduplicate_activities(self, activities: list[ActivityOption]) -> list[ActivityOption]:
+    async def _deduplicate_activities(
+        self, activities: list[ActivityOption]
+    ) -> list[ActivityOption]:
         """Remove duplicate activities based on name and location similarity.
 
         Args:
@@ -224,9 +222,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         return unique_activities
 
     async def _rank_activities(
-        self,
-        activities: list[ActivityOption],
-        request: ActivitySearchRequest
+        self, activities: list[ActivityOption], request: ActivitySearchRequest
     ) -> list[ActivityOption]:
         """Rank activities based on user preferences and criteria.
 
@@ -265,18 +261,17 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         # Apply budget filtering
         if request.budget_per_person:
             comparison_results = [
-                result for result in comparison_results
+                result
+                for result in comparison_results
                 if result.activity.price <= request.budget_per_person
             ]
 
         # Return top results
-        top_results = comparison_results[:request.max_results]
+        top_results = comparison_results[: request.max_results]
         return [result.activity for result in top_results]
 
     async def _calculate_activity_score(
-        self,
-        activity: ActivityOption,
-        request: ActivitySearchRequest
+        self, activity: ActivityOption, request: ActivitySearchRequest
     ) -> dict[str, Any]:
         """Calculate comprehensive score for an activity.
 
@@ -350,9 +345,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
 
         # Sort by rating for rating ranking
         rating_sorted = sorted(
-            comparison_results,
-            key=lambda x: x.activity.rating or 0,
-            reverse=True
+            comparison_results, key=lambda x: x.activity.rating or 0, reverse=True
         )
         for i, result in enumerate(rating_sorted):
             result.rating_rank = i + 1

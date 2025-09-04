@@ -25,7 +25,9 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         self.openweather_client = OpenWeatherMapAPIClient()
         self.cache_manager = CacheManager(self.redis)
 
-        self.logger.info("Weather agent initialized with OpenWeatherMap API client and cache manager")
+        self.logger.info(
+            "Weather agent initialized with OpenWeatherMap API client and cache manager"
+        )
 
     @property
     def agent_name(self) -> str:
@@ -52,9 +54,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             # Validate request data
             search_request = WeatherSearchRequest(**request_data)
 
-            self.logger.info(
-                f"Processing weather search request for {search_request.location}"
-            )
+            self.logger.info(f"Processing weather search request for {search_request.location}")
 
             # Check cache first
             cache_key = self._generate_cache_key(search_request)
@@ -71,7 +71,9 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             if search_request.include_historical:
                 try:
                     # Calculate historical data timestamps (past 5 days from start_date)
-                    historical_start = int((search_request.start_date - timedelta(days=5)).timestamp())
+                    historical_start = int(
+                        (search_request.start_date - timedelta(days=5)).timestamp()
+                    )
                     historical_end = int(search_request.start_date.timestamp())
 
                     # Get coordinates from forecast location
@@ -82,7 +84,9 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                         lat, lon, historical_start, historical_end
                     )
 
-                    self.logger.info(f"Retrieved {len(historical_data)} historical weather data points")
+                    self.logger.info(
+                        f"Retrieved {len(historical_data)} historical weather data points"
+                    )
                 except Exception as e:
                     self.logger.warning(f"Failed to get historical weather data: {e}")
                     # Continue without historical data
@@ -100,7 +104,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     "include_alerts": search_request.include_alerts,
                     "include_historical": search_request.include_historical,
                 },
-                data_source="OpenWeatherMap"
+                data_source="OpenWeatherMap",
             )
 
             self.logger.info(
@@ -116,7 +120,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             if search_request.include_historical:
                 cache_ttl = 10800  # 3 hours for historical data (changes less frequently)
             elif len(forecast.alerts) > 0:
-                cache_ttl = 1800   # 30 minutes if there are weather alerts (more volatile)
+                cache_ttl = 1800  # 30 minutes if there are weather alerts (more volatile)
 
             await self.cache_manager.set_weather_cache(cache_key, response, cache_ttl)
 
@@ -127,9 +131,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             raise
 
     async def get_activity_recommendations(
-        self,
-        weather_data: list[WeatherData],
-        activity_types: list[str] | None = None
+        self, weather_data: list[WeatherData], activity_types: list[str] | None = None
     ) -> list[ActivityRecommendation]:
         """Generate activity recommendations based on weather conditions.
 
@@ -152,7 +154,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     "restaurants",
                     "water_sports",
                     "winter_sports",
-                    "photography"
+                    "photography",
                 ]
 
             recommendations = []
@@ -167,17 +169,23 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     suitability_scores.append(score)
                     weather_factors.extend(factors)
 
-                avg_score = sum(suitability_scores) / len(suitability_scores) if suitability_scores else 0
+                avg_score = (
+                    sum(suitability_scores) / len(suitability_scores) if suitability_scores else 0
+                )
                 unique_factors = list(set(weather_factors))
 
-                recommendation = self._generate_recommendation_text(activity_type, avg_score, unique_factors)
+                recommendation = self._generate_recommendation_text(
+                    activity_type, avg_score, unique_factors
+                )
 
-                recommendations.append(ActivityRecommendation(
-                    activity_type=activity_type,
-                    suitability_score=avg_score,
-                    recommendation=recommendation,
-                    weather_factors=unique_factors
-                ))
+                recommendations.append(
+                    ActivityRecommendation(
+                        activity_type=activity_type,
+                        suitability_score=avg_score,
+                        recommendation=recommendation,
+                        weather_factors=unique_factors,
+                    )
+                )
 
             # Sort by suitability score descending
             recommendations.sort(key=lambda x: x.suitability_score, reverse=True)
@@ -238,7 +246,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                 "risk_factors": [],
                 "recommendations": [],
                 "critical_periods": [],
-                "alternative_suggestions": []
+                "alternative_suggestions": [],
             }
 
             for weather in weather_data:
@@ -248,12 +256,14 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     impact_assessment["risk_factors"].append(
                         f"Extreme weather: {weather.condition_description} on {weather.timestamp.date()}"
                     )
-                    impact_assessment["critical_periods"].append({
-                        "date": weather.timestamp.isoformat(),
-                        "condition": weather.condition_description,
-                        "temperature": weather.temperature,
-                        "precipitation_probability": weather.precipitation_probability
-                    })
+                    impact_assessment["critical_periods"].append(
+                        {
+                            "date": weather.timestamp.isoformat(),
+                            "condition": weather.condition_description,
+                            "temperature": weather.temperature,
+                            "precipitation_probability": weather.precipitation_probability,
+                        }
+                    )
 
                 # Check for moderate impact conditions
                 elif self._is_challenging_weather(weather):
@@ -265,33 +275,43 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
 
             # Generate recommendations based on impact
             if impact_assessment["overall_impact"] == "high":
-                impact_assessment["recommendations"].extend([
-                    "Consider indoor activities during extreme weather periods",
-                    "Pack appropriate protective clothing",
-                    "Monitor weather alerts closely",
-                    "Have backup plans for outdoor activities"
-                ])
-                impact_assessment["alternative_suggestions"].extend([
-                    "Museums and indoor attractions",
-                    "Shopping centers and malls",
-                    "Indoor dining experiences",
-                    "Cultural venues and theaters"
-                ])
+                impact_assessment["recommendations"].extend(
+                    [
+                        "Consider indoor activities during extreme weather periods",
+                        "Pack appropriate protective clothing",
+                        "Monitor weather alerts closely",
+                        "Have backup plans for outdoor activities",
+                    ]
+                )
+                impact_assessment["alternative_suggestions"].extend(
+                    [
+                        "Museums and indoor attractions",
+                        "Shopping centers and malls",
+                        "Indoor dining experiences",
+                        "Cultural venues and theaters",
+                    ]
+                )
             elif impact_assessment["overall_impact"] == "moderate":
-                impact_assessment["recommendations"].extend([
-                    "Pack weather-appropriate clothing",
-                    "Plan flexible schedules for outdoor activities",
-                    "Consider covered or indoor alternatives"
-                ])
+                impact_assessment["recommendations"].extend(
+                    [
+                        "Pack weather-appropriate clothing",
+                        "Plan flexible schedules for outdoor activities",
+                        "Consider covered or indoor alternatives",
+                    ]
+                )
 
-            self.logger.info(f"Travel impact assessment: {impact_assessment['overall_impact']} impact")
+            self.logger.info(
+                f"Travel impact assessment: {impact_assessment['overall_impact']} impact"
+            )
             return impact_assessment
 
         except Exception as e:
             self.logger.error(f"Failed to assess travel impact: {e}")
             raise
 
-    def _calculate_activity_suitability(self, activity_type: str, weather: WeatherData) -> tuple[float, list[str]]:
+    def _calculate_activity_suitability(
+        self, activity_type: str, weather: WeatherData
+    ) -> tuple[float, list[str]]:
         """Calculate weather suitability score for an activity type.
 
         Args:
@@ -438,22 +458,32 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
     def _is_extreme_weather(self, weather: WeatherData) -> bool:
         """Check if weather conditions are extreme."""
         return (
-            weather.condition in [WeatherCondition.THUNDERSTORM, WeatherCondition.HEAVY_RAIN, WeatherCondition.HEAVY_SNOW] or
-            weather.temperature < -10 or weather.temperature > 40 or
-            weather.wind_speed > 70 or  # km/h
-            weather.precipitation_probability > 0.9
+            weather.condition
+            in [
+                WeatherCondition.THUNDERSTORM,
+                WeatherCondition.HEAVY_RAIN,
+                WeatherCondition.HEAVY_SNOW,
+            ]
+            or weather.temperature < -10
+            or weather.temperature > 40
+            or weather.wind_speed > 70  # km/h
+            or weather.precipitation_probability > 0.9
         )
 
     def _is_challenging_weather(self, weather: WeatherData) -> bool:
         """Check if weather conditions are challenging but not extreme."""
         return (
-            weather.condition in [WeatherCondition.RAIN, WeatherCondition.SNOW, WeatherCondition.FOG] or
-            weather.temperature < 0 or weather.temperature > 35 or
-            weather.wind_speed > 40 or  # km/h
-            weather.precipitation_probability > 0.7
+            weather.condition
+            in [WeatherCondition.RAIN, WeatherCondition.SNOW, WeatherCondition.FOG]
+            or weather.temperature < 0
+            or weather.temperature > 35
+            or weather.wind_speed > 40  # km/h
+            or weather.precipitation_probability > 0.7
         )
 
-    def _generate_recommendation_text(self, activity_type: str, score: float, factors: list[str]) -> str:
+    def _generate_recommendation_text(
+        self, activity_type: str, score: float, factors: list[str]
+    ) -> str:
         """Generate human-readable recommendation text."""
         if score >= 0.8:
             sentiment = "Excellent conditions"
