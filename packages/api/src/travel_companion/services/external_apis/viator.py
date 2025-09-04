@@ -19,7 +19,7 @@ from travel_companion.models.external import (
 
 class ViatorDestination(BaseModel):
     """Viator destination model."""
-    
+
     destination_id: int = Field(..., description="Viator destination ID")
     destination_name: str = Field(..., description="Destination name")
     country_code: str | None = Field(None, description="Country code")
@@ -27,7 +27,7 @@ class ViatorDestination(BaseModel):
 
 class ViatorProduct(BaseModel):
     """Viator product/tour model."""
-    
+
     code: str = Field(..., description="Product code")
     title: str = Field(..., description="Product title")
     description: str | None = Field(None, description="Product description")
@@ -48,16 +48,16 @@ class ViatorAPIClient:
         self.settings = get_settings()
         self.logger = logging.getLogger("travel_companion.services.viator")
         self.base_url = "https://api.viator.com/partner"
-        
+
         # Circuit breaker state
         self.failure_count = 0
         self.last_failure_time: float = 0
         self.circuit_open = False
-        
+
         # Rate limiting
         self.request_count = 0
         self.rate_limit_reset_time: float = 0
-        
+
         self.logger.info("Viator API client initialized")
 
     async def search_activities(self, request: ActivitySearchRequest) -> list[ActivityOption]:
@@ -82,7 +82,7 @@ class ViatorAPIClient:
 
             # Then search for products at that destination
             products = await self._search_products(destination_id, request)
-            
+
             # Convert to our internal format
             activities = []
             for product in products:
@@ -96,7 +96,7 @@ class ViatorAPIClient:
 
             self.logger.info(f"Viator returned {len(activities)} activities")
             self._reset_circuit_breaker()
-            
+
             return activities
 
         except Exception as e:
@@ -114,12 +114,12 @@ class ViatorAPIClient:
             Viator destination ID or None if not found
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self.settings.viator_api_key}",
         }
-        
+
         params = {
             "q": location,
         }
@@ -127,36 +127,34 @@ class ViatorAPIClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/destinations/search",
-                    headers=headers,
-                    params=params
+                    f"{self.base_url}/destinations/search", headers=headers, params=params
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     destinations = data.get("destinations", [])
-                    
+
                     if destinations:
                         # Return the first destination ID
                         destination = ViatorDestination(**destinations[0])
-                        self.logger.debug(f"Found Viator destination ID: {destination.destination_id}")
+                        self.logger.debug(
+                            f"Found Viator destination ID: {destination.destination_id}"
+                        )
                         return destination.destination_id
-                        
+
                 elif response.status_code == 429:
                     await self._handle_rate_limit(response)
                     return None
-                    
+
                 response.raise_for_status()
-                
+
         except Exception as e:
             self.logger.warning(f"Viator destination search failed: {e}")
-            
+
         return None
 
     async def _search_products(
-        self, 
-        destination_id: int, 
-        request: ActivitySearchRequest
+        self, destination_id: int, request: ActivitySearchRequest
     ) -> list[ViatorProduct]:
         """Search for products at a specific destination.
 
@@ -168,17 +166,17 @@ class ViatorAPIClient:
             List of Viator products
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self.settings.viator_api_key}",
         }
-        
+
         params = {
             "destination_id": destination_id,
             "count": min(request.max_results, 100),  # Viator max is typically 100
         }
-        
+
         # Add category filter if specified
         if request.category:
             viator_category = self._map_category_to_viator(request.category)
@@ -188,15 +186,13 @@ class ViatorAPIClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/products/search",
-                    headers=headers,
-                    params=params
+                    f"{self.base_url}/products/search", headers=headers, params=params
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     products_data = data.get("products", [])
-                    
+
                     products = []
                     for product_data in products_data:
                         try:
@@ -205,21 +201,23 @@ class ViatorAPIClient:
                         except Exception as e:
                             self.logger.debug(f"Failed to parse Viator product: {e}")
                             continue
-                    
+
                     return products
-                    
+
                 elif response.status_code == 429:
                     await self._handle_rate_limit(response)
                     return []
-                    
+
                 response.raise_for_status()
-                
+
         except Exception as e:
             self.logger.warning(f"Viator product search failed: {e}")
-            
+
         return []
 
-    async def _convert_to_activity(self, product: ViatorProduct, location: str) -> ActivityOption | None:
+    async def _convert_to_activity(
+        self, product: ViatorProduct, location: str
+    ) -> ActivityOption | None:
         """Convert Viator product to our internal ActivityOption model.
 
         Args:
@@ -232,7 +230,7 @@ class ViatorAPIClient:
         try:
             # Estimate location coordinates (Viator API might not provide exact coordinates)
             location_coords = await self._estimate_location_coordinates(location)
-            
+
             location_obj = ActivityLocation(
                 latitude=location_coords[0],
                 longitude=location_coords[1],
@@ -245,7 +243,7 @@ class ViatorAPIClient:
             # Parse pricing
             price = Decimal("0.00")
             currency = "USD"
-            
+
             if product.price:
                 # Viator pricing can be complex, extract the base price
                 if "retail" in product.price:
@@ -314,12 +312,12 @@ class ViatorAPIClient:
             "sydney": (-33.8688, 151.2093),
             "bangkok": (13.7563, 100.5018),
         }
-        
+
         location_lower = location.lower()
         for city, coords in location_coords.items():
             if city in location_lower:
                 return coords
-        
+
         # Default to NYC if no match
         return (40.7128, -74.0060)
 
@@ -334,7 +332,7 @@ class ViatorAPIClient:
         """
         try:
             duration_lower = duration_str.lower()
-            
+
             # Handle common patterns
             if "hour" in duration_lower:
                 hours = 0
@@ -345,30 +343,33 @@ class ViatorAPIClient:
                 else:
                     # Extract number before "hour"
                     import re
-                    match = re.search(r'(\d+(?:\.\d+)?)\s*hour', duration_lower)
+
+                    match = re.search(r"(\d+(?:\.\d+)?)\s*hour", duration_lower)
                     if match:
                         hours = float(match.group(1))
-                
+
                 return int(hours * 60)
-            
+
             elif "day" in duration_lower:
                 days = 1
                 import re
-                match = re.search(r'(\d+)\s*day', duration_lower)
+
+                match = re.search(r"(\d+)\s*day", duration_lower)
                 if match:
                     days = int(match.group(1))
-                
+
                 return days * 8 * 60  # Assume 8 hours per day
-            
+
             elif "minute" in duration_lower:
                 import re
-                match = re.search(r'(\d+)\s*minute', duration_lower)
+
+                match = re.search(r"(\d+)\s*minute", duration_lower)
                 if match:
                     return int(match.group(1))
-            
+
         except Exception as e:
             self.logger.debug(f"Failed to parse duration '{duration_str}': {e}")
-        
+
         return None
 
     def _map_category_to_viator(self, category: ActivityCategory) -> str | None:
@@ -391,7 +392,7 @@ class ViatorAPIClient:
             ActivityCategory.FOOD: "136",  # Food & Drink
             ActivityCategory.RELAXATION: "61",  # Spa & Wellness
         }
-        
+
         return category_mapping.get(category)
 
     def _map_viator_category_to_internal(self, product: ViatorProduct) -> ActivityCategory:
@@ -408,28 +409,47 @@ class ViatorAPIClient:
         for cat in product.categories:
             if "name" in cat:
                 category_names.append(cat["name"].lower())
-        
+
         combined_categories = " ".join(category_names)
         title_lower = product.title.lower()
         description_lower = (product.description or "").lower()
         combined_text = f"{combined_categories} {title_lower} {description_lower}"
 
         # Map based on keywords
-        if any(keyword in combined_text for keyword in ["museum", "historic", "cultural", "heritage", "tour", "sightseeing"]):
+        if any(
+            keyword in combined_text
+            for keyword in ["museum", "historic", "cultural", "heritage", "tour", "sightseeing"]
+        ):
             return ActivityCategory.CULTURAL
-        elif any(keyword in combined_text for keyword in ["adventure", "outdoor", "hiking", "climbing", "extreme"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["adventure", "outdoor", "hiking", "climbing", "extreme"]
+        ):
             return ActivityCategory.ADVENTURE
-        elif any(keyword in combined_text for keyword in ["food", "dining", "cooking", "culinary", "taste", "wine"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["food", "dining", "cooking", "culinary", "taste", "wine"]
+        ):
             return ActivityCategory.FOOD
-        elif any(keyword in combined_text for keyword in ["show", "theater", "performance", "entertainment", "concert"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["show", "theater", "performance", "entertainment", "concert"]
+        ):
             return ActivityCategory.ENTERTAINMENT
-        elif any(keyword in combined_text for keyword in ["nature", "park", "wildlife", "safari", "beach"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["nature", "park", "wildlife", "safari", "beach"]
+        ):
             return ActivityCategory.NATURE
         elif any(keyword in combined_text for keyword in ["shopping", "market", "souvenir"]):
             return ActivityCategory.SHOPPING
-        elif any(keyword in combined_text for keyword in ["spa", "wellness", "relaxation", "massage"]):
+        elif any(
+            keyword in combined_text for keyword in ["spa", "wellness", "relaxation", "massage"]
+        ):
             return ActivityCategory.RELAXATION
-        elif any(keyword in combined_text for keyword in ["nightlife", "bar", "club", "evening", "night"]):
+        elif any(
+            keyword in combined_text for keyword in ["nightlife", "bar", "club", "evening", "night"]
+        ):
             return ActivityCategory.NIGHTLIFE
         else:
             return ActivityCategory.ENTERTAINMENT  # Default fallback
@@ -441,25 +461,25 @@ class ViatorAPIClient:
             True if circuit is open (should not make requests)
         """
         import time
-        
+
         if not self.circuit_open:
             return False
-            
+
         # Auto-reset after 5 minutes
         if time.time() - self.last_failure_time > 300:
             self.circuit_open = False
             self.failure_count = 0
             self.logger.info("Viator circuit breaker reset")
-            
+
         return self.circuit_open
 
     async def _handle_api_failure(self) -> None:
         """Handle API failure for circuit breaker."""
         import time
-        
+
         self.failure_count += 1
         self.last_failure_time = time.time()
-        
+
         if self.failure_count >= 3:
             self.circuit_open = True
             self.logger.warning("Viator circuit breaker opened due to repeated failures")
@@ -473,19 +493,19 @@ class ViatorAPIClient:
     async def _check_rate_limit(self) -> None:
         """Check and enforce rate limits."""
         import time
-        
+
         current_time = time.time()
-        
+
         # Reset counter every hour
         if current_time > self.rate_limit_reset_time:
             self.request_count = 0
             self.rate_limit_reset_time = current_time + 3600  # 1 hour
-        
+
         # Conservative rate limiting: 30 requests/hour
         if self.request_count >= 30:
             self.logger.warning("Viator rate limit reached, waiting...")
             await asyncio.sleep(10)  # Wait 10 seconds
-        
+
         self.request_count += 1
 
     async def _handle_rate_limit(self, response: httpx.Response) -> None:
@@ -496,6 +516,6 @@ class ViatorAPIClient:
         """
         retry_after = response.headers.get("Retry-After", "60")
         wait_time = min(int(retry_after), 300)  # Max 5 minutes
-        
+
         self.logger.warning(f"Viator rate limited, waiting {wait_time} seconds")
         await asyncio.sleep(wait_time)

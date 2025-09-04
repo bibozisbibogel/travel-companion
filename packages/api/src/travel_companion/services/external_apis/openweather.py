@@ -128,13 +128,13 @@ class OpenWeatherMapAPIClient:
 
     async def get_weather_forecast(self, request: WeatherSearchRequest) -> WeatherForecast:
         """Get weather forecast for a location and date range.
-        
+
         Args:
             request: Weather search request with location and dates
-            
+
         Returns:
             Weather forecast data
-            
+
         Raises:
             httpx.HTTPError: If API request fails
             ValueError: If location cannot be geocoded
@@ -161,23 +161,19 @@ class OpenWeatherMapAPIClient:
             raise
 
     async def get_historical_weather(
-        self,
-        lat: float,
-        lon: float,
-        start_timestamp: int,
-        end_timestamp: int
+        self, lat: float, lon: float, start_timestamp: int, end_timestamp: int
     ) -> list[WeatherData]:
         """Get historical weather data for a location and time range.
-        
+
         Args:
             lat: Latitude coordinate
-            lon: Longitude coordinate  
+            lon: Longitude coordinate
             start_timestamp: Start timestamp (Unix time)
             end_timestamp: End timestamp (Unix time)
-            
+
         Returns:
             List of historical weather data points
-            
+
         Note:
             Historical data is only available for dates up to 5 days ago
             and requires a paid OpenWeatherMap subscription.
@@ -194,7 +190,9 @@ class OpenWeatherMapAPIClient:
                         weather_point = self._convert_current_weather(daily_data.current)
                         historical_data.append(weather_point)
                 except Exception as e:
-                    self.logger.warning(f"Failed to get historical data for timestamp {current_time}: {e}")
+                    self.logger.warning(
+                        f"Failed to get historical data for timestamp {current_time}: {e}"
+                    )
 
                 # Move to next day (86400 seconds = 1 day)
                 current_time += 86400
@@ -206,25 +204,21 @@ class OpenWeatherMapAPIClient:
             self.logger.error(f"Failed to get historical weather data: {e}")
             raise
 
-    async def _get_historical_data(self, lat: float, lon: float, timestamp: int) -> OpenWeatherMapResponse:
+    async def _get_historical_data(
+        self, lat: float, lon: float, timestamp: int
+    ) -> OpenWeatherMapResponse:
         """Get historical weather data for a specific timestamp.
-        
+
         Args:
             lat: Latitude coordinate
             lon: Longitude coordinate
             timestamp: Unix timestamp
-            
+
         Returns:
             OpenWeatherMap historical response
         """
         url = f"{self.base_url}/onecall/timemachine"
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "dt": timestamp,
-            "appid": self.api_key,
-            "units": "metric"
-        }
+        params = {"lat": lat, "lon": lon, "dt": timestamp, "appid": self.api_key, "units": "metric"}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for attempt in range(self.max_retries):
@@ -238,24 +232,22 @@ class OpenWeatherMapAPIClient:
                 except httpx.HTTPError as e:
                     if attempt == self.max_retries - 1:
                         raise
-                    self.logger.warning(f"Historical API request failed, retrying in {self.retry_delay}s: {e}")
+                    self.logger.warning(
+                        f"Historical API request failed, retrying in {self.retry_delay}s: {e}"
+                    )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 
     async def _geocode_location(self, location: str) -> dict[str, float]:
         """Geocode location name to coordinates.
-        
+
         Args:
             location: Location name to geocode
-            
+
         Returns:
             Dictionary with lat and lon coordinates
         """
         url = "http://api.openweathermap.org/geo/1.0/direct"
-        params = {
-            "q": location,
-            "limit": 1,
-            "appid": self.api_key
-        }
+        params = {"q": location, "limit": 1, "appid": self.api_key}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(url, params=params)
@@ -270,17 +262,19 @@ class OpenWeatherMapAPIClient:
                 "lat": location_data["lat"],
                 "lon": location_data["lon"],
                 "name": location_data.get("name", location),
-                "country": location_data.get("country")
+                "country": location_data.get("country"),
             }
 
-    async def _get_onecall_data(self, lat: float, lon: float, include_alerts: bool = True) -> OpenWeatherMapResponse:
+    async def _get_onecall_data(
+        self, lat: float, lon: float, include_alerts: bool = True
+    ) -> OpenWeatherMapResponse:
         """Get One Call API data for coordinates.
-        
+
         Args:
             lat: Latitude coordinate
             lon: Longitude coordinate
             include_alerts: Whether to include weather alerts
-            
+
         Returns:
             OpenWeatherMap One Call API response
         """
@@ -290,7 +284,7 @@ class OpenWeatherMapAPIClient:
             "lon": lon,
             "appid": self.api_key,
             "units": "metric",  # Use Celsius
-            "exclude": "minutely"  # Exclude minutely data to reduce response size
+            "exclude": "minutely",  # Exclude minutely data to reduce response size
         }
 
         if not include_alerts:
@@ -311,22 +305,21 @@ class OpenWeatherMapAPIClient:
                     self.logger.warning(f"API request failed, retrying in {self.retry_delay}s: {e}")
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 
-    def _convert_to_forecast(self, data: OpenWeatherMapResponse, location_name: str) -> WeatherForecast:
+    def _convert_to_forecast(
+        self, data: OpenWeatherMapResponse, location_name: str
+    ) -> WeatherForecast:
         """Convert OpenWeatherMap response to our weather forecast model.
-        
+
         Args:
             data: OpenWeatherMap API response
             location_name: Original location name from request
-            
+
         Returns:
             Weather forecast in our format
         """
         # Create location info
         location = WeatherLocation(
-            name=location_name,
-            latitude=data.lat,
-            longitude=data.lon,
-            timezone=data.timezone
+            name=location_name, latitude=data.lat, longitude=data.lon, timezone=data.timezone
         )
 
         # Convert current weather
@@ -335,7 +328,9 @@ class OpenWeatherMapAPIClient:
             current = self._convert_current_weather(data.current)
 
         # Convert hourly forecast
-        hourly = [self._convert_hourly_weather(hour) for hour in data.hourly[:48]]  # Limit to 48 hours
+        hourly = [
+            self._convert_hourly_weather(hour) for hour in data.hourly[:48]
+        ]  # Limit to 48 hours
 
         # Convert daily forecast
         daily = [self._convert_daily_weather(day) for day in data.daily[:7]]  # Limit to 7 days
@@ -344,11 +339,7 @@ class OpenWeatherMapAPIClient:
         alerts = [self._convert_alert(alert) for alert in data.alerts]
 
         return WeatherForecast(
-            location=location,
-            current=current,
-            hourly=hourly,
-            daily=daily,
-            alerts=alerts
+            location=location, current=current, hourly=hourly, daily=daily, alerts=alerts
         )
 
     def _convert_current_weather(self, current: OpenWeatherMapCurrent) -> WeatherData:
@@ -366,7 +357,7 @@ class OpenWeatherMapAPIClient:
             precipitation_probability=0.0,  # Not available in current weather
             condition=self._map_weather_condition(current.weather[0]["main"]),
             condition_description=current.weather[0]["description"],
-            uv_index=current.uvi
+            uv_index=current.uvi,
         )
 
     def _convert_hourly_weather(self, hourly: OpenWeatherMapHourly) -> WeatherData:
@@ -384,7 +375,7 @@ class OpenWeatherMapAPIClient:
             precipitation_probability=hourly.pop,
             condition=self._map_weather_condition(hourly.weather[0]["main"]),
             condition_description=hourly.weather[0]["description"],
-            uv_index=hourly.uvi
+            uv_index=hourly.uvi,
         )
 
     def _convert_daily_weather(self, daily: OpenWeatherMapDaily) -> WeatherData:
@@ -402,7 +393,7 @@ class OpenWeatherMapAPIClient:
             precipitation_probability=daily.pop,
             condition=self._map_weather_condition(daily.weather[0]["main"]),
             condition_description=daily.weather[0]["description"],
-            uv_index=daily.uvi
+            uv_index=daily.uvi,
         )
 
     def _convert_alert(self, alert: OpenWeatherMapAlert) -> WeatherAlert:
@@ -415,7 +406,7 @@ class OpenWeatherMapAPIClient:
             severity=severity,
             start_time=datetime.fromtimestamp(alert.start, tz=UTC),
             end_time=datetime.fromtimestamp(alert.end, tz=UTC),
-            regions=alert.tags
+            regions=alert.tags,
         )
 
     def _map_weather_condition(self, condition: str) -> WeatherCondition:
@@ -451,7 +442,9 @@ class OpenWeatherMapAPIClient:
         else:
             return WeatherSeverity.LOW
 
-    def _get_precipitation_amount(self, rain: dict[str, float] | None, snow: dict[str, float] | None) -> float:
+    def _get_precipitation_amount(
+        self, rain: dict[str, float] | None, snow: dict[str, float] | None
+    ) -> float:
         """Get total precipitation amount from rain and snow data."""
         total = 0.0
         if rain:

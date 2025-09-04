@@ -1,9 +1,10 @@
 """Comprehensive tests for ActivityAgent."""
 
-import pytest
-from datetime import datetime, UTC
 from decimal import Decimal
 from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+from pydantic import ValidationError
 
 from travel_companion.agents.activity_agent import ActivityAgent
 from travel_companion.models.external import (
@@ -46,9 +47,11 @@ def mock_redis():
 @pytest.fixture
 def activity_agent(mock_settings, mock_database, mock_redis):
     """Create ActivityAgent instance for testing."""
-    with patch("travel_companion.services.external_apis.tripadvisor.TripAdvisorAPIClient"), \
-         patch("travel_companion.services.external_apis.viator.ViatorAPIClient"), \
-         patch("travel_companion.services.external_apis.getyourguide.GetYourGuideAPIClient"):
+    with (
+        patch("travel_companion.services.external_apis.tripadvisor.TripAdvisorAPIClient"),
+        patch("travel_companion.services.external_apis.viator.ViatorAPIClient"),
+        patch("travel_companion.services.external_apis.getyourguide.GetYourGuideAPIClient"),
+    ):
         return ActivityAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
 
 
@@ -103,7 +106,7 @@ class TestActivityAgent:
     async def test_health_check_success(self, activity_agent):
         """Test successful health check."""
         result = await activity_agent.health_check()
-        
+
         assert result["agent"] == "activity_agent"
         assert result["status"] == "healthy"
         assert result["dependencies"]["database"] == "healthy"
@@ -113,9 +116,9 @@ class TestActivityAgent:
     async def test_health_check_degraded(self, activity_agent, mock_database):
         """Test health check with degraded dependencies."""
         mock_database.health_check.return_value = False
-        
+
         result = await activity_agent.health_check()
-        
+
         assert result["status"] == "degraded"
         assert result["dependencies"]["database"] == "unhealthy"
 
@@ -128,11 +131,12 @@ class TestActivityAgent:
             search_time_ms=100,
             cached=True,
         )
-        
-        mock_redis.get.return_value = cached_response
-        
+
+        # Mock Redis to return dict (like real Redis would), not the object itself
+        mock_redis.get.return_value = cached_response.model_dump()
+
         result = await activity_agent.process(sample_activity_request)
-        
+
         assert isinstance(result, ActivitySearchResponse)
         assert result.cached is True
         mock_redis.get.assert_called_once()
@@ -142,49 +146,61 @@ class TestActivityAgent:
         """Test processing when no activities are found."""
         with patch.object(activity_agent, "_search_all_providers", return_value=[]):
             result = await activity_agent.process(sample_activity_request)
-            
+
             assert isinstance(result, ActivitySearchResponse)
             assert len(result.activities) == 0
             assert result.total_results == 0
 
     @pytest.mark.asyncio
-    async def test_process_with_activities(self, activity_agent, sample_activity_request, sample_activity_option):
+    async def test_process_with_activities(
+        self, activity_agent, sample_activity_request, sample_activity_option
+    ):
         """Test processing with found activities."""
         activities = [sample_activity_option]
-        
+
         with patch.object(activity_agent, "_search_all_providers", return_value=activities):
             result = await activity_agent.process(sample_activity_request)
-            
+
             assert isinstance(result, ActivitySearchResponse)
             assert len(result.activities) == 1
             assert result.activities[0].name == "Louvre Museum Tour"
             assert result.total_results == 1
 
     @pytest.mark.asyncio
-    async def test_search_all_providers_success(self, activity_agent, sample_activity_request, sample_activity_option):
+    async def test_search_all_providers_success(
+        self, activity_agent, sample_activity_request, sample_activity_option
+    ):
         """Test successful search across all providers."""
-        with patch.object(activity_agent, "_search_tripadvisor", return_value=[sample_activity_option]), \
-             patch.object(activity_agent, "_search_viator", return_value=[]), \
-             patch.object(activity_agent, "_search_getyourguide", return_value=[]):
-            
+        with (
+            patch.object(
+                activity_agent, "_search_tripadvisor", return_value=[sample_activity_option]
+            ),
+            patch.object(activity_agent, "_search_viator", return_value=[]),
+            patch.object(activity_agent, "_search_getyourguide", return_value=[]),
+        ):
             result = await activity_agent._search_all_providers(
                 ActivitySearchRequest(**sample_activity_request)
             )
-            
+
             assert len(result) == 1
             assert result[0].name == "Louvre Museum Tour"
 
     @pytest.mark.asyncio
-    async def test_search_all_providers_with_failures(self, activity_agent, sample_activity_request, sample_activity_option):
+    async def test_search_all_providers_with_failures(
+        self, activity_agent, sample_activity_request, sample_activity_option
+    ):
         """Test search with some provider failures."""
-        with patch.object(activity_agent, "_search_tripadvisor", return_value=[sample_activity_option]), \
-             patch.object(activity_agent, "_search_viator", side_effect=Exception("API Error")), \
-             patch.object(activity_agent, "_search_getyourguide", return_value=[]):
-            
+        with (
+            patch.object(
+                activity_agent, "_search_tripadvisor", return_value=[sample_activity_option]
+            ),
+            patch.object(activity_agent, "_search_viator", side_effect=Exception("API Error")),
+            patch.object(activity_agent, "_search_getyourguide", return_value=[]),
+        ):
             result = await activity_agent._search_all_providers(
                 ActivitySearchRequest(**sample_activity_request)
             )
-            
+
             assert len(result) == 1
             assert result[0].provider == "tripadvisor"
 
@@ -201,7 +217,7 @@ class TestActivityAgent:
             price=Decimal("25.00"),
             provider="tripadvisor",
         )
-        
+
         activity2 = ActivityOption(
             external_id="viator_456",
             name="Eiffel Tower Visit",  # Same name
@@ -211,7 +227,7 @@ class TestActivityAgent:
             price=Decimal("30.00"),
             provider="viator",
         )
-        
+
         activity3 = ActivityOption(
             external_id="gyg_789",
             name="Louvre Museum Tour",  # Different activity
@@ -221,10 +237,10 @@ class TestActivityAgent:
             price=Decimal("35.00"),
             provider="getyourguide",
         )
-        
+
         activities = [activity1, activity2, activity3]
         result = await activity_agent._deduplicate_activities(activities)
-        
+
         assert len(result) == 2  # One duplicate should be removed
         names = [activity.name for activity in result]
         assert "Eiffel Tower Visit" in names
@@ -243,7 +259,7 @@ class TestActivityAgent:
             rating=4.8,
             provider="tripadvisor",
         )
-        
+
         activity_low_rating = ActivityOption(
             external_id="low_rating",
             name="Lower Rated Activity",
@@ -254,18 +270,20 @@ class TestActivityAgent:
             rating=3.2,
             provider="viator",
         )
-        
+
         activities = [activity_low_rating, activity_high_rating]  # Intentionally wrong order
         request = ActivitySearchRequest(**sample_activity_request)
-        
+
         result = await activity_agent._rank_activities(activities, request)
-        
+
         assert len(result) == 2
         assert result[0].rating == 4.8  # Higher rated should be first
         assert result[1].rating == 3.2
 
     @pytest.mark.asyncio
-    async def test_rank_activities_with_category_match(self, activity_agent, sample_activity_request):
+    async def test_rank_activities_with_category_match(
+        self, activity_agent, sample_activity_request
+    ):
         """Test activity ranking with category preference."""
         matching_activity = ActivityOption(
             external_id="matching",
@@ -277,7 +295,7 @@ class TestActivityAgent:
             rating=4.0,
             provider="tripadvisor",
         )
-        
+
         non_matching_activity = ActivityOption(
             external_id="non_matching",
             name="Adventure Activity",
@@ -288,12 +306,12 @@ class TestActivityAgent:
             rating=4.2,  # Higher rating but wrong category
             provider="viator",
         )
-        
+
         activities = [non_matching_activity, matching_activity]
         request = ActivitySearchRequest(**sample_activity_request)
-        
+
         result = await activity_agent._rank_activities(activities, request)
-        
+
         # Category match should boost ranking more than small rating difference
         assert result[0].category == ActivityCategory.CULTURAL
 
@@ -310,7 +328,7 @@ class TestActivityAgent:
             rating=5.0,
             provider="tripadvisor",
         )
-        
+
         affordable_activity = ActivityOption(
             external_id="affordable",
             name="Affordable Activity",
@@ -321,18 +339,20 @@ class TestActivityAgent:
             rating=4.0,
             provider="viator",
         )
-        
+
         activities = [expensive_activity, affordable_activity]
         request = ActivitySearchRequest(**sample_activity_request)
-        
+
         result = await activity_agent._rank_activities(activities, request)
-        
+
         # Only affordable activity should remain
         assert len(result) == 1
         assert result[0].price <= request.budget_per_person
 
     @pytest.mark.asyncio
-    async def test_calculate_activity_score_components(self, activity_agent, sample_activity_request):
+    async def test_calculate_activity_score_components(
+        self, activity_agent, sample_activity_request
+    ):
         """Test activity score calculation components."""
         activity = ActivityOption(
             external_id="test_activity",
@@ -345,23 +365,23 @@ class TestActivityAgent:
             duration_minutes=180,  # 3 hours, matches request
             provider="tripadvisor",
         )
-        
+
         request = ActivitySearchRequest(**sample_activity_request)
         score_details = await activity_agent._calculate_activity_score(activity, request)
-        
+
         assert "total_score" in score_details
         assert "components" in score_details
         assert "rating_score" in score_details["components"]
         assert "category_score" in score_details["components"]
         assert "duration_score" in score_details["components"]
         assert "price_score" in score_details["components"]
-        
+
         # Rating score should be high for 4.5/5.0
         assert score_details["components"]["rating_score"] >= 40
-        
+
         # Category score should be maximum for perfect match
         assert score_details["components"]["category_score"] == 25
-        
+
         # Duration score should be high for exact match
         assert score_details["components"]["duration_score"] > 10
 
@@ -369,7 +389,7 @@ class TestActivityAgent:
     async def test_calculate_ranks(self, activity_agent):
         """Test rank calculation for comparison results."""
         from travel_companion.models.external import ActivityComparisonResult
-        
+
         activities = [
             ActivityOption(
                 external_id="cheap",
@@ -390,7 +410,7 @@ class TestActivityAgent:
                 provider="viator",
             ),
         ]
-        
+
         comparison_results = [
             ActivityComparisonResult(
                 activity=activities[0],
@@ -399,7 +419,7 @@ class TestActivityAgent:
                 rating_rank=1,
                 duration_preference_score=0.5,
                 category_match_score=1.0,
-                reasons=[]
+                reasons=[],
             ),
             ActivityComparisonResult(
                 activity=activities[1],
@@ -408,19 +428,21 @@ class TestActivityAgent:
                 rating_rank=1,
                 duration_preference_score=0.5,
                 category_match_score=1.0,
-                reasons=[]
+                reasons=[],
             ),
         ]
-        
+
         await activity_agent._calculate_ranks(comparison_results)
-        
+
         # Check price ranks (1 = cheapest)
         cheap_result = next(r for r in comparison_results if r.activity.external_id == "cheap")
-        expensive_result = next(r for r in comparison_results if r.activity.external_id == "expensive")
-        
+        expensive_result = next(
+            r for r in comparison_results if r.activity.external_id == "expensive"
+        )
+
         assert cheap_result.price_rank == 1  # Cheapest
         assert expensive_result.price_rank == 2  # More expensive
-        
+
         # Check rating ranks (1 = highest)
         assert expensive_result.rating_rank == 1  # Highest rating
         assert cheap_result.rating_rank == 2  # Lower rating
@@ -432,8 +454,8 @@ class TestActivityAgent:
             "location": "",  # Empty location
             "guest_count": -1,  # Invalid guest count
         }
-        
-        with pytest.raises(Exception):
+
+        with pytest.raises((ValueError, ValidationError)):
             await activity_agent.process(invalid_request)
 
     @pytest.mark.asyncio
@@ -441,7 +463,7 @@ class TestActivityAgent:
         """Test cache key generation consistency."""
         key1 = await activity_agent._cache_key(sample_activity_request)
         key2 = await activity_agent._cache_key(sample_activity_request)
-        
+
         assert key1 == key2  # Should be deterministic
         assert "activity_agent" in key1
         assert "paris" in key1.lower() or "france" in key1.lower()
@@ -450,9 +472,9 @@ class TestActivityAgent:
     async def test_empty_activities_list(self, activity_agent, sample_activity_request):
         """Test handling of empty activities list."""
         request = ActivitySearchRequest(**sample_activity_request)
-        
+
         result = await activity_agent._rank_activities([], request)
         assert result == []
-        
+
         deduped = await activity_agent._deduplicate_activities([])
         assert deduped == []

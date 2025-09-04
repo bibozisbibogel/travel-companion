@@ -5,7 +5,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from travel_companion.core.redis import RedisManager
-from travel_companion.models.external import HotelSearchResponse, WeatherSearchResponse
+from travel_companion.models.external import (
+    HotelSearchResponse,
+    RestaurantSearchResponse,
+    WeatherSearchResponse,
+)
 
 
 class CacheManager:
@@ -384,7 +388,9 @@ class CacheManager:
             success = await self.redis.set(cache_key, cache_data, expire=ttl_seconds)
 
             if success:
-                self.logger.info(f"Cached weather search results: {cache_key} (TTL: {ttl_seconds}s)")
+                self.logger.info(
+                    f"Cached weather search results: {cache_key} (TTL: {ttl_seconds}s)"
+                )
 
                 # Store cache metadata for analytics
                 metadata_key = f"{cache_key}:meta"
@@ -434,4 +440,115 @@ class CacheManager:
 
         except Exception as e:
             self.logger.error(f"Failed to invalidate weather location cache: {e}")
+            return 0
+
+    async def get_restaurant_cache(self, cache_key: str) -> RestaurantSearchResponse | None:
+        """Get cached restaurant search results.
+
+        Args:
+            cache_key: Cache key for restaurant search results
+
+        Returns:
+            Cached RestaurantSearchResponse or None if not found/expired
+        """
+        try:
+            cached_data = await self.redis.get(cache_key, json_decode=True)
+            if not cached_data:
+                return None
+
+            # Check if cache is still valid (restaurant data should not be older than 30 minutes)
+            cache_timestamp = cached_data.get("cache_timestamp")
+            if cache_timestamp:
+                cache_time = datetime.fromisoformat(cache_timestamp)
+                # Restaurant data should not be older than 30 minutes for freshness
+                if datetime.now(UTC) - cache_time > timedelta(minutes=30):
+                    await self.redis.delete(cache_key)
+                    self.logger.info(f"Invalidated stale restaurant cache: {cache_key}")
+                    return None
+
+            # Convert back to RestaurantSearchResponse
+            return RestaurantSearchResponse(**cached_data)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to get cached restaurant search: {e}")
+            return None
+
+    async def set_restaurant_cache(
+        self,
+        cache_key: str,
+        response: RestaurantSearchResponse,
+        ttl_seconds: int = 1800,  # 30 minutes default
+    ) -> bool:
+        """Cache restaurant search results.
+
+        Args:
+            cache_key: Cache key for storage
+            response: RestaurantSearchResponse to cache
+            ttl_seconds: Time to live in seconds (default 30 minutes)
+
+        Returns:
+            True if caching succeeded, False otherwise
+        """
+        try:
+            # Add cache timestamp and expiration info
+            cache_data = response.model_dump()
+            cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
+            cache_data["cached"] = True
+            cache_data["cache_expires_at"] = (
+                datetime.now(UTC) + timedelta(seconds=ttl_seconds)
+            ).isoformat()
+
+            success = await self.redis.set(cache_key, cache_data, expire=ttl_seconds)
+
+            if success:
+                self.logger.info(
+                    f"Cached restaurant search results: {cache_key} (TTL: {ttl_seconds}s)"
+                )
+
+                # Store cache metadata for analytics
+                metadata_key = f"{cache_key}:meta"
+                metadata = {
+                    "created_at": datetime.now(UTC).isoformat(),
+                    "ttl_seconds": ttl_seconds,
+                    "restaurant_count": len(response.restaurants),
+                    "search_params": response.search_metadata,
+                }
+                await self.redis.set(
+                    metadata_key, metadata, expire=ttl_seconds + 300
+                )  # Keep metadata slightly longer
+
+            return success
+
+        except Exception as e:
+            self.logger.error(f"Failed to cache restaurant search results: {e}")
+            return False
+
+    async def invalidate_restaurant_location_cache(self, location: str) -> int:
+        """Invalidate all cached restaurant results for a specific location.
+
+        Args:
+            location: Location identifier to invalidate
+
+        Returns:
+            Number of cache entries invalidated
+        """
+        try:
+            # Create pattern to match all restaurant cache keys for this location
+            location_pattern = f"food_agent:*{location.lower()}*"
+
+            # Use Redis SCAN to find matching keys
+            invalidated_count = 0
+            async for key in self.redis.client.scan_iter(match=location_pattern):
+                await self.redis.delete(key)
+                invalidated_count += 1
+
+            if invalidated_count > 0:
+                self.logger.info(
+                    f"Invalidated {invalidated_count} restaurant cache entries for location: {location}"
+                )
+
+            return invalidated_count
+
+        except Exception as e:
+            self.logger.error(f"Failed to invalidate restaurant location cache: {e}")
             return 0

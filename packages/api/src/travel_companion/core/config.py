@@ -151,7 +151,15 @@ class Settings(BaseSettings):
     expedia_secret_key: str = ""
     airbnb_api_key: str = ""
     tripadvisor_api_key: str = ""
+    viator_api_key: str = ""
+    getyourguide_api_key: str = ""
+    openweather_api_key: str = ""
     openai_api_key: str = ""
+
+    # Food & Restaurant APIs
+    yelp_api_key: str = ""
+    google_places_api_key: str = ""
+    zomato_api_key: str = ""
 
     # Security
     secret_key: str = "your-secret-key-change-in-production"

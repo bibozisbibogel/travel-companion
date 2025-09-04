@@ -287,9 +287,11 @@ class TestFlightAgent:
 
         # Direct flight should score higher in the stops component
         # Direct: (100 - 0*20) * 0.1 = 10.0, Connecting: (100 - 1*20) * 0.1 = 8.0
-        # Since they have same price/duration/departure time, the 2-point difference should make direct flight win
+        # Since they have same price/duration/departure time,
+        # the 2-point difference should make direct flight win
         assert direct_result.score > connecting_result.score, (
-            f"Direct flight score ({direct_result.score}) should be higher than connecting ({connecting_result.score})"
+            f"Direct flight score ({direct_result.score}) should be higher "
+            f"than connecting ({connecting_result.score})"
         )
         assert "Direct flight" in direct_result.reasons
 

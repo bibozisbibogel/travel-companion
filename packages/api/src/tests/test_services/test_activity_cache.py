@@ -1,12 +1,11 @@
 """Tests for ActivityCacheManager with Redis testcontainer."""
 
-import pytest
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import uuid4
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
-from travel_companion.services.activity_cache import ActivityCacheManager
+import pytest
+
 from travel_companion.models.external import (
     ActivityCategory,
     ActivityLocation,
@@ -14,6 +13,7 @@ from travel_companion.models.external import (
     ActivitySearchRequest,
     ActivitySearchResponse,
 )
+from travel_companion.services.activity_cache import ActivityCacheManager
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def sample_search_response():
             provider="viator",
         ),
     ]
-    
+
     return ActivitySearchResponse(
         activities=activities,
         total_results=2,
@@ -86,44 +86,55 @@ class TestActivityCacheManager:
     """Test cases for ActivityCacheManager."""
 
     @pytest.mark.asyncio
-    async def test_cache_search_results(self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis):
+    async def test_cache_search_results(
+        self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis
+    ):
         """Test caching of activity search results."""
         result = await activity_cache_manager.cache_search_results(
-            sample_search_request, 
-            sample_search_response
+            sample_search_request, sample_search_response
         )
-        
+
         assert result is True
-        mock_redis.set.assert_called_once()
-        
-        # Verify cache key generation
-        call_args = mock_redis.set.call_args
-        cache_key = call_args[0][0]
-        assert "activity:search" in cache_key
-        assert "paris_france" in cache_key
-        assert "cultural" in cache_key
+        assert mock_redis.set.call_count == 2  # Search results + location data
+
+        # Verify cache key generation for both calls
+        call_args_list = mock_redis.set.call_args_list
+
+        # First call should be search results
+        search_cache_key = call_args_list[0][0][0]
+        assert "activity:search" in search_cache_key
+        assert "paris_france" in search_cache_key
+        assert "cultural" in search_cache_key
+
+        # Second call should be location data
+        location_cache_key = call_args_list[1][0][0]
+        assert "activity:location" in location_cache_key
 
     @pytest.mark.asyncio
-    async def test_get_search_results_cache_hit(self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis):
+    async def test_get_search_results_cache_hit(
+        self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis
+    ):
         """Test successful retrieval of cached search results."""
         # Mock cache hit
         cached_data = sample_search_response.model_dump()
         mock_redis.get.return_value = cached_data
-        
+
         result = await activity_cache_manager.get_search_results(sample_search_request)
-        
+
         assert result is not None
         assert result.cached is True
         assert len(result.activities) == 2
         mock_redis.get.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_search_results_cache_miss(self, activity_cache_manager, sample_search_request, mock_redis):
+    async def test_get_search_results_cache_miss(
+        self, activity_cache_manager, sample_search_request, mock_redis
+    ):
         """Test cache miss returns None."""
         mock_redis.get.return_value = None
-        
+
         result = await activity_cache_manager.get_search_results(sample_search_request)
-        
+
         assert result is None
         mock_redis.get.assert_called_once()
 
@@ -137,20 +148,20 @@ class TestActivityCacheManager:
             "currency": "EUR",
             "availability": "high",
         }
-        
+
         result = await activity_cache_manager.cache_activity_pricing(
             external_id, provider, pricing_data
         )
-        
+
         assert result is True
         mock_redis.set.assert_called_once()
-        
+
         # Verify cache key and TTL
         call_args = mock_redis.set.call_args
         cache_key = call_args[0][0]
         cached_data = call_args[0][1]
         ttl = call_args[1]["expire"]
-        
+
         assert f"activity:pricing:{provider}:{external_id}" == cache_key
         assert "cached_at" in cached_data
         assert ttl == activity_cache_manager.PRICING_TTL
@@ -161,11 +172,11 @@ class TestActivityCacheManager:
         external_id = "ta_123456"
         provider = "tripadvisor"
         pricing_data = {"price": 45.00, "currency": "EUR"}
-        
+
         mock_redis.get.return_value = pricing_data
-        
+
         result = await activity_cache_manager.get_activity_pricing(external_id, provider)
-        
+
         assert result == pricing_data
         mock_redis.get.assert_called_once()
 
@@ -173,9 +184,9 @@ class TestActivityCacheManager:
     async def test_get_activity_pricing_cache_miss(self, activity_cache_manager, mock_redis):
         """Test pricing cache miss returns None."""
         mock_redis.get.return_value = None
-        
+
         result = await activity_cache_manager.get_activity_pricing("test_id", "test_provider")
-        
+
         assert result is None
 
     @pytest.mark.asyncio
@@ -186,9 +197,9 @@ class TestActivityCacheManager:
             {"location": "London, UK", "priority": "medium"},
             {"location": "New York, USA", "priority": "high"},
         ]
-        
+
         result = await activity_cache_manager.warm_popular_destinations(destinations)
-        
+
         assert result == 3  # All destinations warmed
         assert mock_redis.set.call_count == 3
 
@@ -196,21 +207,17 @@ class TestActivityCacheManager:
     async def test_invalidate_stale_activity_data(self, activity_cache_manager, mock_redis):
         """Test invalidation of stale cache entries."""
         # Mock stale cache entries
-        stale_keys = [
-            "activity:search:paris:cultural",
-            "activity:pricing:tripadvisor:123"
-        ]
         mock_redis.scan_keys.side_effect = [
             ["activity:search:paris:cultural"],
-            ["activity:pricing:tripadvisor:123"]
+            ["activity:pricing:tripadvisor:123"],
         ]
-        
+
         # Mock stale data (older than 24 hours)
         stale_time = (datetime.now(UTC) - timedelta(hours=25)).isoformat()
         mock_redis.get.return_value = {"cached_at": stale_time}
-        
+
         result = await activity_cache_manager.invalidate_stale_activity_data(max_age_hours=24)
-        
+
         assert result == 2  # Both entries invalidated
         assert mock_redis.delete.call_count == 2
 
@@ -221,24 +228,24 @@ class TestActivityCacheManager:
         mock_redis.get.side_effect = [100, 25, 50, 10]  # hits and misses
         mock_redis.scan_keys.side_effect = [
             ["key1", "key2", "key3"],  # search entries
-            ["key4", "key5"],          # pricing entries  
-            ["key6"],                  # popular entries
+            ["key4", "key5"],  # pricing entries
+            ["key6"],  # popular entries
         ]
-        
+
         stats = await activity_cache_manager.get_cache_performance_stats()
-        
+
         assert "search" in stats
         assert "pricing" in stats
         assert "cache_counts" in stats
-        
+
         assert stats["search"]["hits"] == 100
         assert stats["search"]["misses"] == 25
         assert stats["search"]["hit_rate"] == 0.8  # 100/125
-        
+
         assert stats["pricing"]["hits"] == 50
         assert stats["pricing"]["misses"] == 10
-        assert stats["pricing"]["hit_rate"] == 5/6  # 50/60
-        
+        assert stats["pricing"]["hit_rate"] == 5 / 6  # 50/60
+
         assert stats["cache_counts"]["search_entries"] == 3
         assert stats["cache_counts"]["pricing_entries"] == 2
         assert stats["cache_counts"]["popular_entries"] == 1
@@ -251,27 +258,31 @@ class TestActivityCacheManager:
             ["activity:search:key1", "activity:search:key2"],
             ["activity:pricing:key3"],
             ["activity:popular:key4"],
-            ["activity:location:key5"]
+            ["activity:location:key5"],
         ]
-        
+
         result = await activity_cache_manager.clear_all_activity_cache()
-        
+
         assert result == 5  # All entries cleared
         mock_redis.delete_keys.assert_called()
 
     @pytest.mark.asyncio
-    async def test_dynamic_ttl_calculation(self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis):
+    async def test_dynamic_ttl_calculation(
+        self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis
+    ):
         """Test dynamic TTL calculation based on search parameters."""
         # Test with popular destination
-        with patch.object(activity_cache_manager, '_is_popular_destination', return_value=True):
-            ttl = await activity_cache_manager._calculate_dynamic_ttl(sample_search_request, sample_search_response)
+        with patch.object(activity_cache_manager, "_is_popular_destination", return_value=True):
+            ttl = await activity_cache_manager._calculate_dynamic_ttl(
+                sample_search_request, sample_search_response
+            )
             assert ttl == activity_cache_manager.POPULAR_DESTINATION_TTL
 
     @pytest.mark.asyncio
     async def test_search_cache_key_generation(self, activity_cache_manager, sample_search_request):
         """Test generation of search cache keys."""
         cache_key = await activity_cache_manager._generate_search_cache_key(sample_search_request)
-        
+
         assert "activity:search" in cache_key
         assert "paris_france" in cache_key
         assert "cultural" in cache_key
@@ -287,17 +298,19 @@ class TestActivityCacheManager:
             category=ActivityCategory.ENTERTAINMENT,
             guest_count=1,
         )
-        
+
         cache_key = await activity_cache_manager._generate_search_cache_key(request)
-        
-        assert "new_york,_ny" in cache_key
+
+        assert "new_york_ny" in cache_key
         assert "entertainment" in cache_key
 
     @pytest.mark.asyncio
-    async def test_error_handling_redis_failure(self, activity_cache_manager, sample_search_request, mock_redis):
+    async def test_error_handling_redis_failure(
+        self, activity_cache_manager, sample_search_request, mock_redis
+    ):
         """Test error handling when Redis operations fail."""
         mock_redis.get.side_effect = Exception("Redis connection failed")
-        
+
         # Should not raise exception, should return None
         result = await activity_cache_manager.get_search_results(sample_search_request)
         assert result is None
@@ -306,21 +319,25 @@ class TestActivityCacheManager:
     async def test_cache_statistics_increment(self, activity_cache_manager, mock_redis):
         """Test cache statistics are properly incremented."""
         await activity_cache_manager._increment_cache_stats("test_metric", 5)
-        
+
         mock_redis.incr.assert_called_with("activity:stats:test_metric", 5)
         mock_redis.expire.assert_called_with("activity:stats:test_metric", 86400)
 
     @pytest.mark.asyncio
-    async def test_location_data_caching(self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis):
+    async def test_location_data_caching(
+        self, activity_cache_manager, sample_search_request, sample_search_response, mock_redis
+    ):
         """Test caching of location-specific data."""
-        await activity_cache_manager._cache_location_data(sample_search_request, sample_search_response)
-        
+        await activity_cache_manager._cache_location_data(
+            sample_search_request, sample_search_response
+        )
+
         # Should call set with location-specific key
         mock_redis.set.assert_called_once()
         call_args = mock_redis.set.call_args
         cache_key = call_args[0][0]
         cached_data = call_args[0][1]
-        
+
         assert "activity:location:paris,_france" == cache_key
         assert "total_activities" in cached_data
         assert "avg_price" in cached_data
@@ -329,12 +346,12 @@ class TestActivityCacheManager:
 
 class TestActivityCacheIntegration:
     """Integration tests that would run with Redis testcontainer."""
-    
+
     @pytest.mark.skip(reason="Requires Redis testcontainer setup")
     @pytest.mark.asyncio
     async def test_full_cache_lifecycle_with_real_redis(self):
         """Test complete cache lifecycle with real Redis.
-        
+
         This test would:
         1. Start Redis testcontainer
         2. Cache search results
@@ -349,7 +366,7 @@ class TestActivityCacheIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_cache_operations(self):
         """Test concurrent cache operations with real Redis.
-        
+
         This test would verify:
         1. Concurrent reads and writes
         2. Cache key conflicts
@@ -361,7 +378,7 @@ class TestActivityCacheIntegration:
     @pytest.mark.asyncio
     async def test_cache_performance_under_load(self):
         """Test cache performance under high load.
-        
+
         This test would measure:
         1. Cache hit/miss ratios
         2. Response times

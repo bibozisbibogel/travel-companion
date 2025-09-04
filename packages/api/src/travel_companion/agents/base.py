@@ -105,12 +105,14 @@ class BaseAgent(ABC, Generic[T]):
         """
         import hashlib
         import json
-        from datetime import datetime
+        from datetime import datetime, date
         from decimal import Decimal
 
         def json_serializer(obj: Any) -> str:
-            """Custom JSON serializer for datetime and Decimal objects."""
+            """Custom JSON serializer for datetime, date and Decimal objects."""
             if isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, date):
                 return obj.isoformat()
             elif isinstance(obj, Decimal):
                 return str(obj)

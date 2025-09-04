@@ -19,7 +19,7 @@ from travel_companion.models.external import (
 
 class GetYourGuideLocation(BaseModel):
     """GetYourGuide location model."""
-    
+
     location_id: str = Field(..., description="GetYourGuide location ID")
     name: str = Field(..., description="Location name")
     country: str | None = Field(None, description="Country name")
@@ -29,7 +29,7 @@ class GetYourGuideLocation(BaseModel):
 
 class GetYourGuideActivity(BaseModel):
     """GetYourGuide activity model."""
-    
+
     activity_id: str = Field(..., description="Activity ID")
     title: str = Field(..., description="Activity title")
     summary: str | None = Field(None, description="Activity summary")
@@ -37,7 +37,9 @@ class GetYourGuideActivity(BaseModel):
     price: dict[str, Any] = Field(default_factory=dict, description="Price information")
     rating: dict[str, Any] | None = Field(None, description="Rating information")
     pictures: list[dict[str, Any]] = Field(default_factory=list, description="Activity pictures")
-    categories: list[dict[str, Any]] = Field(default_factory=list, description="Activity categories")
+    categories: list[dict[str, Any]] = Field(
+        default_factory=list, description="Activity categories"
+    )
     booking_link: str | None = Field(None, description="Booking URL")
     location: dict[str, Any] = Field(default_factory=dict, description="Location information")
 
@@ -50,16 +52,16 @@ class GetYourGuideAPIClient:
         self.settings = get_settings()
         self.logger = logging.getLogger("travel_companion.services.getyourguide")
         self.base_url = "https://api.getyourguide.com/partner"
-        
+
         # Circuit breaker state
         self.failure_count = 0
         self.last_failure_time: float = 0
         self.circuit_open = False
-        
+
         # Rate limiting
         self.request_count = 0
         self.rate_limit_reset_time: float = 0
-        
+
         self.logger.info("GetYourGuide API client initialized")
 
     async def search_activities(self, request: ActivitySearchRequest) -> list[ActivityOption]:
@@ -84,7 +86,7 @@ class GetYourGuideAPIClient:
 
             # Then search for activities at that location
             activities_data = await self._search_activities_by_location(location_data, request)
-            
+
             # Convert to our internal format
             activities = []
             for activity_data in activities_data:
@@ -98,7 +100,7 @@ class GetYourGuideAPIClient:
 
             self.logger.info(f"GetYourGuide returned {len(activities)} activities")
             self._reset_circuit_breaker()
-            
+
             return activities
 
         except Exception as e:
@@ -116,12 +118,12 @@ class GetYourGuideAPIClient:
             GetYourGuide location data or None if not found
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self.settings.getyourguide_api_key}",
         }
-        
+
         params = {
             "q": location,
             "limit": 1,  # We only need the first match
@@ -130,35 +132,33 @@ class GetYourGuideAPIClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/locations/search",
-                    headers=headers,
-                    params=params
+                    f"{self.base_url}/locations/search", headers=headers, params=params
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     locations = data.get("data", [])
-                    
+
                     if locations:
                         location_info = GetYourGuideLocation(**locations[0])
-                        self.logger.debug(f"Found GetYourGuide location: {location_info.location_id}")
+                        self.logger.debug(
+                            f"Found GetYourGuide location: {location_info.location_id}"
+                        )
                         return location_info
-                        
+
                 elif response.status_code == 429:
                     await self._handle_rate_limit(response)
                     return None
-                    
+
                 response.raise_for_status()
-                
+
         except Exception as e:
             self.logger.warning(f"GetYourGuide location search failed: {e}")
-            
+
         return None
 
     async def _search_activities_by_location(
-        self, 
-        location: GetYourGuideLocation, 
-        request: ActivitySearchRequest
+        self, location: GetYourGuideLocation, request: ActivitySearchRequest
     ) -> list[GetYourGuideActivity]:
         """Search for activities at a specific location.
 
@@ -170,17 +170,17 @@ class GetYourGuideAPIClient:
             List of GetYourGuide activities
         """
         await self._check_rate_limit()
-        
+
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {self.settings.getyourguide_api_key}",
         }
-        
+
         params = {
             "location_id": location.location_id,
             "limit": min(request.max_results, 50),  # GetYourGuide max is typically 50
         }
-        
+
         # Add category filter if specified
         if request.category:
             gyg_category = self._map_category_to_getyourguide(request.category)
@@ -194,15 +194,13 @@ class GetYourGuideAPIClient:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/activities",
-                    headers=headers,
-                    params=params
+                    f"{self.base_url}/activities", headers=headers, params=params
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     activities_data = data.get("data", [])
-                    
+
                     activities = []
                     for activity_data in activities_data:
                         try:
@@ -211,21 +209,23 @@ class GetYourGuideAPIClient:
                         except Exception as e:
                             self.logger.debug(f"Failed to parse GetYourGuide activity: {e}")
                             continue
-                    
+
                     return activities
-                    
+
                 elif response.status_code == 429:
                     await self._handle_rate_limit(response)
                     return []
-                    
+
                 response.raise_for_status()
-                
+
         except Exception as e:
             self.logger.warning(f"GetYourGuide activity search failed: {e}")
-            
+
         return []
 
-    async def _convert_to_activity(self, activity_data: GetYourGuideActivity) -> ActivityOption | None:
+    async def _convert_to_activity(
+        self, activity_data: GetYourGuideActivity
+    ) -> ActivityOption | None:
         """Convert GetYourGuide activity to our internal ActivityOption model.
 
         Args:
@@ -239,7 +239,7 @@ class GetYourGuideAPIClient:
             location_info = activity_data.location
             lat = location_info.get("latitude", 0.0) if location_info else 0.0
             lng = location_info.get("longitude", 0.0) if location_info else 0.0
-            
+
             location = ActivityLocation(
                 latitude=float(lat) if lat else 40.7128,  # Default to NYC
                 longitude=float(lng) if lng else -74.0060,
@@ -252,7 +252,7 @@ class GetYourGuideAPIClient:
             # Parse pricing
             price = Decimal("0.00")
             currency = "USD"
-            
+
             if activity_data.price:
                 if "amount" in activity_data.price:
                     price = Decimal(str(activity_data.price["amount"]))
@@ -265,7 +265,7 @@ class GetYourGuideAPIClient:
                 if "value" in activity_data.duration and "unit" in activity_data.duration:
                     value = activity_data.duration["value"]
                     unit = activity_data.duration["unit"].lower()
-                    
+
                     if unit in ["hour", "hours"]:
                         duration_minutes = value * 60
                     elif unit in ["minute", "minutes"]:
@@ -276,7 +276,7 @@ class GetYourGuideAPIClient:
             # Parse rating
             rating = None
             review_count = None
-            
+
             if activity_data.rating:
                 if "average" in activity_data.rating:
                     rating = float(activity_data.rating["average"])
@@ -311,7 +311,9 @@ class GetYourGuideAPIClient:
             return activity
 
         except Exception as e:
-            self.logger.warning(f"Failed to convert GetYourGuide activity {activity_data.title}: {e}")
+            self.logger.warning(
+                f"Failed to convert GetYourGuide activity {activity_data.title}: {e}"
+            )
             return None
 
     def _map_category_to_getyourguide(self, category: ActivityCategory) -> str | None:
@@ -333,10 +335,12 @@ class GetYourGuideAPIClient:
             ActivityCategory.FOOD: "food-drink",
             ActivityCategory.RELAXATION: "wellness",
         }
-        
+
         return category_mapping.get(category)
 
-    def _map_getyourguide_category_to_internal(self, activity: GetYourGuideActivity) -> ActivityCategory:
+    def _map_getyourguide_category_to_internal(
+        self, activity: GetYourGuideActivity
+    ) -> ActivityCategory:
         """Map GetYourGuide category to our internal category.
 
         Args:
@@ -350,28 +354,51 @@ class GetYourGuideAPIClient:
         for cat in activity.categories:
             if "name" in cat:
                 category_names.append(cat["name"].lower())
-        
+
         combined_categories = " ".join(category_names)
         title_lower = activity.title.lower()
         summary_lower = (activity.summary or "").lower()
         combined_text = f"{combined_categories} {title_lower} {summary_lower}"
 
         # Map based on keywords
-        if any(keyword in combined_text for keyword in ["museum", "historic", "cultural", "heritage", "art", "monument"]):
+        if any(
+            keyword in combined_text
+            for keyword in ["museum", "historic", "cultural", "heritage", "art", "monument"]
+        ):
             return ActivityCategory.CULTURAL
-        elif any(keyword in combined_text for keyword in ["adventure", "outdoor", "hiking", "cycling", "extreme", "sport"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["adventure", "outdoor", "hiking", "cycling", "extreme", "sport"]
+        ):
             return ActivityCategory.ADVENTURE
-        elif any(keyword in combined_text for keyword in ["food", "culinary", "cooking", "wine", "tasting", "dining"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["food", "culinary", "cooking", "wine", "tasting", "dining"]
+        ):
             return ActivityCategory.FOOD
-        elif any(keyword in combined_text for keyword in ["show", "theater", "performance", "entertainment", "concert", "music"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["show", "theater", "performance", "entertainment", "concert", "music"]
+        ):
             return ActivityCategory.ENTERTAINMENT
-        elif any(keyword in combined_text for keyword in ["nature", "park", "wildlife", "safari", "garden", "beach"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["nature", "park", "wildlife", "safari", "garden", "beach"]
+        ):
             return ActivityCategory.NATURE
-        elif any(keyword in combined_text for keyword in ["shopping", "market", "boutique", "souvenir"]):
+        elif any(
+            keyword in combined_text for keyword in ["shopping", "market", "boutique", "souvenir"]
+        ):
             return ActivityCategory.SHOPPING
-        elif any(keyword in combined_text for keyword in ["spa", "wellness", "relaxation", "massage", "thermal"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["spa", "wellness", "relaxation", "massage", "thermal"]
+        ):
             return ActivityCategory.RELAXATION
-        elif any(keyword in combined_text for keyword in ["nightlife", "bar", "club", "evening", "night", "pub"]):
+        elif any(
+            keyword in combined_text
+            for keyword in ["nightlife", "bar", "club", "evening", "night", "pub"]
+        ):
             return ActivityCategory.NIGHTLIFE
         else:
             return ActivityCategory.ENTERTAINMENT  # Default fallback
@@ -383,25 +410,25 @@ class GetYourGuideAPIClient:
             True if circuit is open (should not make requests)
         """
         import time
-        
+
         if not self.circuit_open:
             return False
-            
+
         # Auto-reset after 5 minutes
         if time.time() - self.last_failure_time > 300:
             self.circuit_open = False
             self.failure_count = 0
             self.logger.info("GetYourGuide circuit breaker reset")
-            
+
         return self.circuit_open
 
     async def _handle_api_failure(self) -> None:
         """Handle API failure for circuit breaker."""
         import time
-        
+
         self.failure_count += 1
         self.last_failure_time = time.time()
-        
+
         if self.failure_count >= 3:
             self.circuit_open = True
             self.logger.warning("GetYourGuide circuit breaker opened due to repeated failures")
@@ -415,19 +442,19 @@ class GetYourGuideAPIClient:
     async def _check_rate_limit(self) -> None:
         """Check and enforce rate limits."""
         import time
-        
+
         current_time = time.time()
-        
+
         # Reset counter every hour
         if current_time > self.rate_limit_reset_time:
             self.request_count = 0
             self.rate_limit_reset_time = current_time + 3600  # 1 hour
-        
+
         # Conservative rate limiting: 25 requests/hour
         if self.request_count >= 25:
             self.logger.warning("GetYourGuide rate limit reached, waiting...")
             await asyncio.sleep(10)  # Wait 10 seconds
-        
+
         self.request_count += 1
 
     async def _handle_rate_limit(self, response: httpx.Response) -> None:
@@ -438,6 +465,6 @@ class GetYourGuideAPIClient:
         """
         retry_after = response.headers.get("Retry-After", "60")
         wait_time = min(int(retry_after), 300)  # Max 5 minutes
-        
+
         self.logger.warning(f"GetYourGuide rate limited, waiting {wait_time} seconds")
         await asyncio.sleep(wait_time)

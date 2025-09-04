@@ -26,7 +26,7 @@ from travel_companion.utils.errors import (
 class TestErrorCodes:
     """Test error code enums."""
 
-    def test_auth_error_codes(self):
+    def test_auth_error_codes(self) -> None:
         """Test authentication error codes are correctly defined."""
         assert AuthErrorCode.INVALID_CREDENTIALS == "AUTH001"
         assert AuthErrorCode.TOKEN_EXPIRED == "AUTH002"
@@ -42,7 +42,7 @@ class TestErrorCodes:
         assert AuthErrorCode.AUTHENTICATION_REQUIRED == "AUTH012"
         assert AuthErrorCode.INSUFFICIENT_PERMISSIONS == "AUTH013"
 
-    def test_database_error_codes(self):
+    def test_database_error_codes(self) -> None:
         """Test database error codes are correctly defined."""
         assert DatabaseErrorCode.CONNECTION_FAILED == "DB001"
         assert DatabaseErrorCode.QUERY_FAILED == "DB002"
@@ -50,7 +50,7 @@ class TestErrorCodes:
         assert DatabaseErrorCode.TRANSACTION_FAILED == "DB004"
         assert DatabaseErrorCode.USER_LOOKUP_FAILED == "DB005"
 
-    def test_validation_error_codes(self):
+    def test_validation_error_codes(self) -> None:
         """Test validation error codes are correctly defined."""
         assert ValidationErrorCode.INVALID_EMAIL_FORMAT == "VAL001"
         assert ValidationErrorCode.INVALID_PASSWORD_FORMAT == "VAL002"
@@ -62,7 +62,7 @@ class TestErrorCodes:
 class TestTravelCompanionError:
     """Test base TravelCompanionError class."""
 
-    def test_basic_error_creation(self):
+    def test_basic_error_creation(self) -> None:
         """Test basic error creation with message only."""
         error = TravelCompanionError("Test error")
 
@@ -71,7 +71,7 @@ class TestTravelCompanionError:
         assert error.error_code is None
         assert error.details == {}
 
-    def test_error_with_code_and_details(self):
+    def test_error_with_code_and_details(self) -> None:
         """Test error creation with error code and details."""
         details = {"field": "email", "value": "invalid"}
         error = TravelCompanionError("Test error", error_code="TEST001", details=details)
@@ -80,7 +80,7 @@ class TestTravelCompanionError:
         assert error.error_code == "TEST001"
         assert error.details == details
 
-    def test_to_dict_basic(self):
+    def test_to_dict_basic(self) -> None:
         """Test to_dict() method with basic error."""
         error = TravelCompanionError("Test error")
         result = error.to_dict()
@@ -92,7 +92,7 @@ class TestTravelCompanionError:
         }
         assert result == expected
 
-    def test_to_dict_with_code_and_details(self):
+    def test_to_dict_with_code_and_details(self) -> None:
         """Test to_dict() method with error code and details."""
         details = {"field": "email"}
         error = TravelCompanionError("Test error", error_code="TEST001", details=details)
