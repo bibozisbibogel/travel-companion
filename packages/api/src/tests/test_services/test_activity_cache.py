@@ -206,7 +206,7 @@ class TestActivityCacheManager:
     @pytest.mark.asyncio
     async def test_invalidate_stale_activity_data(self, activity_cache_manager, mock_redis):
         """Test invalidation of stale cache entries."""
-        # Mock stale cache entries  
+        # Mock stale cache entries
         mock_redis.scan_keys.side_effect = [
             ["activity:search:paris:cultural"],
             ["activity:pricing:tripadvisor:123"],
