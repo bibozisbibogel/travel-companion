@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from travel_companion.core.redis import RedisManager
-from travel_companion.models.external import HotelSearchResponse
+from travel_companion.models.external import HotelSearchResponse, WeatherSearchResponse
 
 
 class CacheManager:
@@ -324,3 +324,114 @@ class CacheManager:
         except Exception as e:
             self.logger.warning(f"Failed to generate cache key variants: {e}")
             return [base_key] if "base_key" in locals() else []
+
+    async def get_weather_cache(self, cache_key: str) -> WeatherSearchResponse | None:
+        """Get cached weather search results.
+
+        Args:
+            cache_key: Cache key for weather search results
+
+        Returns:
+            Cached WeatherSearchResponse or None if not found/expired
+        """
+        try:
+            cached_data = await self.redis.get(cache_key, json_decode=True)
+            if not cached_data:
+                return None
+
+            # Check if cache is still valid (weather data should not be older than 3 hours)
+            cache_timestamp = cached_data.get("cache_timestamp")
+            if cache_timestamp:
+                cache_time = datetime.fromisoformat(cache_timestamp)
+                # Weather data should not be older than 3 hours for forecast reliability
+                if datetime.now(UTC) - cache_time > timedelta(hours=3):
+                    await self.redis.delete(cache_key)
+                    self.logger.info(f"Invalidated stale weather cache: {cache_key}")
+                    return None
+
+            # Convert back to WeatherSearchResponse
+            return WeatherSearchResponse(**cached_data)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to get cached weather search: {e}")
+            return None
+
+    async def set_weather_cache(
+        self,
+        cache_key: str,
+        response: WeatherSearchResponse,
+        ttl_seconds: int = 10800,  # 3 hours default
+    ) -> bool:
+        """Cache weather search results.
+
+        Args:
+            cache_key: Cache key for storage
+            response: WeatherSearchResponse to cache
+            ttl_seconds: Time to live in seconds (default 3 hours)
+
+        Returns:
+            True if caching succeeded, False otherwise
+        """
+        try:
+            # Add cache timestamp and expiration info
+            cache_data = response.model_dump()
+            cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
+            cache_data["cached"] = True
+            cache_data["cache_expires_at"] = (
+                datetime.now(UTC) + timedelta(seconds=ttl_seconds)
+            ).isoformat()
+
+            success = await self.redis.set(cache_key, cache_data, expire=ttl_seconds)
+
+            if success:
+                self.logger.info(f"Cached weather search results: {cache_key} (TTL: {ttl_seconds}s)")
+
+                # Store cache metadata for analytics
+                metadata_key = f"{cache_key}:meta"
+                metadata = {
+                    "created_at": datetime.now(UTC).isoformat(),
+                    "ttl_seconds": ttl_seconds,
+                    "forecast_days": len(response.forecast.daily),
+                    "alert_count": len(response.forecast.alerts),
+                    "historical_points": len(response.historical_data),
+                    "search_params": response.search_metadata,
+                }
+                await self.redis.set(
+                    metadata_key, metadata, expire=ttl_seconds + 300
+                )  # Keep metadata slightly longer
+
+            return success
+
+        except Exception as e:
+            self.logger.error(f"Failed to cache weather search results: {e}")
+            return False
+
+    async def invalidate_weather_location_cache(self, location: str) -> int:
+        """Invalidate all cached weather results for a specific location.
+
+        Args:
+            location: Location identifier to invalidate
+
+        Returns:
+            Number of cache entries invalidated
+        """
+        try:
+            # Create pattern to match all weather cache keys for this location
+            location_pattern = f"weather_agent:*{location.lower()}*"
+
+            # Use Redis SCAN to find matching keys
+            invalidated_count = 0
+            async for key in self.redis.client.scan_iter(match=location_pattern):
+                await self.redis.delete(key)
+                invalidated_count += 1
+
+            if invalidated_count > 0:
+                self.logger.info(
+                    f"Invalidated {invalidated_count} weather cache entries for location: {location}"
+                )
+
+            return invalidated_count
+
+        except Exception as e:
+            self.logger.error(f"Failed to invalidate weather location cache: {e}")
+            return 0
