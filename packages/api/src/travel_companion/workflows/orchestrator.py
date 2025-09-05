@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph
 
 from ..core.config import get_settings
 from ..core.redis import get_redis_manager
+from ..models.trip import ActivityOption, FlightOption, HotelOption, TripPlanRequest
 from ..utils.logging import workflow_logger
 
 
@@ -26,6 +27,32 @@ class WorkflowState(TypedDict):
     input_data: dict[str, Any]
     output_data: dict[str, Any]
     intermediate_results: dict[str, Any]
+
+
+class TripPlanningWorkflowState(WorkflowState):
+    """Extended state structure for trip planning workflows."""
+
+    # Trip planning specific fields
+    trip_request: TripPlanRequest
+    trip_id: str | None
+
+    # Agent execution tracking
+    agents_completed: list[str]
+    agents_failed: list[str]
+    agent_dependencies: dict[str, list[str]]
+
+    # Agent results
+    flight_results: list[FlightOption]
+    hotel_results: list[HotelOption]
+    activity_results: list[ActivityOption]
+    weather_data: dict[str, Any]
+    food_recommendations: list[dict[str, Any]]
+    itinerary_data: dict[str, Any]
+
+    # Workflow context
+    user_preferences: dict[str, Any]
+    budget_tracking: dict[str, float]
+    optimization_metrics: dict[str, float]
 
 
 class BaseWorkflow(ABC):
@@ -83,6 +110,15 @@ class BaseWorkflow(ABC):
         """
         pass
 
+    def get_state_class(self) -> type[WorkflowState]:
+        """
+        Get the state class for this workflow.
+
+        Returns:
+            State class to use for this workflow
+        """
+        return WorkflowState
+
     def build_graph(self) -> Any:
         """
         Build and compile the LangGraph workflow.
@@ -98,8 +134,9 @@ class BaseWorkflow(ABC):
             self._nodes = self.define_nodes()
             self._edges = self.define_edges()
 
-            # Create state graph
-            graph = StateGraph(WorkflowState)
+            # Create state graph with appropriate state class
+            state_class = self.get_state_class()
+            graph = StateGraph(state_class)
 
             # Add nodes
             for node_name, node_func in self._nodes.items():
@@ -437,3 +474,264 @@ class BaseWorkflow(ABC):
                 "node_count": 0,
                 "edge_count": 0,
             }
+
+
+class TripPlanningWorkflow(BaseWorkflow):
+    """
+    Concrete implementation of trip planning workflow with multi-agent coordination.
+
+    Orchestrates all travel agents (flight, hotel, activity, weather, food, itinerary)
+    with dependency management and parallel execution optimization.
+    """
+
+    def __init__(self) -> None:
+        """Initialize trip planning workflow."""
+        super().__init__("trip_planning")
+
+    def get_state_class(self) -> type[TripPlanningWorkflowState]:
+        """Return trip planning specific state class."""
+        return TripPlanningWorkflowState
+
+    def define_nodes(self) -> dict[str, Any]:
+        """
+        Define workflow nodes for trip planning agents.
+
+        Returns:
+            Dictionary mapping node names to agent functions
+        """
+        # Import nodes from nodes.py (these will be implemented in Task 2)
+        try:
+            from .nodes import (
+                execute_activity_agent,
+                execute_flight_agent,
+                execute_food_agent,
+                execute_hotel_agent,
+                execute_itinerary_agent,
+                execute_weather_agent,
+                finalize_trip_plan,
+                initialize_trip_context,
+            )
+
+            return {
+                "initialize_trip": initialize_trip_context,
+                "weather_agent": execute_weather_agent,
+                "flight_agent": execute_flight_agent,
+                "hotel_agent": execute_hotel_agent,
+                "activity_agent": execute_activity_agent,
+                "food_agent": execute_food_agent,
+                "itinerary_agent": execute_itinerary_agent,
+                "finalize_plan": finalize_trip_plan,
+            }
+        except ImportError:
+            # Temporary placeholder nodes for Task 1 foundation testing
+            # These will be replaced with actual implementations in Task 2
+            return {
+                "initialize_trip": self._placeholder_node,
+                "weather_agent": self._placeholder_node,
+                "flight_agent": self._placeholder_node,
+                "hotel_agent": self._placeholder_node,
+                "activity_agent": self._placeholder_node,
+                "food_agent": self._placeholder_node,
+                "itinerary_agent": self._placeholder_node,
+                "finalize_plan": self._placeholder_node,
+            }
+
+    def _placeholder_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
+        """
+        Placeholder node for Task 1 foundation testing.
+        Will be replaced with actual node implementations in Task 2.
+        """
+        return state
+
+    def define_edges(self) -> list[tuple[str, str]]:
+        """
+        Define workflow edges with dependency management.
+
+        Returns:
+            List of workflow transitions
+        """
+        return [
+            # Sequential initialization
+            ("initialize_trip", "weather_agent"),
+
+            # Parallel execution after weather (weather needed for activities)
+            ("weather_agent", "flight_agent"),
+            ("weather_agent", "hotel_agent"),
+            ("weather_agent", "activity_agent"),
+            ("weather_agent", "food_agent"),
+
+            # Final coordination
+            ("flight_agent", "itinerary_agent"),
+            ("hotel_agent", "itinerary_agent"),
+            ("activity_agent", "itinerary_agent"),
+            ("food_agent", "itinerary_agent"),
+
+            # Finalization
+            ("itinerary_agent", "finalize_plan"),
+        ]
+
+    def get_entry_point(self) -> str:
+        """Return workflow entry point."""
+        return "initialize_trip"
+
+    def create_initial_state(
+        self,
+        trip_request: TripPlanRequest,
+        user_id: str | None = None,
+        request_id: str | None = None,
+    ) -> TripPlanningWorkflowState:
+        """
+        Create initial workflow state with trip context.
+
+        Args:
+            trip_request: Trip planning request data
+            user_id: Optional user ID for context
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Initialized trip planning workflow state
+        """
+        workflow_id = str(uuid.uuid4())
+        request_id = request_id or str(uuid.uuid4())
+        start_time = time.time()
+
+        # Initialize state with trip context
+        initial_state: TripPlanningWorkflowState = {
+            # Base workflow fields
+            "request_id": request_id,
+            "workflow_id": workflow_id,
+            "user_id": user_id,
+            "status": "running",
+            "error": None,
+            "start_time": start_time,
+            "end_time": None,
+            "current_node": self.get_entry_point(),
+            "input_data": trip_request.model_dump(),
+            "output_data": {},
+            "intermediate_results": {},
+
+            # Trip planning specific fields
+            "trip_request": trip_request,
+            "trip_id": None,
+
+            # Agent tracking
+            "agents_completed": [],
+            "agents_failed": [],
+            "agent_dependencies": {
+                "activity_agent": ["weather_agent"],  # Activities depend on weather
+                "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
+            },
+
+            # Agent results (initialized empty)
+            "flight_results": [],
+            "hotel_results": [],
+            "activity_results": [],
+            "weather_data": {},
+            "food_recommendations": [],
+            "itinerary_data": {},
+
+            # Workflow context
+            "user_preferences": trip_request.preferences or {},
+            "budget_tracking": {"allocated": float(trip_request.requirements.budget), "spent": 0.0},
+            "optimization_metrics": {"execution_time": 0.0, "success_rate": 0.0},
+        }
+
+        return initial_state
+
+    async def execute_trip_planning(
+        self,
+        trip_request: TripPlanRequest,
+        user_id: str | None = None,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Execute complete trip planning workflow.
+
+        Args:
+            trip_request: Trip planning request data
+            user_id: Optional user ID for context
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Complete trip planning results
+
+        Raises:
+            TimeoutError: If workflow execution exceeds timeout
+            RuntimeError: If workflow execution fails
+        """
+        # Create initial state
+        initial_state = self.create_initial_state(trip_request, user_id, request_id)
+
+        # Log workflow start
+        workflow_logger.log_workflow_started(
+            workflow_id=initial_state["workflow_id"],
+            workflow_type=self.workflow_type,
+            request_id=initial_state["request_id"],
+            input_data=initial_state["input_data"],
+        )
+
+        try:
+            # Ensure graph is built
+            if self._graph is None:
+                self.build_graph()
+
+            # Persist initial state
+            await self._persist_state(initial_state)
+
+            # Execute workflow with timeout
+            result = await self._execute_with_timeout(initial_state)
+
+            # Update final state
+            end_time = time.time()
+            execution_time_ms = (end_time - initial_state["start_time"]) * 1000
+
+            result["end_time"] = end_time
+            result["status"] = "completed"
+
+            # Persist final state
+            await self._persist_state(result)
+
+            # Log success
+            workflow_logger.log_workflow_completed(
+                workflow_id=initial_state["workflow_id"],
+                workflow_type=self.workflow_type,
+                request_id=initial_state["request_id"],
+                execution_time_ms=execution_time_ms,
+                output_data=result.get("output_data"),
+            )
+
+            return result["output_data"]
+
+        except TimeoutError:
+            execution_time_ms = (time.time() - initial_state["start_time"]) * 1000
+            workflow_logger.log_workflow_failed(
+                workflow_id=initial_state["workflow_id"],
+                workflow_type=self.workflow_type,
+                request_id=initial_state["request_id"],
+                error="Workflow execution timeout",
+                execution_time_ms=execution_time_ms,
+            )
+            raise
+
+        except Exception as e:
+            execution_time_ms = (time.time() - initial_state["start_time"]) * 1000
+            workflow_logger.log_workflow_failed(
+                workflow_id=initial_state["workflow_id"],
+                workflow_type=self.workflow_type,
+                request_id=initial_state["request_id"],
+                error=str(e),
+                execution_time_ms=execution_time_ms,
+            )
+
+            # Update state with error
+            error_state = initial_state.copy()
+            error_state.update(
+                {
+                    "status": "failed",
+                    "error": str(e),
+                    "end_time": time.time(),
+                }
+            )
+            await self._persist_state(error_state)
+
+            raise RuntimeError(f"Trip planning workflow execution failed: {e}") from e
