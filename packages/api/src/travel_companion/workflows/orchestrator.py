@@ -3,7 +3,13 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, TypedDict
+from typing import Any, TypedDict, Optional
+
+# Add import for TYPE_CHECKING to handle forward references
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .parallel_executor import ParallelExecutionConfig
 
 from langgraph.graph import StateGraph
 
@@ -522,9 +528,12 @@ class TripPlanningWorkflow(BaseWorkflow):
     with dependency management and parallel execution optimization.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, parallel_config: Optional["ParallelExecutionConfig"] = None) -> None:
         """Initialize trip planning workflow."""
         super().__init__("trip_planning")
+        
+        # Store parallel config for delayed initialization
+        self.parallel_config = parallel_config
 
     def get_state_class(self) -> type[TripPlanningWorkflowState]:
         """Return trip planning specific state class."""
@@ -576,10 +585,17 @@ class TripPlanningWorkflow(BaseWorkflow):
         """
         Coordinated execution node that manages all agent execution with dependencies.
         
-        This node uses the WorkflowCoordinator to execute agents in the optimal order
-        with parallel execution where possible and proper dependency management.
+        This node uses the ParallelExecutionOptimizer for optimal parallel execution
+        with timeout handling, load balancing, and performance monitoring.
         """
-        from .coordinator import WorkflowCoordinator
+        # Import here to avoid circular import
+        from .parallel_executor import ParallelExecutionOptimizer, ParallelExecutionConfig
+        
+        # Initialize parallel optimizer with delayed import
+        parallel_optimizer = ParallelExecutionOptimizer(
+            config=self.parallel_config or ParallelExecutionConfig()
+        )
+        
         from .nodes import (
             execute_activity_agent,
             execute_flight_agent,
@@ -599,24 +615,49 @@ class TripPlanningWorkflow(BaseWorkflow):
             "itinerary_agent": execute_itinerary_agent,
         }
         
-        # Initialize coordinator with current state
-        coordinator = WorkflowCoordinator(state)
+        # Define agent dependencies (weather before activities)
+        dependencies = {
+            "activity_agent": ["weather_agent"],
+            "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
+        }
         
-        # Execute coordinated workflow
-        updated_state = await coordinator.coordinate_execution(agent_functions)
-        
-        # Update state with coordination metrics
-        coordination_metrics = coordinator.get_coordination_metrics()
-        updated_state["coordination_metrics"] = coordination_metrics
-        
-        workflow_logger.log_coordination_metrics(
+        workflow_logger.log_parallel_execution_starting(
             workflow_id=state["workflow_id"],
             request_id=state["request_id"],
-            metrics=coordination_metrics
+            agent_count=len(agent_functions)
         )
         
-        return updated_state
-    
+        try:
+            # Execute agents with parallel optimization
+            updated_state = await parallel_optimizer.execute_agents_parallel(
+                state=state,
+                agent_functions=agent_functions,
+                dependencies=dependencies
+            )
+            
+            # Log parallel execution completion
+            execution_metrics = updated_state.get("parallel_execution_metrics", {})
+            workflow_logger.log_parallel_execution_completed(
+                workflow_id=state["workflow_id"],
+                request_id=state["request_id"],
+                execution_metrics=execution_metrics
+            )
+            
+            return updated_state
+            
+        except Exception as e:
+            workflow_logger.log_parallel_execution_failed(
+                workflow_id=state["workflow_id"],
+                request_id=state["request_id"],
+                error=str(e),
+                partial_metrics={}
+            )
+            
+            # Set error state but allow error handler to process
+            state["error"] = str(e)
+            state["status"] = "parallel_execution_failed"
+            return state
+
     def _error_handler_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
         """
         Error handler node for workflow failures.

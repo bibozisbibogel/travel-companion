@@ -48,6 +48,23 @@ class WorkflowEvent(str, Enum):
     STATE_UPDATED = "state_updated"
     STATE_PERSISTED = "state_persisted"
     STATE_RESTORED = "state_restored"
+    
+    # Parallel execution events
+    PARALLEL_EXECUTION_STARTED = "parallel_execution_started"
+    PARALLEL_EXECUTION_COMPLETED = "parallel_execution_completed"
+    PARALLEL_EXECUTION_FAILED = "parallel_execution_failed"
+    
+    # Agent coordination events
+    AGENT_EXECUTION_STARTED = "agent_execution_started"
+    AGENT_EXECUTION_COMPLETED = "agent_execution_completed"
+    AGENT_EXECUTION_FAILED = "agent_execution_failed"
+    AGENT_FAILURE_HANDLED = "agent_failure_handled"
+    
+    # Coordination events  
+    COORDINATION_STARTED = "coordination_started"
+    COORDINATION_COMPLETED = "coordination_completed"
+    COORDINATION_FAILED = "coordination_failed"
+    COORDINATION_METRICS = "coordination_metrics"
 
 
 class SecurityLogLevel(str, Enum):
@@ -625,6 +642,261 @@ class WorkflowLogger:
                 },
             },
         )
+
+    # Parallel execution logging methods
+    def log_parallel_execution_started(
+        self,
+        workflow_id: str,
+        request_id: str,
+        total_agents: int,
+        config: dict[str, Any] | None = None,
+    ) -> None:
+        """Log parallel execution start."""
+        self.logger.info(
+            "Parallel agent execution started",
+            extra={
+                "event_type": WorkflowEvent.PARALLEL_EXECUTION_STARTED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": {
+                    "total_agents": total_agents,
+                    "config": config or {},
+                },
+            },
+        )
+
+    def log_parallel_execution_completed(
+        self,
+        workflow_id: str,
+        request_id: str,
+        execution_metrics: dict[str, Any],
+    ) -> None:
+        """Log successful parallel execution completion."""
+        self.logger.info(
+            "Parallel agent execution completed",
+            extra={
+                "event_type": WorkflowEvent.PARALLEL_EXECUTION_COMPLETED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": execution_metrics,
+            },
+        )
+
+    def log_parallel_execution_failed(
+        self,
+        workflow_id: str,
+        request_id: str,
+        error: str,
+        partial_metrics: dict[str, Any],
+    ) -> None:
+        """Log parallel execution failure."""
+        self.logger.error(
+            f"Parallel agent execution failed: {error}",
+            extra={
+                "event_type": WorkflowEvent.PARALLEL_EXECUTION_FAILED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "error_code": "PARALLEL_EXECUTION_FAILED",
+                "details": {
+                    "error_message": error,
+                    "partial_metrics": partial_metrics,
+                },
+            },
+        )
+
+    def log_parallel_execution_starting(
+        self,
+        workflow_id: str,
+        request_id: str,
+        agent_count: int,
+    ) -> None:
+        """Log parallel execution starting (convenience method)."""
+        self.logger.info(
+            f"Starting parallel execution of {agent_count} agents",
+            extra={
+                "event_type": WorkflowEvent.PARALLEL_EXECUTION_STARTED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": {"agent_count": agent_count},
+            },
+        )
+
+    # Agent coordination logging methods
+    def log_agent_execution_started(
+        self,
+        workflow_id: str,
+        request_id: str,
+        agent_name: str,
+        phase: str,
+    ) -> None:
+        """Log individual agent execution start."""
+        self.logger.debug(
+            f"Agent {agent_name} execution started in phase {phase}",
+            extra={
+                "event_type": WorkflowEvent.AGENT_EXECUTION_STARTED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "agent_name": agent_name,
+                "details": {"execution_phase": phase},
+            },
+        )
+
+    def log_agent_execution_completed(
+        self,
+        workflow_id: str,
+        request_id: str,
+        agent_name: str,
+        execution_time_ms: float,
+    ) -> None:
+        """Log individual agent execution completion."""
+        self.logger.debug(
+            f"Agent {agent_name} execution completed",
+            extra={
+                "event_type": WorkflowEvent.AGENT_EXECUTION_COMPLETED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "agent_name": agent_name,
+                "details": {"execution_time_ms": execution_time_ms},
+            },
+        )
+
+    def log_agent_execution_failed(
+        self,
+        workflow_id: str,
+        request_id: str,
+        agent_name: str,
+        error: str,
+        execution_time_ms: float,
+    ) -> None:
+        """Log individual agent execution failure."""
+        self.logger.warning(
+            f"Agent {agent_name} execution failed: {error}",
+            extra={
+                "event_type": WorkflowEvent.AGENT_EXECUTION_FAILED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "agent_name": agent_name,
+                "error_code": "AGENT_EXECUTION_FAILED",
+                "details": {
+                    "execution_time_ms": execution_time_ms,
+                    "error_message": error,
+                },
+            },
+        )
+
+    def log_agent_failure_handled(
+        self,
+        workflow_id: str,
+        request_id: str,
+        agent_name: str,
+        error: str,
+        workflow_continuing: bool,
+    ) -> None:
+        """Log agent failure being handled gracefully."""
+        self.logger.info(
+            f"Agent {agent_name} failure handled, workflow continuing: {workflow_continuing}",
+            extra={
+                "event_type": WorkflowEvent.AGENT_FAILURE_HANDLED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "agent_name": agent_name,
+                "details": {
+                    "error_message": error,
+                    "workflow_continuing": workflow_continuing,
+                },
+            },
+        )
+
+    # Coordination logging methods
+    def log_coordination_started(
+        self,
+        workflow_id: str,
+        request_id: str,
+        total_agents: int,
+    ) -> None:
+        """Log workflow coordination start."""
+        self.logger.info(
+            "Workflow coordination started",
+            extra={
+                "event_type": WorkflowEvent.COORDINATION_STARTED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": {"total_agents": total_agents},
+            },
+        )
+
+    def log_coordination_completed(
+        self,
+        workflow_id: str,
+        request_id: str,
+        execution_summary: dict[str, Any],
+    ) -> None:
+        """Log workflow coordination completion."""
+        self.logger.info(
+            "Workflow coordination completed",
+            extra={
+                "event_type": WorkflowEvent.COORDINATION_COMPLETED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": execution_summary,
+            },
+        )
+
+    def log_coordination_failed(
+        self,
+        workflow_id: str,
+        request_id: str,
+        error: str,
+        execution_summary: dict[str, Any],
+    ) -> None:
+        """Log workflow coordination failure."""
+        self.logger.error(
+            f"Workflow coordination failed: {error}",
+            extra={
+                "event_type": WorkflowEvent.COORDINATION_FAILED,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "error_code": "COORDINATION_FAILED",
+                "details": {
+                    "error_message": error,
+                    "execution_summary": execution_summary,
+                },
+            },
+        )
+
+    def log_coordination_metrics(
+        self,
+        workflow_id: str,
+        request_id: str,
+        metrics: dict[str, Any],
+    ) -> None:
+        """Log coordination performance metrics."""
+        self.logger.info(
+            "Coordination metrics recorded",
+            extra={
+                "event_type": WorkflowEvent.COORDINATION_METRICS,
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "details": metrics,
+            },
+        )
+
+    # Convenience logging methods
+    def warning(self, message: str, **kwargs: Any) -> None:
+        """Log a warning message."""
+        self.logger.warning(message, extra=kwargs)
+
+    def debug(self, message: str, **kwargs: Any) -> None:
+        """Log a debug message."""
+        self.logger.debug(message, extra=kwargs)
+
+    def info(self, message: str, **kwargs: Any) -> None:
+        """Log an info message."""
+        self.logger.info(message, extra=kwargs)
+
+    def error(self, message: str, **kwargs: Any) -> None:
+        """Log an error message."""
+        self.logger.error(message, extra=kwargs)
 
 
 # Global logger instances
