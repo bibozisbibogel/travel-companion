@@ -330,11 +330,49 @@ class BaseWorkflow(ABC):
 
     async def _persist_state(self, state: WorkflowState) -> None:
         """
-        Persist workflow state to Redis.
+        Persist workflow state to Redis with enhanced state management.
 
         Args:
             state: Workflow state to persist
         """
+        try:
+            # Use enhanced state manager for TripPlanningWorkflow
+            if isinstance(state, dict) and "trip_request" in state:
+                from .state_manager import WorkflowStateManager
+                
+                state_manager = WorkflowStateManager(
+                    workflow_id=state["workflow_id"],
+                    redis_ttl_hours=24
+                )
+                
+                # Determine checkpoint type based on workflow status
+                checkpoint_type = "automatic"
+                if state.get("status") == "failed":
+                    checkpoint_type = "error"
+                elif state.get("status") == "completed":
+                    checkpoint_type = "completion"
+                elif state.get("current_node") in ["initialize_trip", "finalize_plan"]:
+                    checkpoint_type = "manual"
+                
+                # Persist with enhanced features
+                success = await state_manager.persist_state(state, checkpoint_type)
+                
+                if not success:
+                    workflow_logger.warning(
+                        f"Enhanced state persistence failed for {state['workflow_id']}, falling back to basic persistence"
+                    )
+                    await self._basic_persist_state(state)
+            else:
+                # Fallback to basic persistence for non-trip workflows
+                await self._basic_persist_state(state)
+
+        except Exception as e:
+            # Fallback to basic persistence
+            workflow_logger.warning(f"Enhanced state persistence error: {e}, falling back to basic persistence")
+            await self._basic_persist_state(state)
+
+    async def _basic_persist_state(self, state: WorkflowState) -> None:
+        """Basic Redis state persistence as fallback."""
         try:
             start_time = time.time()
 
@@ -494,12 +532,12 @@ class TripPlanningWorkflow(BaseWorkflow):
 
     def define_nodes(self) -> dict[str, Any]:
         """
-        Define workflow nodes for trip planning agents.
+        Define workflow nodes for trip planning agents with coordinator integration.
 
         Returns:
             Dictionary mapping node names to agent functions
         """
-        # Import nodes from nodes.py (these will be implemented in Task 2)
+        # Import nodes from nodes.py (implemented in Task 2)
         try:
             from .nodes import (
                 execute_activity_agent,
@@ -514,26 +552,17 @@ class TripPlanningWorkflow(BaseWorkflow):
 
             return {
                 "initialize_trip": initialize_trip_context,
-                "weather_agent": execute_weather_agent,
-                "flight_agent": execute_flight_agent,
-                "hotel_agent": execute_hotel_agent,
-                "activity_agent": execute_activity_agent,
-                "food_agent": execute_food_agent,
-                "itinerary_agent": execute_itinerary_agent,
+                "coordinated_execution": self._coordinated_execution_node,
                 "finalize_plan": finalize_trip_plan,
+                "error_handler": self._error_handler_node,
             }
         except ImportError:
             # Temporary placeholder nodes for Task 1 foundation testing
-            # These will be replaced with actual implementations in Task 2
             return {
                 "initialize_trip": self._placeholder_node,
-                "weather_agent": self._placeholder_node,
-                "flight_agent": self._placeholder_node,
-                "hotel_agent": self._placeholder_node,
-                "activity_agent": self._placeholder_node,
-                "food_agent": self._placeholder_node,
-                "itinerary_agent": self._placeholder_node,
+                "coordinated_execution": self._placeholder_node,
                 "finalize_plan": self._placeholder_node,
+                "error_handler": self._placeholder_node,
             }
 
     def _placeholder_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
@@ -542,32 +571,105 @@ class TripPlanningWorkflow(BaseWorkflow):
         Will be replaced with actual node implementations in Task 2.
         """
         return state
+    
+    async def _coordinated_execution_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
+        """
+        Coordinated execution node that manages all agent execution with dependencies.
+        
+        This node uses the WorkflowCoordinator to execute agents in the optimal order
+        with parallel execution where possible and proper dependency management.
+        """
+        from .coordinator import WorkflowCoordinator
+        from .nodes import (
+            execute_activity_agent,
+            execute_flight_agent,
+            execute_food_agent,
+            execute_hotel_agent,
+            execute_itinerary_agent,
+            execute_weather_agent,
+        )
+        
+        # Define all agent node functions
+        agent_functions = {
+            "weather_agent": execute_weather_agent,
+            "flight_agent": execute_flight_agent,
+            "hotel_agent": execute_hotel_agent,
+            "activity_agent": execute_activity_agent,
+            "food_agent": execute_food_agent,
+            "itinerary_agent": execute_itinerary_agent,
+        }
+        
+        # Initialize coordinator with current state
+        coordinator = WorkflowCoordinator(state)
+        
+        # Execute coordinated workflow
+        updated_state = await coordinator.coordinate_execution(agent_functions)
+        
+        # Update state with coordination metrics
+        coordination_metrics = coordinator.get_coordination_metrics()
+        updated_state["coordination_metrics"] = coordination_metrics
+        
+        workflow_logger.log_coordination_metrics(
+            workflow_id=state["workflow_id"],
+            request_id=state["request_id"],
+            metrics=coordination_metrics
+        )
+        
+        return updated_state
+    
+    def _error_handler_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
+        """
+        Error handler node for workflow failures.
+        
+        Handles workflow errors and prepares appropriate error responses.
+        """
+        # Log error handling
+        workflow_logger.log_error_handling_started(
+            workflow_id=state["workflow_id"],
+            request_id=state["request_id"],
+            error=state.get("error", "Unknown error")
+        )
+        
+        # Create error response in output_data
+        error_response = {
+            "success": False,
+            "error": state.get("error", "Workflow execution failed"),
+            "partial_results": {
+                "flight_results": state.get("flight_results", []),
+                "hotel_results": state.get("hotel_results", []),
+                "activity_results": state.get("activity_results", []),
+                "weather_data": state.get("weather_data", {}),
+                "food_recommendations": state.get("food_recommendations", []),
+            },
+            "execution_metrics": state.get("optimization_metrics", {}),
+            "coordination_metrics": state.get("coordination_metrics", {})
+        }
+        
+        state["output_data"] = error_response
+        state["status"] = "failed_with_partial_results"
+        
+        return state
 
     def define_edges(self) -> list[tuple[str, str]]:
         """
         Define workflow edges with dependency management.
+        
+        Uses the WorkflowCoordinator for intelligent execution order and parallel optimization.
 
         Returns:
-            List of workflow transitions
+            List of workflow transitions (simplified for coordinator-based execution)
         """
+        # Import coordination functions
+        from .nodes import route_based_on_preferences, should_proceed_to_itinerary
+        
         return [
-            # Sequential initialization
-            ("initialize_trip", "weather_agent"),
-
-            # Parallel execution after weather (weather needed for activities)
-            ("weather_agent", "flight_agent"),
-            ("weather_agent", "hotel_agent"),
-            ("weather_agent", "activity_agent"),
-            ("weather_agent", "food_agent"),
-
-            # Final coordination
-            ("flight_agent", "itinerary_agent"),
-            ("hotel_agent", "itinerary_agent"),
-            ("activity_agent", "itinerary_agent"),
-            ("food_agent", "itinerary_agent"),
-
-            # Finalization
-            ("itinerary_agent", "finalize_plan"),
+            # Use coordinator for intelligent routing
+            ("initialize_trip", "coordinated_execution"),
+            ("coordinated_execution", route_based_on_preferences, {
+                "continue": "finalize_plan",
+                "retry": "coordinated_execution", 
+                "abort": "error_handler"
+            }),
         ]
 
     def get_entry_point(self) -> str:
