@@ -26,6 +26,7 @@ dependencies = [
     "langgraph>=0.0.40",
     "langchain>=0.1.0",
     "python-dotenv>=1.0.0",
+    "structlog>=25.4.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
