@@ -20,6 +20,7 @@ from travel_companion.models.trip import (
 )
 from travel_companion.models.user import User
 from travel_companion.utils.logging import get_client_ip, get_user_agent
+from travel_companion.workflows.orchestrator import TripPlanningWorkflow
 
 router = APIRouter()
 
@@ -50,26 +51,58 @@ async def generate_trip_plan(
     get_client_ip(request)
     get_user_agent(request)
 
-    # TODO: Implement workflow orchestration integration
-    # This will be implemented in future stories when LangGraph integration is ready
-
-    # For now, return a placeholder response to satisfy AC1 requirement
-    # The actual workflow integration will be implemented in subsequent stories
-    trip_response = TripResponse(
-        trip_id=UUID("00000000-0000-4000-8000-000000000001"),
-        user_id=current_user.user_id,
-        name=f"Trip to {trip_request.destination.city}",
-        description="AI-generated travel plan",
-        destination=trip_request.destination,
-        requirements=trip_request.requirements,
-        plan=None,  # Will be populated by workflow engine
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
-    )
-
-    return SuccessResponse[TripResponse](
-        data=trip_response, message="Trip plan generated successfully"
-    )
+    # Initialize workflow orchestrator
+    workflow = TripPlanningWorkflow()
+    
+    try:
+        # Execute the trip planning workflow
+        result = await workflow.execute_trip_planning(
+            trip_request=trip_request,
+            user_id=str(current_user.user_id),
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        
+        # Extract workflow results
+        trip_id = result.get("trip_id", UUID("00000000-0000-4000-8000-000000000001"))
+        plan_data = result.get("itinerary_data")
+        
+        # Create trip response with workflow results
+        trip_response = TripResponse(
+            trip_id=trip_id if isinstance(trip_id, UUID) else UUID(trip_id),
+            user_id=current_user.user_id,
+            name=f"Trip to {trip_request.destination.city}",
+            description=f"AI-generated travel plan for {trip_request.destination.city}",
+            destination=trip_request.destination,
+            requirements=trip_request.requirements,
+            plan=plan_data,  # Can be None or partial data for testing
+            created_at=current_user.created_at,
+            updated_at=current_user.updated_at,
+        )
+        
+        return SuccessResponse[TripResponse](
+            data=trip_response, 
+            message="Trip plan generated successfully"
+        )
+    
+    except TimeoutError as e:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail={
+                "message": "Trip planning workflow timed out",
+                "error_code": "WORKFLOW_TIMEOUT",
+                "details": str(e),
+            },
+        ) from e
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": "Failed to generate trip plan",
+                "error_code": "TRIP_PLANNING_ERROR",
+                "details": str(e),
+            },
+        ) from e
 
 
 @router.post(

@@ -1453,6 +1453,32 @@ class WorkflowLogger:
         """Log an error message."""
         self.logger.error(message, extra=kwargs)
 
+    def log_workflow_cleanup(
+        self, 
+        workflow_id: str,
+        cleanup_scope: str = "full",
+    ) -> None:
+        """Log workflow data cleanup."""
+        self.logger.info(
+            "workflow.cleanup",
+            workflow_id=workflow_id,
+            cleanup_scope=cleanup_scope,
+        )
+
+    def log_workflow_cancelled(
+        self,
+        workflow_id: str,
+        request_id: str,
+        cancellation_reason: str = "user_request",
+    ) -> None:
+        """Log workflow cancellation."""
+        self.logger.warning(
+            "workflow.cancelled",
+            workflow_id=workflow_id,
+            request_id=request_id,
+            cancellation_reason=cancellation_reason,
+        )
+
 
 # Global logger instances
 auth_logger = AuthLogger()
