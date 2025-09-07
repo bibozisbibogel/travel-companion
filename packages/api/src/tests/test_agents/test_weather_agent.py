@@ -195,7 +195,7 @@ class TestWeatherAgent:
             "end_date": datetime.now(UTC) - timedelta(days=1),  # End before start
         }
 
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, Exception)):
             await weather_agent.process(invalid_request)
 
     @pytest.mark.asyncio

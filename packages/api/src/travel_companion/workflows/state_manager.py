@@ -79,7 +79,7 @@ class WorkflowPersistenceConfig:
 class EnhancedWorkflowStateManager:
     """
     Enhanced state manager for long-running workflows with comprehensive Redis persistence.
-    
+
     Task 6 Features:
     1. Redis-based workflow state storage with configurable TTL
     2. Advanced checkpoint and resume functionality with versioning
@@ -95,7 +95,7 @@ class EnhancedWorkflowStateManager:
     ):
         """
         Initialize enhanced state manager.
-        
+
         Args:
             workflow_id: Unique workflow identifier
             config: Persistence configuration
@@ -130,11 +130,11 @@ class EnhancedWorkflowStateManager:
     ) -> bool:
         """
         Initialize workflow with enhanced tracking and TTL management.
-        
+
         Args:
             initial_state: Initial workflow state
             estimated_duration_minutes: Expected workflow duration
-            
+
         Returns:
             True if initialization was successful
         """
@@ -206,12 +206,12 @@ class EnhancedWorkflowStateManager:
     ) -> bool:
         """
         Enhanced state persistence with progress tracking and dynamic TTL.
-        
+
         Args:
             state: Current workflow state
             checkpoint_type: Type of checkpoint
             progress_description: Description of current progress
-            
+
         Returns:
             True if persistence was successful
         """
@@ -281,11 +281,11 @@ class EnhancedWorkflowStateManager:
     ) -> dict[str, Any] | None:
         """
         Enhanced state restoration with progress information.
-        
+
         Args:
             snapshot_id: Optional specific snapshot to restore
             include_progress: Include progress tracking information
-            
+
         Returns:
             Dictionary containing restored state and metadata
         """
@@ -349,10 +349,10 @@ class EnhancedWorkflowStateManager:
     async def suspend_workflow(self, reason: str = "") -> bool:
         """
         Suspend workflow with state preservation and TTL extension.
-        
+
         Args:
             reason: Reason for suspension
-            
+
         Returns:
             True if suspension was successful
         """
@@ -403,10 +403,10 @@ class EnhancedWorkflowStateManager:
     async def resume_workflow(self, snapshot_id: str | None = None) -> dict[str, Any] | None:
         """
         Resume suspended workflow from checkpoint.
-        
+
         Args:
             snapshot_id: Optional specific snapshot to resume from
-            
+
         Returns:
             Restored workflow state and metadata
         """
@@ -461,11 +461,11 @@ class EnhancedWorkflowStateManager:
     ) -> bool:
         """
         Complete workflow with final state persistence and TTL adjustment.
-        
+
         Args:
             final_state: Final workflow state
             completion_summary: Optional completion summary
-            
+
         Returns:
             True if completion was successful
         """
@@ -518,7 +518,7 @@ class EnhancedWorkflowStateManager:
     async def get_comprehensive_progress(self) -> dict[str, Any]:
         """
         Get comprehensive workflow progress with enhanced tracking.
-        
+
         Returns:
             Detailed progress information including metrics and predictions
         """
@@ -586,10 +586,10 @@ class EnhancedWorkflowStateManager:
     async def cleanup_old_snapshots(self, max_age_hours: int = 168) -> int:
         """
         Clean up old snapshots to manage storage.
-        
+
         Args:
             max_age_hours: Maximum age for snapshots in hours (default 7 days)
-            
+
         Returns:
             Number of snapshots cleaned up
         """
@@ -643,10 +643,10 @@ class EnhancedWorkflowStateManager:
     async def cleanup_expired_workflows(self, max_workflows: int = 100) -> dict[str, Any]:
         """
         Comprehensive cleanup of expired and completed workflows.
-        
+
         Args:
             max_workflows: Maximum number of workflows to process in one batch
-            
+
         Returns:
             Cleanup summary with counts and results
         """
@@ -1602,7 +1602,7 @@ class EnhancedWorkflowStateManager:
             # This keeps the final state but cleans temporary tracking information
             cleanup_delay = 3600  # 1 hour after completion
 
-            cleanup_task = {
+            {
                 "workflow_id": self.workflow_id,
                 "scheduled_at": time.time(),
                 "cleanup_at": time.time() + cleanup_delay,

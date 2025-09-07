@@ -548,12 +548,6 @@ class TripPlanningWorkflow(BaseWorkflow):
         # Import nodes from nodes.py (implemented in Task 2)
         try:
             from .nodes import (
-                execute_activity_agent,
-                execute_flight_agent,
-                execute_food_agent,
-                execute_hotel_agent,
-                execute_itinerary_agent,
-                execute_weather_agent,
                 finalize_trip_plan,
                 initialize_trip_context,
             )
@@ -583,7 +577,7 @@ class TripPlanningWorkflow(BaseWorkflow):
     async def _coordinated_execution_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
         """
         Coordinated execution node that manages all agent execution with dependencies.
-        
+
         This node uses the ParallelExecutionOptimizer for optimal parallel execution
         with timeout handling, load balancing, and performance monitoring.
         """
@@ -660,7 +654,7 @@ class TripPlanningWorkflow(BaseWorkflow):
     def _error_handler_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
         """
         Error handler node for workflow failures.
-        
+
         Handles workflow errors and prepares appropriate error responses.
         """
         # Log error handling
@@ -693,7 +687,7 @@ class TripPlanningWorkflow(BaseWorkflow):
     def define_edges(self) -> list[tuple[str, str]]:
         """
         Define workflow edges with dependency management.
-        
+
         Uses the WorkflowCoordinator for intelligent execution order and parallel optimization.
 
         Returns:

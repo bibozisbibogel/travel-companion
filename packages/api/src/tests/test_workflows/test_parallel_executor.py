@@ -406,7 +406,7 @@ class TestParallelExecutionOptimizer:
                 pass
 
         # Verify circuit breaker was activated
-        circuit_breaker = optimizer._get_circuit_breaker("failing_agent")
+        optimizer._get_circuit_breaker("failing_agent")
         # Note: Circuit breaker behavior depends on specific implementation
 
     async def test_retry_mechanism(self, optimizer, sample_state):

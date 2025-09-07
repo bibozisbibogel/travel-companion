@@ -471,28 +471,6 @@ class WorkflowLogger:
             },
         )
 
-    def log_workflow_completed(
-        self,
-        workflow_id: str,
-        workflow_type: str,
-        request_id: str,
-        execution_time_ms: float,
-        output_data: dict[str, Any] | None = None,
-    ) -> None:
-        """Log successful workflow completion."""
-        self.logger.info(
-            f"Workflow {workflow_type} completed successfully",
-            extra={
-                "event_type": WorkflowEvent.WORKFLOW_COMPLETED,
-                "workflow_id": workflow_id,
-                "workflow_type": workflow_type,
-                "request_id": request_id,
-                "details": {
-                    "execution_time_ms": execution_time_ms,
-                    "output_keys": list(output_data.keys()) if output_data else [],
-                },
-            },
-        )
 
     def log_workflow_failed(
         self,

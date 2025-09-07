@@ -60,7 +60,7 @@ class AgentExecutionInfo:
 class AgentDependencyResolver:
     """
     Resolves agent dependencies and determines execution order for optimal parallel execution.
-    
+
     Manages agent dependencies, execution phases, and coordinates parallel execution
     while respecting dependency constraints.
     """
@@ -68,7 +68,7 @@ class AgentDependencyResolver:
     def __init__(self, dependency_map: dict[str, list[str]], critical_agents: set[str] | None = None):
         """
         Initialize dependency resolver.
-        
+
         Args:
             dependency_map: Map of agent_name -> list of required dependencies
             critical_agents: Set of agents whose failure should fail the workflow
@@ -149,7 +149,7 @@ class AgentDependencyResolver:
     def get_ready_agents(self) -> list[str]:
         """
         Get list of agents ready for execution.
-        
+
         Returns:
             List of agent names that can be executed now
         """
@@ -204,7 +204,7 @@ class AgentDependencyResolver:
     def should_fail_workflow(self) -> bool:
         """
         Check if workflow should fail based on critical agent failures.
-        
+
         Returns:
             True if workflow should fail
         """
@@ -218,7 +218,7 @@ class AgentDependencyResolver:
     def can_continue_workflow(self) -> bool:
         """
         Check if workflow can continue despite some failures.
-        
+
         Returns:
             True if workflow can continue
         """
@@ -228,7 +228,7 @@ class AgentDependencyResolver:
     def get_execution_summary(self) -> dict[str, Any]:
         """
         Get execution summary for all agents.
-        
+
         Returns:
             Dictionary with execution statistics and status
         """
@@ -275,10 +275,10 @@ class AgentDependencyResolver:
     def get_agents_by_phase(self, phase: ExecutionPhase) -> list[str]:
         """
         Get agents for a specific execution phase.
-        
+
         Args:
             phase: Execution phase to get agents for
-            
+
         Returns:
             List of agent names in the specified phase
         """
@@ -288,7 +288,7 @@ class AgentDependencyResolver:
 class WorkflowCoordinator:
     """
     Coordinates workflow execution with dependency management and state transitions.
-    
+
     Manages the overall workflow execution, handles state persistence,
     and coordinates agent execution with proper error boundaries.
     """
@@ -296,7 +296,7 @@ class WorkflowCoordinator:
     def __init__(self, state: TripPlanningWorkflowState):
         """
         Initialize workflow coordinator.
-        
+
         Args:
             state: Current workflow state
         """
@@ -321,10 +321,10 @@ class WorkflowCoordinator:
     async def coordinate_execution(self, node_functions: dict[str, Any]) -> TripPlanningWorkflowState:
         """
         Coordinate the execution of all workflow nodes with dependency management.
-        
+
         Args:
             node_functions: Dictionary of node name -> function mappings
-            
+
         Returns:
             Final workflow state
         """
@@ -395,7 +395,7 @@ class WorkflowCoordinator:
             results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
             # Process results and handle any exceptions
-            for (agent_name, task), result in zip(tasks, results, strict=False):
+            for (agent_name, _task), result in zip(tasks, results, strict=False):
                 if isinstance(result, Exception):
                     self.dependency_resolver.mark_agent_failed(
                         agent_name, str(result)
@@ -430,7 +430,7 @@ class WorkflowCoordinator:
     async def _execute_single_agent(self, agent_name: str, agent_function: Any) -> None:
         """
         Execute a single agent with error boundaries.
-        
+
         Args:
             agent_name: Name of the agent to execute
             agent_function: Function to execute for this agent
@@ -507,10 +507,10 @@ class WorkflowCoordinator:
     def _check_agent_dependencies(self, agent_name: str) -> bool:
         """
         Check if all dependencies for an agent are satisfied.
-        
+
         Args:
             agent_name: Name of the agent to check
-            
+
         Returns:
             True if dependencies are satisfied
         """
@@ -554,7 +554,7 @@ class WorkflowCoordinator:
     def get_coordination_metrics(self) -> dict[str, Any]:
         """
         Get comprehensive coordination metrics.
-        
+
         Returns:
             Dictionary with coordination statistics
         """

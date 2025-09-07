@@ -94,7 +94,7 @@ class AggregatedTripPlan:
 class AgentResultAggregator:
     """
     Aggregates and correlates results from multiple travel agents.
-    
+
     Provides intelligent correlation analysis, cost optimization,
     temporal coordination, and quality scoring for trip planning results.
     """
@@ -102,7 +102,7 @@ class AgentResultAggregator:
     def __init__(self, state: TripPlanningWorkflowState):
         """
         Initialize result aggregator.
-        
+
         Args:
             state: Current workflow state with agent results
         """
@@ -122,7 +122,7 @@ class AgentResultAggregator:
     def aggregate_all_results(self) -> AggregatedTripPlan:
         """
         Aggregate all agent results into a comprehensive trip plan.
-        
+
         Returns:
             Complete aggregated trip plan with correlations and insights
         """
@@ -401,7 +401,7 @@ class AgentResultAggregator:
 
         budget_allocation = self.budget_tracking.get("allocations", {})
         flight_budget = budget_allocation.get("flights", 0)
-        hotel_budget = budget_allocation.get("hotels", 0)
+        budget_allocation.get("hotels", 0)
 
         # Flight budget correlations
         if plan.flights and flight_budget > 0:

@@ -71,7 +71,7 @@ async def health_check(
 ) -> HealthCheckResponse:
     """
     Perform comprehensive system health check.
-    
+
     Returns overall system health status and individual component checks.
     """
     health_monitor = WorkflowHealthMonitor(redis_manager)
@@ -86,7 +86,7 @@ async def readiness_check(
 ) -> dict[str, str]:
     """
     Kubernetes readiness probe endpoint.
-    
+
     Returns 200 if system is ready to accept traffic, 503 otherwise.
     """
     health_monitor = WorkflowHealthMonitor(redis_manager)
@@ -105,7 +105,7 @@ async def readiness_check(
 async def liveness_check() -> dict[str, str]:
     """
     Kubernetes liveness probe endpoint.
-    
+
     Simple check to verify the service is alive.
     """
     return {"status": "alive"}
@@ -118,10 +118,10 @@ async def workflow_health_check(
 ) -> WorkflowHealthResponse:
     """
     Check health status of a specific workflow.
-    
+
     Args:
         workflow_id: The workflow identifier to check
-        
+
     Returns:
         Detailed health status for the specified workflow
     """
@@ -145,11 +145,11 @@ async def get_metrics(
 ) -> MetricsResponse:
     """
     Get aggregated workflow performance metrics.
-    
+
     Args:
         workflow_type: Optional filter by workflow type
         time_window_hours: Time window for metrics aggregation (1-168 hours)
-        
+
     Returns:
         Aggregated metrics for the specified time window
     """
@@ -175,10 +175,10 @@ async def get_workflow_metrics(
 ) -> dict[str, Any]:
     """
     Get detailed metrics for a specific workflow.
-    
+
     Args:
         workflow_id: The workflow identifier
-        
+
     Returns:
         Detailed performance metrics for the workflow
     """
@@ -200,7 +200,7 @@ async def get_health_metrics(
 ) -> HealthMetricsResponse:
     """
     Get combined health status and performance metrics.
-    
+
     Provides a comprehensive view of system health and performance.
     """
     health_monitor = WorkflowHealthMonitor(redis_manager)
@@ -215,10 +215,10 @@ async def enable_debug_logging(
 ) -> dict[str, str]:
     """
     Enable debug logging for a specific workflow.
-    
+
     Args:
         workflow_id: The workflow identifier
-        
+
     Returns:
         Confirmation of debug logging enablement
     """
@@ -237,10 +237,10 @@ async def get_debug_report(
 ) -> dict[str, Any]:
     """
     Get debug report for a specific workflow.
-    
+
     Args:
         workflow_id: The workflow identifier
-        
+
     Returns:
         Comprehensive debug report including state history
     """

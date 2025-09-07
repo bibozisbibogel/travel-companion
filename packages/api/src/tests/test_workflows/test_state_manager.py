@@ -3,7 +3,7 @@ Comprehensive tests for Enhanced Workflow State Manager (Task 6).
 
 Tests cover:
 1. Redis-based workflow state storage with TTL
-2. Advanced checkpoint and resume functionality 
+2. Advanced checkpoint and resume functionality
 3. Real-time progress tracking for long-running operations
 4. Automated state cleanup for completed and expired workflows
 """
@@ -244,7 +244,7 @@ class TestCheckpointAndResumeFunctionality:
         mock_redis.get.return_value = json.dumps(mock_snapshots)
 
         # Create new snapshot that should trigger cleanup
-        snapshot = await state_manager._store_enhanced_snapshot(
+        await state_manager._store_enhanced_snapshot(
             StateSnapshot(
                 workflow_id="test",
                 timestamp=time.time(),
@@ -496,7 +496,7 @@ class TestAutomatedStateCleanup:
     async def test_single_workflow_cleanup_criteria(self, state_manager):
         """Test single workflow cleanup criteria evaluation."""
         # Test completed workflow cleanup
-        completed_result = await state_manager._cleanup_single_workflow("completed_test")
+        await state_manager._cleanup_single_workflow("completed_test")
 
         # Test with different workflow states
         mock_metadata = {

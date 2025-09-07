@@ -482,7 +482,7 @@ class TestIntegrationScenarios:
         # Execute multiple times to trigger circuit breaker
         results = []
         with patch('asyncio.sleep'):  # Speed up test
-            for i in range(10):
+            for _i in range(10):
                 try:
                     result = await recovery_manager.execute_with_recovery(
                         "activity_agent", failing_operation

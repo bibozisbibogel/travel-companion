@@ -185,7 +185,7 @@ class ParallelExecutionQueue:
     ) -> None:
         """
         Enqueue an agent for execution with priority and load balancing.
-        
+
         Args:
             agent_name: Name of the agent
             agent_function: Function to execute
@@ -213,11 +213,11 @@ class ParallelExecutionQueue:
     def _apply_load_balancing(self, agent_name: str, priority: ExecutionPriority) -> ExecutionPriority:
         """
         Apply load balancing logic to adjust priority based on current queue state.
-        
+
         Args:
             agent_name: Name of the agent
             priority: Original priority
-            
+
         Returns:
             Adjusted priority based on load balancing
         """
@@ -244,7 +244,7 @@ class ParallelExecutionQueue:
     async def get_next_agent(self) -> tuple[str, Callable, dict, ExecutionPriority] | None:
         """
         Get the next agent to execute based on priority and availability.
-        
+
         Returns:
             Tuple of (agent_name, function, context, priority) or None if no agents available
         """
@@ -296,7 +296,7 @@ class ParallelExecutionQueue:
 class ParallelExecutionOptimizer:
     """
     Optimizes parallel execution of workflow agents with advanced coordination features.
-    
+
     Provides:
     - Priority-based agent execution
     - Timeout management with adaptive timeouts
@@ -384,12 +384,12 @@ class ParallelExecutionOptimizer:
     ) -> TripPlanningWorkflowState:
         """
         Execute agents in parallel with optimization and coordination.
-        
+
         Args:
             state: Current workflow state
             agent_functions: Dictionary of agent name -> function mappings
             dependencies: Optional agent dependency mapping
-            
+
         Returns:
             Updated workflow state with results from all agents
         """
@@ -918,13 +918,13 @@ async def execute_agents_with_parallel_optimization(
 ) -> TripPlanningWorkflowState:
     """
     Convenience function to execute agents with parallel optimization.
-    
+
     Args:
         state: Current workflow state
-        agent_functions: Dictionary of agent functions to execute  
+        agent_functions: Dictionary of agent functions to execute
         config: Optional parallel execution configuration
         dependencies: Optional agent dependency mapping
-        
+
     Returns:
         Updated workflow state with parallel execution results
     """
@@ -939,12 +939,12 @@ def create_optimized_parallel_config(
 ) -> ParallelExecutionConfig:
     """
     Create an optimized parallel execution configuration.
-    
+
     Args:
         max_concurrent: Maximum concurrent agent executions
         timeout_seconds: Default timeout for agent execution
         enable_adaptive: Enable adaptive timeout adjustments
-        
+
     Returns:
         Configured ParallelExecutionConfig instance
     """

@@ -111,7 +111,7 @@ async def execute_workflow_async(
 ) -> dict[str, str]:
     """
     Execute a travel planning workflow asynchronously.
-    
+
     Returns immediately with a workflow ID that can be used to poll for status and results.
     The workflow continues executing in the background.
     """
@@ -217,7 +217,7 @@ async def execute_workflow_async(
 async def get_workflow_progress(workflow_id: str) -> dict[str, Any]:
     """
     Get real-time progress information for a workflow.
-    
+
     Returns detailed progress metrics including:
     - Current execution phase
     - Completed and pending agents
@@ -318,7 +318,7 @@ async def get_workflow_status(workflow_id: str) -> WorkflowStatusResponse:
 async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
     """
     Get the results of a completed workflow.
-    
+
     Returns the complete output data from the workflow execution.
     Returns 404 if workflow not found, 425 if workflow still running.
     """
@@ -389,7 +389,7 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
 async def cancel_workflow(workflow_id: str) -> dict[str, str]:
     """
     Cancel a running workflow execution.
-    
+
     Attempts to gracefully stop the workflow and clean up resources.
     Returns success even if workflow was already completed.
     """
@@ -463,7 +463,7 @@ async def cancel_workflow(workflow_id: str) -> dict[str, str]:
 async def cleanup_workflow(workflow_id: str) -> dict[str, str]:
     """
     Clean up workflow data and state from storage.
-    
+
     Removes all workflow-related data including state, checkpoints, and snapshots.
     This action cannot be undone.
     """
