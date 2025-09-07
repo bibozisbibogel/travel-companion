@@ -56,7 +56,7 @@ class TestWorkflowAPI:
             "input_echo": {"destination": "Paris, France"},
         }
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_execute_workflow_success(
         self, mock_workflow_class, client, sample_workflow_request, mock_workflow_result
     ):
@@ -74,7 +74,7 @@ class TestWorkflowAPI:
         assert data["workflow_id"] == "wf123"
         assert data["request_id"] == "req123"
         assert data["status"] == "completed"
-        assert data["workflow_type"] == "TravelPlanningWorkflow"
+        assert data["workflow_type"] == "TripPlanningWorkflow"
         assert "execution_time_ms" in data
         assert data["output_data"] == mock_workflow_result
 
@@ -83,7 +83,7 @@ class TestWorkflowAPI:
             input_data=sample_workflow_request["input_data"], user_id="user123", request_id="req123"
         )
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_execute_workflow_timeout(self, mock_workflow_class, client, sample_workflow_request):
         """Test workflow execution timeout."""
         mock_workflow = AsyncMock()
@@ -97,7 +97,7 @@ class TestWorkflowAPI:
         assert data["detail"]["error"] == "WORKFLOW_TIMEOUT"
         assert "timeout limit" in data["detail"]["message"]
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_execute_workflow_failure(self, mock_workflow_class, client, sample_workflow_request):
         """Test workflow execution failure."""
         mock_workflow = AsyncMock()
@@ -132,13 +132,13 @@ class TestWorkflowAPI:
 
         assert response.status_code == 422  # Validation error
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_get_workflow_status_success(self, mock_workflow_class, client):
         """Test successful workflow status retrieval."""
         mock_workflow = AsyncMock()
         mock_status = {
             "workflow_id": "wf123",
-            "workflow_type": "TravelPlanningWorkflow",
+            "workflow_type": "TripPlanningWorkflow",
             "status": "completed",
             "current_node": "end",
             "start_time": 1234567890.0,
@@ -155,7 +155,7 @@ class TestWorkflowAPI:
         assert data == mock_status
         mock_workflow.get_workflow_status.assert_called_once_with("wf123")
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_get_workflow_status_not_found(self, mock_workflow_class, client):
         """Test workflow status when workflow not found."""
         mock_workflow = AsyncMock()
@@ -169,7 +169,7 @@ class TestWorkflowAPI:
         assert data["detail"]["error"] == "WORKFLOW_NOT_FOUND"
         assert "nonexistent" in data["detail"]["message"]
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_get_workflow_status_error(self, mock_workflow_class, client):
         """Test workflow status retrieval with error."""
         mock_workflow = AsyncMock()
@@ -183,12 +183,12 @@ class TestWorkflowAPI:
         assert data["detail"]["error"] == "STATUS_CHECK_FAILED"
         assert data["detail"]["workflow_id"] == "wf123"
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_get_workflow_health_success(self, mock_workflow_class, client):
         """Test successful workflow health check."""
         mock_workflow = MagicMock()
         mock_health = {
-            "workflow_type": "TravelPlanningWorkflow",
+            "workflow_type": "TripPlanningWorkflow",
             "status": "healthy",
             "graph_built": True,
             "redis_connected": True,
@@ -210,12 +210,12 @@ class TestWorkflowAPI:
         assert data["workflows"][0] == mock_health
         assert "timestamp" in data
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_get_workflow_health_degraded(self, mock_workflow_class, client):
         """Test workflow health check with degraded status."""
         mock_workflow = MagicMock()
         mock_health = {
-            "workflow_type": "TravelPlanningWorkflow",
+            "workflow_type": "TripPlanningWorkflow",
             "status": "degraded",
             "graph_built": True,
             "redis_connected": False,  # Redis issue
@@ -234,7 +234,7 @@ class TestWorkflowAPI:
         assert data["redis_connected"] is False
         assert data["workflows"][0]["status"] == "degraded"
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_get_workflow_health_error(self, mock_workflow_class, client):
         """Test workflow health check with error."""
         mock_workflow_class.side_effect = Exception("Initialization error")
@@ -262,14 +262,14 @@ class TestWorkflowAPI:
         # Should not be 404 (route exists)
         assert response.status_code != 404
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_workflow_status_endpoint_path(self, mock_workflow_class, client):
         """Test that workflow status endpoint is properly routed."""
         # Mock the workflow to avoid Redis connection issues
         mock_workflow = MagicMock()
         mock_workflow.get_workflow_status.return_value = {
             "workflow_id": "test123",
-            "workflow_type": "TravelPlanningWorkflow",
+            "workflow_type": "TripPlanningWorkflow",
             "status": "running",
             "current_node": "start",
             "start_time": 12345.0,
@@ -290,7 +290,7 @@ class TestWorkflowAPI:
         # Should not be 404 (route exists)
         assert response.status_code != 404
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_execute_workflow_optional_fields(
         self, mock_workflow_class, client, mock_workflow_result
     ):

@@ -29,7 +29,7 @@ class TestWorkflowEndpoints:
             # Even if it fails due to dependencies, the route should exist
             assert "404" not in str(e)
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_workflow_execute_endpoint_basic(self, mock_workflow_class, client):
         """Test basic workflow execute endpoint functionality."""
         # Mock successful workflow execution
@@ -57,14 +57,14 @@ class TestWorkflowEndpoints:
             assert "workflow_id" in data
             assert "status" in data
 
-    @patch("travel_companion.api.v1.workflows.TravelPlanningWorkflow")
+    @patch("travel_companion.api.v1.workflows.TripPlanningWorkflow")
     def test_workflow_status_endpoint_exists(self, mock_workflow_class, client):
         """Test that workflow status endpoint exists."""
         # Mock the workflow to avoid Redis connection issues
         mock_workflow = MagicMock()
         mock_workflow.get_workflow_status.return_value = {
             "workflow_id": "test123",
-            "workflow_type": "TravelPlanningWorkflow",
+            "workflow_type": "TripPlanningWorkflow",
             "status": "running",
             "current_node": "start",
             "start_time": 12345.0,

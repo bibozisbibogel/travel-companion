@@ -1,15 +1,13 @@
 """Comprehensive tests for error recovery and fallback strategies."""
 
-import asyncio
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
 
 from travel_companion.utils.errors import CriticalAgentFailureError
 from travel_companion.workflows.error_recovery import (
-    AgentPriority,
     ErrorRecoveryManager,
     FallbackData,
-    FallbackStrategy,
     RetryConfig,
     RetryStrategy,
     WorkflowFallbackOrchestrator,
@@ -29,7 +27,7 @@ class TestRetryConfig:
             backoff_multiplier=2.0,
             jitter=False,
         )
-        
+
         assert config.calculate_delay(1) == 1.0  # base_delay * 2^0
         assert config.calculate_delay(2) == 2.0  # base_delay * 2^1
         assert config.calculate_delay(3) == 4.0  # base_delay * 2^2
@@ -41,7 +39,7 @@ class TestRetryConfig:
             base_delay=2.0,
             jitter=False,
         )
-        
+
         assert config.calculate_delay(1) == 2.0  # base_delay * 1
         assert config.calculate_delay(2) == 4.0  # base_delay * 2
         assert config.calculate_delay(3) == 6.0  # base_delay * 3
@@ -53,7 +51,7 @@ class TestRetryConfig:
             base_delay=5.0,
             jitter=False,
         )
-        
+
         assert config.calculate_delay(1) == 5.0
         assert config.calculate_delay(2) == 5.0
         assert config.calculate_delay(3) == 5.0
@@ -61,7 +59,7 @@ class TestRetryConfig:
     def test_immediate_delay(self):
         """Test immediate retry strategy."""
         config = RetryConfig(strategy=RetryStrategy.IMMEDIATE)
-        
+
         assert config.calculate_delay(1) == 0.0
         assert config.calculate_delay(2) == 0.0
 
@@ -74,7 +72,7 @@ class TestRetryConfig:
             backoff_multiplier=2.0,
             jitter=False,
         )
-        
+
         assert config.calculate_delay(1) == 10.0
         assert config.calculate_delay(2) == 15.0  # Capped at max_delay
         assert config.calculate_delay(3) == 15.0  # Capped at max_delay
@@ -86,13 +84,13 @@ class TestRetryConfig:
             base_delay=10.0,
             jitter=True,
         )
-        
+
         # Get multiple delay calculations
         delays = [config.calculate_delay(1) for _ in range(10)]
-        
+
         # All delays should be positive
         assert all(delay >= 0 for delay in delays)
-        
+
         # Not all delays should be identical (due to jitter)
         assert len(set(delays)) > 1
 
@@ -103,7 +101,7 @@ class TestFallbackData:
     def test_flight_fallback_data(self):
         """Test flight agent fallback data."""
         data = FallbackData.get_fallback_data("flight")
-        
+
         assert data["fallback"] is True
         assert "flights" in data
         assert "message" in data
@@ -112,7 +110,7 @@ class TestFallbackData:
     def test_hotel_fallback_data(self):
         """Test hotel agent fallback data."""
         data = FallbackData.get_fallback_data("hotel")
-        
+
         assert data["fallback"] is True
         assert "hotels" in data
         assert "message" in data
@@ -120,7 +118,7 @@ class TestFallbackData:
     def test_weather_fallback_data(self):
         """Test weather agent fallback data."""
         data = FallbackData.get_fallback_data("weather")
-        
+
         assert data["fallback"] is True
         assert "forecast" in data
         assert "message" in data
@@ -128,7 +126,7 @@ class TestFallbackData:
     def test_unknown_agent_fallback(self):
         """Test fallback for unknown agent type."""
         data = FallbackData.get_fallback_data("unknown_agent")
-        
+
         assert data["fallback"] is True
 
 
@@ -144,11 +142,11 @@ class TestErrorRecoveryManager:
     async def test_successful_execution_no_retry(self, recovery_manager):
         """Test successful execution without retries."""
         mock_operation = AsyncMock(return_value="success")
-        
+
         result = await recovery_manager.execute_with_recovery(
             "flight_agent", mock_operation
         )
-        
+
         assert result == "success"
         mock_operation.assert_called_once()
 
@@ -159,12 +157,12 @@ class TestErrorRecoveryManager:
             Exception("Temporary failure"),
             "success"
         ])
-        
+
         with patch('asyncio.sleep'):  # Speed up test
             result = await recovery_manager.execute_with_recovery(
                 "flight_agent", mock_operation
             )
-        
+
         assert result == "success"
         assert mock_operation.call_count == 2
 
@@ -172,13 +170,13 @@ class TestErrorRecoveryManager:
     async def test_critical_agent_failure_raises_exception(self, recovery_manager):
         """Test that critical agent failures raise exceptions."""
         mock_operation = AsyncMock(side_effect=Exception("Persistent failure"))
-        
+
         with patch('asyncio.sleep'):  # Speed up test
             with pytest.raises(CriticalAgentFailureError) as exc_info:
                 await recovery_manager.execute_with_recovery(
                     "flight_agent", mock_operation
                 )
-        
+
         assert "flight_agent" in str(exc_info.value)
         assert "all_retries_exhausted" in exc_info.value.details["recovery_strategy"]
 
@@ -186,12 +184,12 @@ class TestErrorRecoveryManager:
     async def test_non_critical_agent_returns_fallback(self, recovery_manager):
         """Test that non-critical agent failures return fallback data."""
         mock_operation = AsyncMock(side_effect=Exception("Persistent failure"))
-        
+
         with patch('asyncio.sleep'):  # Speed up test
             result = await recovery_manager.execute_with_recovery(
                 "activity_agent", mock_operation
             )
-        
+
         assert result["fallback"] is True
         assert "activities" in result
 
@@ -202,14 +200,14 @@ class TestErrorRecoveryManager:
         circuit_breaker = recovery_manager.circuit_breakers["flight_agent"]
         from travel_companion.utils.circuit_breaker import CircuitState
         circuit_breaker.state = CircuitState.OPEN
-        
+
         mock_operation = AsyncMock()
-        
+
         with pytest.raises(CriticalAgentFailureError):
             await recovery_manager.execute_with_recovery(
                 "flight_agent", mock_operation
             )
-        
+
         # Operation should not be called when circuit is open
         mock_operation.assert_not_called()
 
@@ -220,20 +218,20 @@ class TestErrorRecoveryManager:
         circuit_breaker = recovery_manager.circuit_breakers["activity_agent"]
         from travel_companion.utils.circuit_breaker import CircuitState
         circuit_breaker.state = CircuitState.OPEN
-        
+
         mock_operation = AsyncMock()
-        
+
         result = await recovery_manager.execute_with_recovery(
             "activity_agent", mock_operation
         )
-        
+
         assert result["fallback"] is True
         mock_operation.assert_not_called()
 
     def test_get_circuit_breaker_status(self, recovery_manager):
         """Test getting circuit breaker status."""
         status = recovery_manager.get_circuit_breaker_status("flight_agent")
-        
+
         assert status is not None
         assert "name" in status
         assert "state" in status
@@ -242,7 +240,7 @@ class TestErrorRecoveryManager:
     def test_get_all_circuit_breaker_status(self, recovery_manager):
         """Test getting all circuit breaker statuses."""
         all_status = recovery_manager.get_all_circuit_breaker_status()
-        
+
         assert isinstance(all_status, dict)
         assert "flight_agent" in all_status
         assert "hotel_agent" in all_status
@@ -255,9 +253,9 @@ class TestErrorRecoveryManager:
         circuit_breaker.failure_count = 5
         from travel_companion.utils.circuit_breaker import CircuitState
         circuit_breaker.state = CircuitState.OPEN
-        
+
         success = recovery_manager.reset_circuit_breaker("flight_agent")
-        
+
         assert success is True
         assert circuit_breaker.failure_count == 0
         from travel_companion.utils.circuit_breaker import CircuitState
@@ -272,11 +270,11 @@ class TestErrorRecoveryManager:
     async def test_health_check_all_healthy(self, recovery_manager):
         """Test health check when all agents are healthy."""
         health = await recovery_manager.health_check()
-        
+
         assert health["overall_status"] == "healthy"
         assert health["unhealthy_count"] == 0
         assert len(health["agents"]) == 6
-        
+
         for agent_status in health["agents"].values():
             assert agent_status["status"] == "healthy"
 
@@ -287,9 +285,9 @@ class TestErrorRecoveryManager:
         circuit_breaker = recovery_manager.circuit_breakers["flight_agent"]
         from travel_companion.utils.circuit_breaker import CircuitState
         circuit_breaker.state = CircuitState.OPEN
-        
+
         health = await recovery_manager.health_check()
-        
+
         assert health["overall_status"] == "degraded"
         assert health["unhealthy_count"] == 1
         assert health["agents"]["flight_agent"]["status"] == "unhealthy"
@@ -302,9 +300,9 @@ class TestErrorRecoveryManager:
         for agent_name in ["flight_agent", "hotel_agent", "activity_agent", "weather_agent"]:
             circuit_breaker = recovery_manager.circuit_breakers[agent_name]
             circuit_breaker.state = CircuitState.OPEN
-        
+
         health = await recovery_manager.health_check()
-        
+
         assert health["overall_status"] == "unhealthy"
         assert health["unhealthy_count"] == 4
 
@@ -328,16 +326,16 @@ class TestWorkflowFallbackOrchestrator:
             "end_date": "2024-06-07",
             "budget": 2000,
         }
-        
+
         successful_agents = {
             "weather_agent": {"forecast": [{"day": 1, "temperature": 20}]},
             "activity_agent": {"fallback": True, "activities": []},
         }
-        
+
         result = await orchestrator.create_minimal_itinerary(
             trip_request, successful_agents
         )
-        
+
         assert result["trip_id"] == "test-trip-123"
         assert result["status"] == "partial"
         assert result["destination"] == "Paris"
@@ -354,20 +352,20 @@ class TestWorkflowFallbackOrchestrator:
             "trip_id": "test-trip-456",
             "destination": "London",
         }
-        
+
         # Mock agent operations
         flight_mock = AsyncMock(return_value={"flights": ["flight1"]})
         hotel_mock = AsyncMock(side_effect=Exception("Hotel API down"))
-        
+
         agent_operations = {
             "flight_agent": flight_mock,
             "hotel_agent": hotel_mock,
         }
-        
+
         result = await orchestrator.execute_degraded_workflow(
             trip_request, agent_operations
         )
-        
+
         assert result["trip_id"] == "test-trip-456"
         assert result["status"] == "partial"
         assert "flight_agent" in result["available_data"]
@@ -382,7 +380,7 @@ class TestWorkflowFallbackOrchestrator:
             "weather_agent", success_operation
         )
         assert result == {"data": "success"}
-        
+
         # Mock failed operation
         failed_operation = AsyncMock(side_effect=Exception("API failure"))
         with patch('asyncio.sleep'):  # Speed up test
@@ -434,14 +432,14 @@ class TestIntegrationScenarios:
         ])
         activity_operation = AsyncMock(side_effect=Exception("Persistent failure"))
         weather_operation = AsyncMock(return_value={"forecast": [{"temp": 22}]})
-        
+
         agent_operations = {
             "flight_agent": flight_operation,
             "hotel_agent": hotel_operation,
             "activity_agent": activity_operation,
             "weather_agent": weather_operation,
         }
-        
+
         trip_request = {
             "trip_id": "integration-test",
             "destination": "Barcelona",
@@ -449,26 +447,26 @@ class TestIntegrationScenarios:
             "end_date": "2024-07-07",
             "budget": 3000,
         }
-        
+
         with patch('asyncio.sleep'):  # Speed up test
             result = await orchestrator.execute_degraded_workflow(
                 trip_request, agent_operations
             )
-        
+
         # Verify results
         assert result["trip_id"] == "integration-test"
         assert result["destination"] == "Barcelona"
-        
+
         # Flight and weather should succeed
         assert "flight_agent" in result["available_data"]
         assert "weather_agent" in result["available_data"]
-        
+
         # Hotel should succeed on retry
         assert "hotel_agent" in result["available_data"]
-        
+
         # Activity should have fallback data
         # (Note: In degraded workflow, even failed agents get fallback data)
-        
+
         # Verify operations were called
         flight_operation.assert_called_once()
         hotel_operation.assert_called()  # Called multiple times due to retry
@@ -480,7 +478,7 @@ class TestIntegrationScenarios:
         """Test that circuit breakers prevent cascade failures."""
         # Create operations that always fail
         failing_operation = AsyncMock(side_effect=Exception("Service unavailable"))
-        
+
         # Execute multiple times to trigger circuit breaker
         results = []
         with patch('asyncio.sleep'):  # Speed up test
@@ -492,16 +490,16 @@ class TestIntegrationScenarios:
                     results.append(result)
                 except Exception as e:
                     results.append(f"Exception: {type(e).__name__}")
-        
+
         # Verify circuit breaker behavior
         # First few calls should attempt operation and get fallback
         # Later calls should be blocked by circuit breaker
         assert len(results) == 10
-        
+
         # Some results should be fallback data
         fallback_count = sum(1 for r in results if isinstance(r, dict) and r.get("fallback"))
         assert fallback_count > 0
-        
+
         # Circuit breaker should eventually open for this agent
         cb_status = recovery_manager.get_circuit_breaker_status("activity_agent")
         # Circuit breaker might be open or half-open depending on timing

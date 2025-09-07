@@ -48,19 +48,19 @@ class WorkflowEvent(str, Enum):
     STATE_UPDATED = "state_updated"
     STATE_PERSISTED = "state_persisted"
     STATE_RESTORED = "state_restored"
-    
+
     # Parallel execution events
     PARALLEL_EXECUTION_STARTED = "parallel_execution_started"
     PARALLEL_EXECUTION_COMPLETED = "parallel_execution_completed"
     PARALLEL_EXECUTION_FAILED = "parallel_execution_failed"
-    
+
     # Agent coordination events
     AGENT_EXECUTION_STARTED = "agent_execution_started"
     AGENT_EXECUTION_COMPLETED = "agent_execution_completed"
     AGENT_EXECUTION_FAILED = "agent_execution_failed"
     AGENT_FAILURE_HANDLED = "agent_failure_handled"
-    
-    # Coordination events  
+
+    # Coordination events
     COORDINATION_STARTED = "coordination_started"
     COORDINATION_COMPLETED = "coordination_completed"
     COORDINATION_FAILED = "coordination_failed"
@@ -1454,7 +1454,7 @@ class WorkflowLogger:
         self.logger.error(message, extra=kwargs)
 
     def log_workflow_cleanup(
-        self, 
+        self,
         workflow_id: str,
         cleanup_scope: str = "full",
     ) -> None:

@@ -143,9 +143,9 @@ class TestFlightAgentComprehensive:
     async def test_flight_search_timeout_handling(self, flight_agent, sample_flight_request):
         """Test timeout handling in flight search."""
 
-        # Mock Amadeus client that times out
+        # Mock Amadeus client that times out - use shorter timeout to prevent test hanging
         async def slow_search(*args, **kwargs):
-            await asyncio.sleep(35)  # Longer than 30s timeout
+            await asyncio.sleep(2)  # Shorter sleep to prevent hanging tests
             return []
 
         mock_amadeus_client = Mock()
@@ -153,8 +153,12 @@ class TestFlightAgentComprehensive:
         mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
         mock_amadeus_client.search_flights = slow_search
 
-        with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
-            flights = await flight_agent.search_flights(sample_flight_request)
+        # Patch the timeout to be very short for testing
+        with patch("asyncio.wait_for") as mock_wait_for:
+            mock_wait_for.side_effect = TimeoutError("Test timeout")
+
+            with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
+                flights = await flight_agent.search_flights(sample_flight_request)
 
         # Should fall back to mock data due to timeout
         assert len(flights) > 0

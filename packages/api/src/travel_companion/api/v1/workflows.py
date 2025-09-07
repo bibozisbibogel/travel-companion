@@ -1,22 +1,20 @@
 """Workflow execution API endpoints."""
 
-import asyncio
 import time
 from typing import Any
-from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
+from ...models.trip import TripPlanRequest
 from ...models.workflow import (
     WorkflowExecutionRequest,
     WorkflowExecutionResponse,
     WorkflowHealthResponse,
     WorkflowStatusResponse,
 )
-from ...models.trip import TripPlanRequest
+from ...utils.logging import workflow_logger
 from ...workflows.orchestrator import TripPlanningWorkflow
 from ...workflows.state_manager import WorkflowStateManager
-from ...utils.logging import workflow_logger
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -45,13 +43,13 @@ async def execute_workflow(request: WorkflowExecutionRequest) -> WorkflowExecuti
         # Convert input data to TripPlanRequest if needed
         if "destination" in request.input_data and "requirements" in request.input_data:
             from ...models.trip import TripDestination, TripRequirements
-            
+
             trip_request = TripPlanRequest(
                 destination=TripDestination(**request.input_data["destination"]),
                 requirements=TripRequirements(**request.input_data["requirements"]),
                 preferences=request.input_data.get("preferences", {}),
             )
-            
+
             result = await workflow.execute_trip_planning(
                 trip_request=trip_request,
                 user_id=request.user_id,
@@ -59,8 +57,8 @@ async def execute_workflow(request: WorkflowExecutionRequest) -> WorkflowExecuti
             )
         else:
             result = await workflow.execute(
-                input_data=request.input_data, 
-                user_id=request.user_id, 
+                input_data=request.input_data,
+                user_id=request.user_id,
                 request_id=request.request_id
             )
 
@@ -120,12 +118,12 @@ async def execute_workflow_async(
     try:
         # Initialize workflow
         workflow = TripPlanningWorkflow()
-        
+
         # Generate workflow ID
         import uuid
         workflow_id = str(uuid.uuid4())
         request_id = request.request_id or str(uuid.uuid4())
-        
+
         # Create initial state for async execution
         initial_state = {
             "workflow_id": workflow_id,
@@ -134,11 +132,11 @@ async def execute_workflow_async(
             "status": "pending",
             "input_data": request.input_data,
         }
-        
+
         # Store initial state
         state_manager = WorkflowStateManager(workflow_id=workflow_id)
         await state_manager.persist_state(initial_state, "automatic")
-        
+
         # Execute workflow in background
         async def run_workflow():
             try:
@@ -148,17 +146,17 @@ async def execute_workflow_async(
                     request_id=request_id,
                     input_data=request.input_data,
                 )
-                
+
                 # Convert input data to TripPlanRequest if needed
                 if "destination" in request.input_data and "requirements" in request.input_data:
                     from ...models.trip import TripDestination, TripRequirements
-                    
+
                     trip_request = TripPlanRequest(
                         destination=TripDestination(**request.input_data["destination"]),
                         requirements=TripRequirements(**request.input_data["requirements"]),
                         preferences=request.input_data.get("preferences", {}),
                     )
-                    
+
                     # Use pre-generated workflow_id for tracking
                     result = await workflow.execute_trip_planning(
                         trip_request=trip_request,
@@ -171,14 +169,14 @@ async def execute_workflow_async(
                         user_id=request.user_id,
                         request_id=request_id,
                     )
-                
+
                 # Update state with results
                 final_state = await state_manager.restore_state()
                 if final_state:
                     final_state["status"] = "completed"
                     final_state["output_data"] = result
                     await state_manager.persist_state(final_state, "completion")
-                    
+
             except Exception as e:
                 # Update state with error
                 error_state = await state_manager.restore_state()
@@ -186,10 +184,10 @@ async def execute_workflow_async(
                     error_state["status"] = "failed"
                     error_state["error"] = str(e)
                     await state_manager.persist_state(error_state, "error")
-        
+
         # Add to background tasks
         background_tasks.add_task(run_workflow)
-        
+
         return {
             "workflow_id": workflow_id,
             "request_id": request_id,
@@ -197,7 +195,7 @@ async def execute_workflow_async(
             "status_url": f"/api/v1/workflows/status/{workflow_id}",
             "progress_url": f"/api/v1/workflows/progress/{workflow_id}",
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -229,10 +227,10 @@ async def get_workflow_progress(workflow_id: str) -> dict[str, Any]:
     try:
         # Use enhanced state manager for progress tracking
         state_manager = WorkflowStateManager(workflow_id=workflow_id)
-        
+
         # Get progress information
         progress = await state_manager.get_progress()
-        
+
         if progress is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -242,12 +240,12 @@ async def get_workflow_progress(workflow_id: str) -> dict[str, Any]:
                     "workflow_id": workflow_id,
                 },
             )
-        
+
         return progress
-        
+
     except HTTPException:
         raise
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -278,41 +276,21 @@ async def get_workflow_status(workflow_id: str) -> WorkflowStatusResponse:
         Current workflow status and execution details
     """
     try:
-        # Use enhanced state manager for status retrieval
-        state_manager = WorkflowStateManager(workflow_id=workflow_id)
-        
-        # Get workflow state
-        state = await state_manager.restore_state()
-        
-        if state is None:
-            # Fallback to basic workflow status
-            workflow = TripPlanningWorkflow()
-            status_info = await workflow.get_workflow_status(workflow_id)
-            
-            if status_info is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail={
-                        "error": "WORKFLOW_NOT_FOUND",
-                        "message": f"Workflow with ID {workflow_id} not found",
-                        "workflow_id": workflow_id,
-                    },
-                )
-            
-            return WorkflowStatusResponse(**status_info)
-        
-        # Build status response from enhanced state
-        status_response = WorkflowStatusResponse(
-            workflow_id=workflow_id,
-            workflow_type="TripPlanningWorkflow",
-            status=state.get("status", "unknown"),
-            current_node=state.get("current_node"),
-            start_time=state.get("start_time"),
-            end_time=state.get("end_time"),
-            error=state.get("error"),
-        )
-        
-        return status_response
+        # Initialize workflow for status check
+        workflow = TripPlanningWorkflow()
+        status_info = await workflow.get_workflow_status(workflow_id)
+
+        if status_info is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "error": "WORKFLOW_NOT_FOUND",
+                    "message": f"Workflow with ID {workflow_id} not found",
+                    "workflow_id": workflow_id,
+                },
+            )
+
+        return WorkflowStatusResponse(**status_info)
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -347,10 +325,10 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
     try:
         # Use enhanced state manager for result retrieval
         state_manager = WorkflowStateManager(workflow_id=workflow_id)
-        
+
         # Get workflow state
         state = await state_manager.restore_state()
-        
+
         if state is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -360,7 +338,7 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
                     "workflow_id": workflow_id,
                 },
             )
-        
+
         # Check if workflow is completed
         if state.get("status") not in ["completed", "failed", "failed_with_partial_results"]:
             raise HTTPException(
@@ -372,7 +350,7 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
                     "workflow_id": workflow_id,
                 },
             )
-        
+
         # Return results
         return {
             "workflow_id": workflow_id,
@@ -385,10 +363,10 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
                 else None
             ),
         }
-        
+
     except HTTPException:
         raise
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -418,10 +396,10 @@ async def cancel_workflow(workflow_id: str) -> dict[str, str]:
     try:
         # Use enhanced state manager for cancellation
         state_manager = WorkflowStateManager(workflow_id=workflow_id)
-        
+
         # Get current state
         state = await state_manager.restore_state()
-        
+
         if state is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -431,7 +409,7 @@ async def cancel_workflow(workflow_id: str) -> dict[str, str]:
                     "workflow_id": workflow_id,
                 },
             )
-        
+
         # Check if already completed
         if state.get("status") in ["completed", "failed", "cancelled"]:
             return {
@@ -439,30 +417,30 @@ async def cancel_workflow(workflow_id: str) -> dict[str, str]:
                 "message": f"Workflow already {state.get('status')}",
                 "status": state.get("status"),
             }
-        
+
         # Update state to cancelled
         state["status"] = "cancelled"
         state["end_time"] = time.time()
         state["error"] = "Workflow cancelled by user"
-        
+
         # Persist cancellation state
         await state_manager.persist_state(state, "manual")
-        
+
         # Log cancellation
         workflow_logger.log_workflow_cancelled(
             workflow_id=workflow_id,
             request_id=state.get("request_id", "unknown"),
         )
-        
+
         return {
             "workflow_id": workflow_id,
             "message": "Workflow cancelled successfully",
             "status": "cancelled",
         }
-        
+
     except HTTPException:
         raise
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -492,10 +470,10 @@ async def cleanup_workflow(workflow_id: str) -> dict[str, str]:
     try:
         # Use enhanced state manager for cleanup
         state_manager = WorkflowStateManager(workflow_id=workflow_id)
-        
+
         # Perform cleanup
         cleanup_success = await state_manager.cleanup_workflow()
-        
+
         if not cleanup_success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -505,20 +483,20 @@ async def cleanup_workflow(workflow_id: str) -> dict[str, str]:
                     "workflow_id": workflow_id,
                 },
             )
-        
+
         # Log cleanup
         workflow_logger.log_workflow_cleanup(
             workflow_id=workflow_id,
         )
-        
+
         return {
             "workflow_id": workflow_id,
             "message": "Workflow data cleaned up successfully",
         }
-        
+
     except HTTPException:
         raise
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

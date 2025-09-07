@@ -609,16 +609,16 @@ class TestItineraryAgent:
         """Test agent coordination handles timeouts gracefully."""
         # Mock agents to raise timeout
         itinerary_agent.flight_agent.process = AsyncMock(
-            side_effect=asyncio.TimeoutError("Timeout")
+            side_effect=TimeoutError("Timeout")
         )
-        itinerary_agent.hotel_agent.process = AsyncMock(side_effect=asyncio.TimeoutError("Timeout"))
+        itinerary_agent.hotel_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
         itinerary_agent.activity_agent.process = AsyncMock(
-            side_effect=asyncio.TimeoutError("Timeout")
+            side_effect=TimeoutError("Timeout")
         )
         itinerary_agent.weather_agent.process = AsyncMock(
-            side_effect=asyncio.TimeoutError("Timeout")
+            side_effect=TimeoutError("Timeout")
         )
-        itinerary_agent.food_agent.process = AsyncMock(side_effect=asyncio.TimeoutError("Timeout"))
+        itinerary_agent.food_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
 
         # Mock circuit breaker to allow calls
         with patch("travel_companion.agents.itinerary_agent.CircuitBreaker") as mock_circuit:

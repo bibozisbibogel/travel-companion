@@ -53,7 +53,7 @@ async def generate_trip_plan(
 
     # Initialize workflow orchestrator
     workflow = TripPlanningWorkflow()
-    
+
     try:
         # Execute the trip planning workflow
         result = await workflow.execute_trip_planning(
@@ -61,11 +61,11 @@ async def generate_trip_plan(
             user_id=str(current_user.user_id),
             request_id=request.headers.get("X-Request-ID"),
         )
-        
+
         # Extract workflow results
         trip_id = result.get("trip_id", UUID("00000000-0000-4000-8000-000000000001"))
         plan_data = result.get("itinerary_data")
-        
+
         # Create trip response with workflow results
         trip_response = TripResponse(
             trip_id=trip_id if isinstance(trip_id, UUID) else UUID(trip_id),
@@ -78,12 +78,12 @@ async def generate_trip_plan(
             created_at=current_user.created_at,
             updated_at=current_user.updated_at,
         )
-        
+
         return SuccessResponse[TripResponse](
-            data=trip_response, 
+            data=trip_response,
             message="Trip plan generated successfully"
         )
-    
+
     except TimeoutError as e:
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
@@ -93,7 +93,7 @@ async def generate_trip_plan(
                 "details": str(e),
             },
         ) from e
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

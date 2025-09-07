@@ -124,9 +124,9 @@ async def detailed_health_check(
 
     # Check workflow engine health
     try:
-        from travel_companion.workflows.simple_workflow import TravelPlanningWorkflow
+        from travel_companion.workflows.orchestrator import TripPlanningWorkflow
 
-        workflow = TravelPlanningWorkflow()
+        workflow = TripPlanningWorkflow()
         workflow_health = workflow.get_health_status()
 
         health_status["dependencies"]["workflow_engine"] = workflow_health

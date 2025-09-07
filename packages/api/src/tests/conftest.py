@@ -3,7 +3,7 @@
 import asyncio
 import os
 from datetime import UTC, datetime
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -37,23 +37,41 @@ def client():
 
     app = None
     try:
-        # Import app after setting environment
-        from unittest.mock import AsyncMock
+        # Mock Redis before importing the main app to prevent connections
+        with patch("redis.asyncio.from_url") as mock_redis_from_url:
+            # Create a mock Redis client
+            mock_redis_client = AsyncMock()
+            mock_redis_client.ping = AsyncMock(return_value=True)
+            mock_redis_client.set = AsyncMock(return_value=True)
+            mock_redis_client.get = AsyncMock(return_value=None)
+            mock_redis_client.delete = AsyncMock(return_value=True)
+            mock_redis_client.exists = AsyncMock(return_value=False)
+            mock_redis_client.incr = AsyncMock(return_value=1)
+            mock_redis_client.expire = AsyncMock(return_value=True)
+            mock_redis_client.ttl = AsyncMock(return_value=-1)
+            mock_redis_client.setex = AsyncMock(return_value=True)
+            mock_redis_client.pipeline = Mock()
+            mock_redis_client.pipeline.return_value = mock_redis_client
+            mock_redis_client.execute = AsyncMock(return_value=[])
+            mock_redis_client.close = AsyncMock(return_value=None)
 
-        from travel_companion.api.v1.users import get_user_service
-        from travel_companion.main import app
+            mock_redis_from_url.return_value = mock_redis_client
 
-        # Create a global mock for the user service to prevent database access
-        mock_service = AsyncMock()
-        mock_service.create_user = AsyncMock()
-        mock_service.authenticate_user = AsyncMock()
-        mock_service.get_user_by_id = AsyncMock()
+            # Import app after setting environment and mocking Redis
+            from travel_companion.api.v1.users import get_user_service
+            from travel_companion.main import app
 
-        # Override the dependency globally for this test client
-        app.dependency_overrides[get_user_service] = lambda: mock_service
+            # Create a global mock for the user service to prevent database access
+            mock_service = AsyncMock()
+            mock_service.create_user = AsyncMock()
+            mock_service.authenticate_user = AsyncMock()
+            mock_service.get_user_by_id = AsyncMock()
 
-        with TestClient(app) as client:
-            yield client
+            # Override the dependency globally for this test client
+            app.dependency_overrides[get_user_service] = lambda: mock_service
+
+            with TestClient(app) as client:
+                yield client
     finally:
         # Restore original environment
         for key, value in original_env.items():

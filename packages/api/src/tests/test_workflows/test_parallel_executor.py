@@ -1,25 +1,24 @@
 """Tests for parallel execution optimization in LangGraph workflows."""
 
 import asyncio
-import pytest
 import time
-from unittest.mock import AsyncMock, Mock, patch
-from typing import Dict, Any
+from datetime import date
+from unittest.mock import AsyncMock, Mock
 
-from travel_companion.workflows.parallel_executor import (
-    ParallelExecutionOptimizer,
-    ParallelExecutionConfig,
-    ParallelExecutionQueue,
-    ExecutionPriority,
-    ExecutionMetrics,
-    WorkflowExecutionMetrics,
-    execute_agents_with_parallel_optimization,
-    create_optimized_parallel_config,
-)
+import pytest
+
+from travel_companion.models.trip import TripDestination, TripPlanRequest, TripRequirements
 from travel_companion.workflows.orchestrator import TripPlanningWorkflowState
-from travel_companion.models.trip import TripPlanRequest, TripRequirements, TripDestination
-from travel_companion.utils.circuit_breaker import CircuitBreakerOpenError
-from datetime import date, datetime
+from travel_companion.workflows.parallel_executor import (
+    ExecutionMetrics,
+    ExecutionPriority,
+    ParallelExecutionConfig,
+    ParallelExecutionOptimizer,
+    ParallelExecutionQueue,
+    WorkflowExecutionMetrics,
+    create_optimized_parallel_config,
+    execute_agents_with_parallel_optimization,
+)
 
 
 class TestParallelExecutionConfig:
@@ -28,7 +27,7 @@ class TestParallelExecutionConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = ParallelExecutionConfig()
-        
+
         assert config.default_timeout_seconds == 30
         assert config.max_concurrent_agents == 6
         assert config.max_retries == 2
@@ -43,7 +42,7 @@ class TestParallelExecutionConfig:
             max_retries=5,
             enable_load_balancing=False
         )
-        
+
         assert config.max_concurrent_agents == 10
         assert config.default_timeout_seconds == 60
         assert config.max_retries == 5
@@ -60,7 +59,7 @@ class TestExecutionMetrics:
             priority=ExecutionPriority.HIGH,
             start_time=time.time()
         )
-        
+
         assert metrics.agent_name == "test_agent"
         assert metrics.priority == ExecutionPriority.HIGH
         assert metrics.success is False
@@ -75,12 +74,12 @@ class TestExecutionMetrics:
             priority=ExecutionPriority.MEDIUM,
             start_time=start_time
         )
-        
+
         # Simulate execution
         time.sleep(0.01)  # 10ms
         metrics.end_time = time.time()
         execution_time = metrics.calculate_execution_time()
-        
+
         assert execution_time > 0
         assert metrics.execution_time_ms == execution_time
         assert execution_time >= 10  # At least 10ms
@@ -96,10 +95,10 @@ class TestExecutionMetrics:
         )
         assert fast_metrics.is_fast_execution is True
         assert fast_metrics.is_slow_execution is False
-        
+
         # Slow execution
         slow_metrics = ExecutionMetrics(
-            agent_name="slow_agent", 
+            agent_name="slow_agent",
             priority=ExecutionPriority.LOW,
             start_time=time.time(),
             execution_time_ms=25000.0  # 25 seconds
@@ -114,7 +113,7 @@ class TestWorkflowExecutionMetrics:
     def test_workflow_metrics_creation(self):
         """Test creating workflow execution metrics."""
         metrics = WorkflowExecutionMetrics(workflow_id="test_workflow")
-        
+
         assert metrics.workflow_id == "test_workflow"
         assert metrics.total_agents == 0
         assert metrics.parallel_efficiency == 0.0
@@ -123,17 +122,17 @@ class TestWorkflowExecutionMetrics:
     def test_summary_metrics_calculation(self):
         """Test calculating summary metrics from agent metrics."""
         workflow_metrics = WorkflowExecutionMetrics(workflow_id="test_workflow")
-        
+
         # Add some agent metrics
         agent_metrics = [
             ExecutionMetrics("agent1", ExecutionPriority.HIGH, time.time(), end_time=time.time() + 3.0, execution_time_ms=3000.0, success=True),  # Fast
             ExecutionMetrics("agent2", ExecutionPriority.MEDIUM, time.time(), end_time=time.time() + 15.0, execution_time_ms=15000.0, success=True),  # Normal
             ExecutionMetrics("agent3", ExecutionPriority.LOW, time.time(), end_time=time.time() + 25.0, execution_time_ms=25000.0, success=False),  # Slow
         ]
-        
+
         workflow_metrics.agent_metrics = agent_metrics
         workflow_metrics.calculate_summary_metrics()
-        
+
         assert workflow_metrics.total_agents == 3
         assert workflow_metrics.agents_executed == 3
         assert workflow_metrics.agents_succeeded == 2
@@ -151,7 +150,7 @@ class TestParallelExecutionQueue:
         """Provide queue configuration."""
         return ParallelExecutionConfig(max_concurrent_agents=4)
 
-    @pytest.fixture  
+    @pytest.fixture
     def execution_queue(self, queue_config):
         """Provide execution queue instance."""
         return ParallelExecutionQueue(queue_config)
@@ -160,59 +159,59 @@ class TestParallelExecutionQueue:
         """Test enqueuing agents with priorities."""
         mock_function = AsyncMock()
         context = {"test": "context"}
-        
+
         await execution_queue.enqueue_agent(
             agent_name="test_agent",
             agent_function=mock_function,
             priority=ExecutionPriority.HIGH,
             execution_context=context
         )
-        
+
         assert len(execution_queue.priority_queues[ExecutionPriority.HIGH]) == 1
         assert execution_queue.priority_queues[ExecutionPriority.HIGH][0][0] == "test_agent"
 
     async def test_priority_based_retrieval(self, execution_queue):
         """Test retrieving agents based on priority order."""
         mock_function = AsyncMock()
-        
+
         # Enqueue agents with different priorities
         await execution_queue.enqueue_agent("low_agent", mock_function, ExecutionPriority.LOW, {})
         await execution_queue.enqueue_agent("critical_agent", mock_function, ExecutionPriority.CRITICAL, {})
         await execution_queue.enqueue_agent("medium_agent", mock_function, ExecutionPriority.MEDIUM, {})
-        
+
         # Should retrieve critical first
         next_agent = await execution_queue.get_next_agent()
         assert next_agent is not None
         assert next_agent[0] == "critical_agent"
-        
+
         # Then medium
         next_agent = await execution_queue.get_next_agent()
         assert next_agent is not None
         assert next_agent[0] == "medium_agent"
-        
+
         # Then low
-        next_agent = await execution_queue.get_next_agent()  
+        next_agent = await execution_queue.get_next_agent()
         assert next_agent is not None
         assert next_agent[0] == "low_agent"
 
     async def test_load_balancing(self, execution_queue):
         """Test load balancing adjustments."""
         mock_function = AsyncMock()
-        
+
         # Fill high priority queue to trigger load balancing
         for i in range(4):
             await execution_queue.enqueue_agent(f"high_agent_{i}", mock_function, ExecutionPriority.HIGH, {})
-        
+
         # This agent should be demoted to medium priority due to load balancing
         await execution_queue.enqueue_agent("activity_agent", mock_function, ExecutionPriority.HIGH, {})
-        
+
         # Verify load balancing occurred
         assert execution_queue.load_balance_stats["decisions"] > 0
 
     def test_queue_metrics(self, execution_queue):
         """Test queue performance metrics."""
         metrics = execution_queue.get_queue_metrics()
-        
+
         assert "total_queued" in metrics
         assert "total_active" in metrics
         assert "queued_by_priority" in metrics
@@ -229,6 +228,10 @@ class TestParallelExecutionOptimizer:
         return ParallelExecutionConfig(
             max_concurrent_agents=4,
             default_timeout_seconds=5,  # Short timeout for tests
+            critical_timeout_seconds=5,
+            high_priority_timeout_seconds=5,
+            medium_priority_timeout_seconds=5,
+            low_priority_timeout_seconds=5,
             max_retries=1
         )
 
@@ -249,10 +252,10 @@ class TestParallelExecutionOptimizer:
                 budget=5000.0
             )
         )
-        
+
         return TripPlanningWorkflowState(
             request_id="test_request",
-            workflow_id="test_workflow", 
+            workflow_id="test_workflow",
             user_id="test_user",
             status="running",
             error=None,
@@ -289,7 +292,7 @@ class TestParallelExecutionOptimizer:
         """Test agent timeout calculation."""
         timeout = optimizer._get_agent_timeout("flight_agent", ExecutionPriority.HIGH)
         assert timeout == optimizer.config.high_priority_timeout_seconds
-        
+
         timeout = optimizer._get_agent_timeout("weather_agent", ExecutionPriority.CRITICAL)
         assert timeout == optimizer.config.critical_timeout_seconds
 
@@ -302,7 +305,7 @@ class TestParallelExecutionOptimizer:
             return state
 
         async def mock_flight_agent(state):
-            await asyncio.sleep(0.1)  
+            await asyncio.sleep(0.1)
             state["flight_results"] = [{"flight": "test"}]
             return state
 
@@ -327,7 +330,7 @@ class TestParallelExecutionOptimizer:
     async def test_agent_dependency_handling(self, optimizer, sample_state):
         """Test handling of agent dependencies."""
         execution_order = []
-        
+
         async def mock_weather_agent(state):
             execution_order.append("weather")
             await asyncio.sleep(0.05)
@@ -383,7 +386,7 @@ class TestParallelExecutionOptimizer:
     async def test_circuit_breaker_integration(self, optimizer, sample_state):
         """Test circuit breaker integration."""
         failure_count = 0
-        
+
         async def failing_agent(state):
             nonlocal failure_count
             failure_count += 1
@@ -409,7 +412,7 @@ class TestParallelExecutionOptimizer:
     async def test_retry_mechanism(self, optimizer, sample_state):
         """Test retry mechanism with exponential backoff."""
         attempt_count = 0
-        
+
         async def retry_agent(state):
             nonlocal attempt_count
             attempt_count += 1
@@ -434,11 +437,14 @@ class TestParallelExecutionOptimizer:
 
     async def test_performance_metrics_collection(self, optimizer, sample_state):
         """Test comprehensive performance metrics collection."""
+        # Clear pre-existing agents
+        sample_state["agents_completed"] = []
+        sample_state["agents_failed"] = []
         async def fast_agent(state):
             await asyncio.sleep(0.001)  # Very fast
             state["fast_result"] = "done"
             return state
-            
+
         async def slow_agent(state):
             await asyncio.sleep(0.1)  # Slower but not timeout
             state["slow_result"] = "done"
@@ -458,17 +464,17 @@ class TestParallelExecutionOptimizer:
 
         # Verify metrics collection
         metrics = result_state["parallel_execution_metrics"]
-        
+
         assert "total_execution_time_ms" in metrics
         assert "parallel_efficiency_percent" in metrics
         assert "max_concurrent_agents" in metrics
         assert "agent_performance" in metrics
         assert len(metrics["agent_performance"]) == 2
-        
+
         # Check individual agent metrics
         agent_performances = {ap["agent_name"]: ap for ap in metrics["agent_performance"]}
         assert agent_performances["fast_agent"]["performance_category"] == "fast"
-        assert agent_performances["slow_agent"]["performance_category"] == "normal"
+        assert agent_performances["slow_agent"]["performance_category"] == "fast"  # 100ms is still fast (<5s)
 
 
 class TestUtilityFunctions:
@@ -479,7 +485,7 @@ class TestUtilityFunctions:
         sample_state = TripPlanningWorkflowState(
             request_id="test_request",
             workflow_id="test_workflow",
-            user_id="test_user", 
+            user_id="test_user",
             status="running",
             error=None,
             start_time=time.time(),
@@ -495,7 +501,7 @@ class TestUtilityFunctions:
             agent_dependencies={},
             flight_results=[],
             hotel_results=[],
-            activity_results=[], 
+            activity_results=[],
             weather_data={},
             food_recommendations=[],
             itinerary_data={},
@@ -526,7 +532,7 @@ class TestUtilityFunctions:
             timeout_seconds=45,
             enable_adaptive=False
         )
-        
+
         assert config.max_concurrent_agents == 8
         assert config.default_timeout_seconds == 45
         assert config.adaptive_timeout is False
@@ -555,18 +561,18 @@ class TestIntegrationScenarios:
             destination=TripDestination(city="Tokyo", country="Japan", country_code="JP"),
             requirements=TripRequirements(
                 start_date=date(2024, 8, 15),
-                end_date=date(2024, 8, 22), 
+                end_date=date(2024, 8, 22),
                 travelers=4,
                 budget=8000.0
             ),
             preferences={"activity_types": ["cultural", "outdoor"], "cuisine_types": ["japanese", "international"]}
         )
-        
+
         return TripPlanningWorkflowState(
             request_id="integration_test",
             workflow_id="integration_workflow",
             user_id="integration_user",
-            status="running", 
+            status="running",
             error=None,
             start_time=time.time(),
             end_time=None,
@@ -595,6 +601,10 @@ class TestIntegrationScenarios:
 
     async def test_full_trip_planning_workflow(self, integration_optimizer, complex_state):
         """Test complete trip planning workflow with all agents."""
+        # Clear pre-existing agent state
+        complex_state["agents_completed"] = []
+        complex_state["agents_failed"] = []
+
         # Define realistic agent functions
         async def weather_agent(state):
             await asyncio.sleep(0.02)  # Simulate API call
@@ -605,7 +615,7 @@ class TestIntegrationScenarios:
             return state
 
         async def flight_agent(state):
-            await asyncio.sleep(0.05)  # Simulate longer API call  
+            await asyncio.sleep(0.05)  # Simulate longer API call
             state["flight_results"] = [
                 {"airline": "JAL", "price": 1200, "duration": "14h"},
                 {"airline": "ANA", "price": 1150, "duration": "15h"}
@@ -632,11 +642,11 @@ class TestIntegrationScenarios:
                 {"name": "Tokyo Tower", "estimated_cost": {"amount": 50}, "type": "cultural"},
                 {"name": "Senso-ji Temple", "estimated_cost": {"amount": 0}, "type": "cultural"}
             ]
-            
+
             # Add outdoor activities if weather is good
             if weather_data.get("forecast", {}).get("daily_forecasts", [{}])[0].get("condition") == "sunny":
                 activities.append({"name": "Ueno Park", "estimated_cost": {"amount": 10}, "type": "outdoor"})
-            
+
             state["activity_results"] = activities
             return state
 
@@ -655,7 +665,7 @@ class TestIntegrationScenarios:
             for key in required_keys:
                 if not state.get(key):
                     raise Exception(f"Missing required data: {key}")
-            
+
             state["itinerary_data"] = {
                 "daily_schedules": [{"day": 1, "activities": ["arrival", "hotel_checkin"]}],
                 "optimization_score": 0.85,
@@ -673,7 +683,7 @@ class TestIntegrationScenarios:
             "itinerary_agent": itinerary_agent
         }
 
-        # Define dependencies 
+        # Define dependencies
         dependencies = {
             "activity_agent": ["weather_agent"],
             "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"]
@@ -695,7 +705,7 @@ class TestIntegrationScenarios:
         # Verify all expected data is present
         assert "weather_data" in result_state
         assert "flight_results" in result_state
-        assert "hotel_results" in result_state 
+        assert "hotel_results" in result_state
         assert "activity_results" in result_state
         assert "food_recommendations" in result_state
         assert "itinerary_data" in result_state
@@ -710,7 +720,7 @@ class TestIntegrationScenarios:
         assert metrics["agents_succeeded"] == 6
         assert metrics["success_rate"] == 1.0
         assert metrics["max_concurrent_agents"] > 1  # Should have parallel execution
-        
+
         # Verify parallel efficiency (should be faster than sequential)
         sequential_time = sum(ap["execution_time_ms"] for ap in metrics["agent_performance"]) / 1000
         assert execution_time < sequential_time * 0.8  # At least 20% improvement
@@ -723,14 +733,14 @@ class TestIntegrationScenarios:
     async def test_partial_failure_resilience(self, integration_optimizer, complex_state):
         """Test resilience to partial agent failures."""
         failure_count = 0
-        
+
         async def stable_agent(name, delay=0.02):
             async def agent(state):
                 await asyncio.sleep(delay)
                 state[f"{name}_results"] = [{"test": "data"}]
                 return state
             return agent
-            
+
         async def failing_agent(state):
             nonlocal failure_count
             failure_count += 1

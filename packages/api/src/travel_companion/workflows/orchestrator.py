@@ -3,10 +3,9 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, TypedDict, Optional
 
 # Add import for TYPE_CHECKING to handle forward references
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
 if TYPE_CHECKING:
     from .parallel_executor import ParallelExecutionConfig
@@ -345,12 +344,12 @@ class BaseWorkflow(ABC):
             # Use enhanced state manager for TripPlanningWorkflow
             if isinstance(state, dict) and "trip_request" in state:
                 from .state_manager import WorkflowStateManager
-                
+
                 state_manager = WorkflowStateManager(
                     workflow_id=state["workflow_id"],
                     redis_ttl_hours=24
                 )
-                
+
                 # Determine checkpoint type based on workflow status
                 checkpoint_type = "automatic"
                 if state.get("status") == "failed":
@@ -359,10 +358,10 @@ class BaseWorkflow(ABC):
                     checkpoint_type = "completion"
                 elif state.get("current_node") in ["initialize_trip", "finalize_plan"]:
                     checkpoint_type = "manual"
-                
+
                 # Persist with enhanced features
                 success = await state_manager.persist_state(state, checkpoint_type)
-                
+
                 if not success:
                     workflow_logger.warning(
                         f"Enhanced state persistence failed for {state['workflow_id']}, falling back to basic persistence"
@@ -531,7 +530,7 @@ class TripPlanningWorkflow(BaseWorkflow):
     def __init__(self, parallel_config: Optional["ParallelExecutionConfig"] = None) -> None:
         """Initialize trip planning workflow."""
         super().__init__("trip_planning")
-        
+
         # Store parallel config for delayed initialization
         self.parallel_config = parallel_config
 
@@ -580,7 +579,7 @@ class TripPlanningWorkflow(BaseWorkflow):
         Will be replaced with actual node implementations in Task 2.
         """
         return state
-    
+
     async def _coordinated_execution_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
         """
         Coordinated execution node that manages all agent execution with dependencies.
@@ -589,13 +588,13 @@ class TripPlanningWorkflow(BaseWorkflow):
         with timeout handling, load balancing, and performance monitoring.
         """
         # Import here to avoid circular import
-        from .parallel_executor import ParallelExecutionOptimizer, ParallelExecutionConfig
-        
+        from .parallel_executor import ParallelExecutionConfig, ParallelExecutionOptimizer
+
         # Initialize parallel optimizer with delayed import
         parallel_optimizer = ParallelExecutionOptimizer(
             config=self.parallel_config or ParallelExecutionConfig()
         )
-        
+
         from .nodes import (
             execute_activity_agent,
             execute_flight_agent,
@@ -604,7 +603,7 @@ class TripPlanningWorkflow(BaseWorkflow):
             execute_itinerary_agent,
             execute_weather_agent,
         )
-        
+
         # Define all agent node functions
         agent_functions = {
             "weather_agent": execute_weather_agent,
@@ -614,19 +613,19 @@ class TripPlanningWorkflow(BaseWorkflow):
             "food_agent": execute_food_agent,
             "itinerary_agent": execute_itinerary_agent,
         }
-        
+
         # Define agent dependencies (weather before activities)
         dependencies = {
             "activity_agent": ["weather_agent"],
             "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
         }
-        
+
         workflow_logger.log_parallel_execution_starting(
             workflow_id=state["workflow_id"],
             request_id=state["request_id"],
             agent_count=len(agent_functions)
         )
-        
+
         try:
             # Execute agents with parallel optimization
             updated_state = await parallel_optimizer.execute_agents_parallel(
@@ -634,7 +633,7 @@ class TripPlanningWorkflow(BaseWorkflow):
                 agent_functions=agent_functions,
                 dependencies=dependencies
             )
-            
+
             # Log parallel execution completion
             execution_metrics = updated_state.get("parallel_execution_metrics", {})
             workflow_logger.log_parallel_execution_completed(
@@ -642,9 +641,9 @@ class TripPlanningWorkflow(BaseWorkflow):
                 request_id=state["request_id"],
                 execution_metrics=execution_metrics
             )
-            
+
             return updated_state
-            
+
         except Exception as e:
             workflow_logger.log_parallel_execution_failed(
                 workflow_id=state["workflow_id"],
@@ -652,7 +651,7 @@ class TripPlanningWorkflow(BaseWorkflow):
                 error=str(e),
                 partial_metrics={}
             )
-            
+
             # Set error state but allow error handler to process
             state["error"] = str(e)
             state["status"] = "parallel_execution_failed"
@@ -670,7 +669,7 @@ class TripPlanningWorkflow(BaseWorkflow):
             request_id=state["request_id"],
             error=state.get("error", "Unknown error")
         )
-        
+
         # Create error response in output_data
         error_response = {
             "success": False,
@@ -685,10 +684,10 @@ class TripPlanningWorkflow(BaseWorkflow):
             "execution_metrics": state.get("optimization_metrics", {}),
             "coordination_metrics": state.get("coordination_metrics", {})
         }
-        
+
         state["output_data"] = error_response
         state["status"] = "failed_with_partial_results"
-        
+
         return state
 
     def define_edges(self) -> list[tuple[str, str]]:
@@ -701,14 +700,14 @@ class TripPlanningWorkflow(BaseWorkflow):
             List of workflow transitions (simplified for coordinator-based execution)
         """
         # Import coordination functions
-        from .nodes import route_based_on_preferences, should_proceed_to_itinerary
-        
+        from .nodes import route_based_on_preferences
+
         return [
             # Use coordinator for intelligent routing
             ("initialize_trip", "coordinated_execution"),
             ("coordinated_execution", route_based_on_preferences, {
                 "continue": "finalize_plan",
-                "retry": "coordinated_execution", 
+                "retry": "coordinated_execution",
                 "abort": "error_handler"
             }),
         ]
