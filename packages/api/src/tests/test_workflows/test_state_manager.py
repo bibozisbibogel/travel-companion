@@ -76,20 +76,18 @@ def sample_workflow_state():
             "hotel": ["flight"],
             "activity": ["weather", "hotel"],
             "food": ["hotel"],
-            "itinerary": ["flight", "hotel", "activity", "food"]
-        }
+            "itinerary": ["flight", "hotel", "activity", "food"],
+        },
     }
 
 
 @pytest.fixture
 def state_manager(mock_redis, config):
     """Enhanced state manager instance for testing."""
-    with patch('travel_companion.workflows.state_manager.get_redis_manager') as mock_manager:
+    with patch("travel_companion.workflows.state_manager.get_redis_manager") as mock_manager:
         mock_manager.return_value.client = mock_redis
         manager = EnhancedWorkflowStateManager(
-            workflow_id="test_workflow_123",
-            config=config,
-            enable_heartbeat=True
+            workflow_id="test_workflow_123", config=config, enable_heartbeat=True
         )
         return manager
 
@@ -98,12 +96,13 @@ class TestWorkflowStateStorageWithTTL:
     """Test Redis-based workflow state storage with TTL management."""
 
     @pytest.mark.asyncio
-    async def test_initialize_workflow_with_ttl(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_initialize_workflow_with_ttl(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test workflow initialization with proper TTL calculation."""
         # Test with estimated duration
         result = await state_manager.initialize_workflow(
-            sample_workflow_state,
-            estimated_duration_minutes=30
+            sample_workflow_state, estimated_duration_minutes=30
         )
 
         assert result is True
@@ -147,8 +146,7 @@ class TestWorkflowStateStorageWithTTL:
 
         # Persist state - should extend TTL
         result = await state_manager.persist_state_with_progress(
-            sample_workflow_state,
-            CheckpointType.AUTOMATIC
+            sample_workflow_state, CheckpointType.AUTOMATIC
         )
 
         assert result is True
@@ -156,7 +154,9 @@ class TestWorkflowStateStorageWithTTL:
         assert mock_redis.expire.called
 
     @pytest.mark.asyncio
-    async def test_workflow_index_management(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_workflow_index_management(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test global workflow index for tracking."""
         # Mock empty index initially
         mock_redis.get.return_value = None
@@ -164,8 +164,9 @@ class TestWorkflowStateStorageWithTTL:
         await state_manager.initialize_workflow(sample_workflow_state)
 
         # Should add to workflow index
-        set_calls = [call for call in mock_redis.set.call_args_list
-                    if 'workflow:index' in str(call)]
+        set_calls = [
+            call for call in mock_redis.set.call_args_list if "workflow:index" in str(call)
+        ]
         assert len(set_calls) >= 1
 
 
@@ -173,15 +174,16 @@ class TestCheckpointAndResumeFunctionality:
     """Test advanced checkpoint and resume functionality."""
 
     @pytest.mark.asyncio
-    async def test_enhanced_checkpoint_creation(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_enhanced_checkpoint_creation(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test enhanced checkpoint creation with metadata."""
         # Initialize workflow
         await state_manager.initialize_workflow(sample_workflow_state)
 
         # Create manual checkpoint
         snapshot_id = await state_manager.create_manual_checkpoint(
-            sample_workflow_state,
-            "Test checkpoint for debugging"
+            sample_workflow_state, "Test checkpoint for debugging"
         )
 
         assert snapshot_id.startswith("manual_")
@@ -194,25 +196,19 @@ class TestCheckpointAndResumeFunctionality:
 
         # Test automatic checkpoint
         auto_id = await state_manager._create_enhanced_checkpoint(
-            sample_workflow_state,
-            CheckpointType.AUTOMATIC,
-            "Automatic checkpoint"
+            sample_workflow_state, CheckpointType.AUTOMATIC, "Automatic checkpoint"
         )
         assert auto_id.startswith("automatic_")
 
         # Test error checkpoint
         error_id = await state_manager._create_enhanced_checkpoint(
-            sample_workflow_state,
-            CheckpointType.ERROR,
-            "Error recovery checkpoint"
+            sample_workflow_state, CheckpointType.ERROR, "Error recovery checkpoint"
         )
         assert error_id.startswith("error_")
 
         # Test completion checkpoint
         completion_id = await state_manager._create_enhanced_checkpoint(
-            sample_workflow_state,
-            CheckpointType.COMPLETION,
-            "Workflow completed"
+            sample_workflow_state, CheckpointType.COMPLETION, "Workflow completed"
         )
         assert completion_id.startswith("completion_")
 
@@ -228,18 +224,20 @@ class TestCheckpointAndResumeFunctionality:
             if i % 5 == 0:
                 checkpoint_type = "manual"  # Important
             elif i % 7 == 0:
-                checkpoint_type = "error"   # Important
+                checkpoint_type = "error"  # Important
 
-            mock_snapshots.append({
-                "snapshot_id": f"{checkpoint_type}_{time.time() + i}",
-                "timestamp": time.time() + i,
-                "checkpoint_type": checkpoint_type,
-                "agents_completed": ["weather"],
-                "agents_failed": [],
-                "current_phase": "test",
-                "state_data": sample_workflow_state,
-                "description": f"Test snapshot {i}"
-            })
+            mock_snapshots.append(
+                {
+                    "snapshot_id": f"{checkpoint_type}_{time.time() + i}",
+                    "timestamp": time.time() + i,
+                    "checkpoint_type": checkpoint_type,
+                    "agents_completed": ["weather"],
+                    "agents_failed": [],
+                    "current_phase": "test",
+                    "state_data": sample_workflow_state,
+                    "description": f"Test snapshot {i}",
+                }
+            )
 
         mock_redis.get.return_value = json.dumps(mock_snapshots)
 
@@ -253,7 +251,7 @@ class TestCheckpointAndResumeFunctionality:
                 checkpoint_type="automatic",
                 agents_completed=[],
                 agents_failed=[],
-                current_phase="test"
+                current_phase="test",
             )
         )
 
@@ -261,7 +259,9 @@ class TestCheckpointAndResumeFunctionality:
         assert mock_redis.setex.called
 
     @pytest.mark.asyncio
-    async def test_workflow_suspension_and_resumption(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_workflow_suspension_and_resumption(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test workflow suspension and resumption with state preservation."""
         # Initialize workflow
         await state_manager.initialize_workflow(sample_workflow_state)
@@ -290,12 +290,15 @@ class TestProgressTrackingLongRunning:
         await state_manager.initialize_workflow(sample_workflow_state)
 
         # Should initialize progress tracking
-        progress_calls = [call for call in mock_redis.setex.call_args_list
-                         if 'workflow:progress:' in str(call)]
+        progress_calls = [
+            call for call in mock_redis.setex.call_args_list if "workflow:progress:" in str(call)
+        ]
         assert len(progress_calls) >= 1
 
     @pytest.mark.asyncio
-    async def test_progress_updates_with_throttling(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_progress_updates_with_throttling(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test progress updates with proper throttling."""
         await state_manager.initialize_workflow(sample_workflow_state)
 
@@ -304,23 +307,24 @@ class TestProgressTrackingLongRunning:
 
         # First progress update - should go through
         await state_manager._update_progress_tracking(
-            sample_workflow_state,
-            "Starting flight search"
+            sample_workflow_state, "Starting flight search"
         )
 
         # Immediate second update - should be throttled
         await state_manager._update_progress_tracking(
-            sample_workflow_state,
-            "Still searching flights"
+            sample_workflow_state, "Still searching flights"
         )
 
         # Should have made only one update due to throttling
-        progress_calls = [call for call in mock_redis.setex.call_args_list
-                         if 'workflow:progress:' in str(call)]
+        progress_calls = [
+            call for call in mock_redis.setex.call_args_list if "workflow:progress:" in str(call)
+        ]
         assert len(progress_calls) <= 1
 
     @pytest.mark.asyncio
-    async def test_comprehensive_progress_info(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_comprehensive_progress_info(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test comprehensive progress information retrieval."""
         # Mock progress, metadata, and heartbeat data
         mock_progress = {
@@ -330,32 +334,40 @@ class TestProgressTrackingLongRunning:
             "completed_steps": 2,
             "current_step": "fetch_hotels",
             "step_history": [
-                {"timestamp": time.time() - 300, "step": "fetch_weather", "description": "Weather data retrieved"},
-                {"timestamp": time.time() - 150, "step": "fetch_flights", "description": "Flight search completed"}
-            ]
+                {
+                    "timestamp": time.time() - 300,
+                    "step": "fetch_weather",
+                    "description": "Weather data retrieved",
+                },
+                {
+                    "timestamp": time.time() - 150,
+                    "step": "fetch_flights",
+                    "description": "Flight search completed",
+                },
+            ],
         }
 
         mock_metadata = {
             "workflow_id": "test_workflow_123",
             "created_at": time.time() - 600,
             "status": "running",
-            "last_update": time.time() - 30
+            "last_update": time.time() - 30,
         }
 
         mock_heartbeat = {
             "workflow_id": "test_workflow_123",
             "started_at": time.time() - 600,
             "last_heartbeat": time.time() - 5,
-            "heartbeat_count": 40
+            "heartbeat_count": 40,
         }
 
         # Mock Redis responses
         def mock_get_side_effect(key):
-            if 'progress' in key:
+            if "progress" in key:
                 return json.dumps(mock_progress)
-            elif 'metadata' in key:
+            elif "metadata" in key:
                 return json.dumps(mock_metadata)
-            elif 'heartbeat' in key:
+            elif "heartbeat" in key:
                 return json.dumps(mock_heartbeat)
             return None
 
@@ -371,7 +383,9 @@ class TestProgressTrackingLongRunning:
 
         assert progress_info["workflow_id"] == "test_workflow_123"
         assert progress_info["status"] == "running"
-        assert progress_info["progress_percentage"] == pytest.approx(22.22, abs=0.1)  # 2/9 * 100 (6 agents + 3 overhead)
+        assert progress_info["progress_percentage"] == pytest.approx(
+            22.22, abs=0.1
+        )  # 2/9 * 100 (6 agents + 3 overhead)
         assert progress_info["ttl_remaining"] == 1800
         assert "heartbeat" in progress_info
         assert "performance_metrics" in progress_info
@@ -382,8 +396,9 @@ class TestProgressTrackingLongRunning:
         await state_manager.initialize_workflow(sample_workflow_state)
 
         # Should start heartbeat
-        heartbeat_calls = [call for call in mock_redis.setex.call_args_list
-                          if 'workflow:heartbeat:' in str(call)]
+        heartbeat_calls = [
+            call for call in mock_redis.setex.call_args_list if "workflow:heartbeat:" in str(call)
+        ]
         assert len(heartbeat_calls) >= 1
 
         # Test heartbeat update
@@ -394,8 +409,9 @@ class TestProgressTrackingLongRunning:
         await state_manager._stop_heartbeat()
 
         # Should have updated heartbeat multiple times
-        heartbeat_updates = [call for call in mock_redis.setex.call_args_list
-                           if 'workflow:heartbeat:' in str(call)]
+        heartbeat_updates = [
+            call for call in mock_redis.setex.call_args_list if "workflow:heartbeat:" in str(call)
+        ]
         assert len(heartbeat_updates) >= 2
 
     @pytest.mark.asyncio
@@ -407,7 +423,7 @@ class TestProgressTrackingLongRunning:
         estimated = state_manager._estimate_enhanced_completion_time(
             elapsed_time=300,  # 5 minutes elapsed
             completed_agents=2,
-            total_agents=6
+            total_agents=6,
         )
 
         assert estimated is not None
@@ -415,9 +431,7 @@ class TestProgressTrackingLongRunning:
 
         # Test with no completed agents
         estimated_none = state_manager._estimate_enhanced_completion_time(
-            elapsed_time=300,
-            completed_agents=0,
-            total_agents=6
+            elapsed_time=300, completed_agents=0, total_agents=6
         )
 
         assert estimated_none is None
@@ -427,14 +441,15 @@ class TestAutomatedStateCleanup:
     """Test automated state cleanup for completed and expired workflows."""
 
     @pytest.mark.asyncio
-    async def test_workflow_completion_cleanup_scheduling(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_workflow_completion_cleanup_scheduling(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test cleanup scheduling after workflow completion."""
         await state_manager.initialize_workflow(sample_workflow_state)
 
         # Complete workflow
         result = await state_manager.complete_workflow(
-            sample_workflow_state,
-            "Test workflow completed successfully"
+            sample_workflow_state, "Test workflow completed successfully"
         )
 
         assert result is True
@@ -449,38 +464,29 @@ class TestAutomatedStateCleanup:
             "completed_workflow_1": {
                 "created_at": time.time() - 86400,  # 1 day ago
                 "status": "completed",
-                "last_update": time.time() - 86400
+                "last_update": time.time() - 86400,
             },
             "failed_workflow_2": {
                 "created_at": time.time() - 3600,
                 "status": "failed",
-                "last_update": time.time() - 3600
+                "last_update": time.time() - 3600,
             },
             "active_workflow_3": {
                 "created_at": time.time() - 1800,
                 "status": "running",
-                "last_update": time.time() - 60
-            }
+                "last_update": time.time() - 60,
+            },
         }
 
         def mock_get_side_effect(key):
-            if 'workflow:index' in key:
+            if "workflow:index" in key:
                 return json.dumps(workflow_index)
-            elif 'workflow:metadata:completed_workflow_1' in key:
-                return json.dumps({
-                    "status": "completed",
-                    "last_update": time.time() - 86400
-                })
-            elif 'workflow:metadata:failed_workflow_2' in key:
-                return json.dumps({
-                    "status": "failed",
-                    "last_update": time.time() - 3600
-                })
-            elif 'workflow:metadata:active_workflow_3' in key:
-                return json.dumps({
-                    "status": "running",
-                    "last_update": time.time() - 60
-                })
+            elif "workflow:metadata:completed_workflow_1" in key:
+                return json.dumps({"status": "completed", "last_update": time.time() - 86400})
+            elif "workflow:metadata:failed_workflow_2" in key:
+                return json.dumps({"status": "failed", "last_update": time.time() - 3600})
+            elif "workflow:metadata:active_workflow_3" in key:
+                return json.dumps({"status": "running", "last_update": time.time() - 60})
             return None
 
         mock_redis.get.side_effect = mock_get_side_effect
@@ -501,7 +507,7 @@ class TestAutomatedStateCleanup:
         # Test with different workflow states
         mock_metadata = {
             "status": "completed",
-            "last_update": time.time() - 604800  # 1 week ago
+            "last_update": time.time() - 604800,  # 1 week ago
         }
 
         state_manager.redis_client.get.return_value = json.dumps(mock_metadata)
@@ -524,32 +530,38 @@ class TestAutomatedStateCleanup:
         assert pipeline_mock.execute.called
 
     @pytest.mark.asyncio
-    async def test_snapshot_age_based_cleanup(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_snapshot_age_based_cleanup(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test age-based cleanup of old snapshots."""
         # Create old snapshots
         old_snapshots = []
         current_time = time.time()
 
         for i in range(5):
-            old_snapshots.append({
-                "snapshot_id": f"old_{i}",
-                "timestamp": current_time - (168 * 3600) - i,  # Older than 1 week
-                "checkpoint_type": "automatic",
-                "agents_completed": [],
-                "agents_failed": [],
-                "current_phase": "test"
-            })
+            old_snapshots.append(
+                {
+                    "snapshot_id": f"old_{i}",
+                    "timestamp": current_time - (168 * 3600) - i,  # Older than 1 week
+                    "checkpoint_type": "automatic",
+                    "agents_completed": [],
+                    "agents_failed": [],
+                    "current_phase": "test",
+                }
+            )
 
         # Add some recent snapshots to keep
         for i in range(3):
-            old_snapshots.append({
-                "snapshot_id": f"recent_{i}",
-                "timestamp": current_time - 3600 - i,  # 1 hour ago
-                "checkpoint_type": "manual",
-                "agents_completed": [],
-                "agents_failed": [],
-                "current_phase": "test"
-            })
+            old_snapshots.append(
+                {
+                    "snapshot_id": f"recent_{i}",
+                    "timestamp": current_time - 3600 - i,  # 1 hour ago
+                    "checkpoint_type": "manual",
+                    "agents_completed": [],
+                    "agents_failed": [],
+                    "current_phase": "test",
+                }
+            )
 
         mock_redis.get.return_value = json.dumps(old_snapshots)
 
@@ -585,6 +597,7 @@ class TestErrorHandlingAndResilience:
     @pytest.mark.asyncio
     async def test_cleanup_with_partial_failures(self, state_manager, mock_redis):
         """Test cleanup operations with partial failures."""
+
         # Mock partial failures in cleanup
         def mock_delete_side_effect(*args, **kwargs):
             # Simulate some deletes failing
@@ -599,7 +612,9 @@ class TestErrorHandlingAndResilience:
         assert mock_redis.pipeline.called
 
     @pytest.mark.asyncio
-    async def test_concurrent_access_handling(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_concurrent_access_handling(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test handling of concurrent access to workflow state."""
         # Mock lock acquisition failure
         mock_redis.set.return_value = False  # Lock acquisition fails
@@ -616,6 +631,7 @@ class TestErrorHandlingAndResilience:
 
                 async def __aenter__(self):
                     import asyncio
+
                     # Try to acquire lock with timeout
                     for _ in range(self.timeout):
                         if await self.redis_client.set(self.lock_key, "locked", ex=60, nx=True):
@@ -647,7 +663,9 @@ class TestBackwardCompatibility:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_legacy_restore_state_method(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_legacy_restore_state_method(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test backward compatibility of restore_state method."""
         # Mock restoration data
         mock_redis.get.return_value = json.dumps(sample_workflow_state)
@@ -657,7 +675,9 @@ class TestBackwardCompatibility:
         assert restored_state == sample_workflow_state
 
     @pytest.mark.asyncio
-    async def test_legacy_workflow_progress_method(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_legacy_workflow_progress_method(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test backward compatibility of get_workflow_progress method."""
         state_manager.current_state = sample_workflow_state
 
@@ -691,7 +711,7 @@ class TestPerformanceOptimizations:
             "datetime": datetime.now(),
             "workflow_status": WorkflowStatus.RUNNING,
             "checkpoint_type": CheckpointType.MANUAL,
-            "regular_string": "test"
+            "regular_string": "test",
         }
 
         serialized = state_manager._json_serializer(test_data["datetime"])
@@ -701,20 +721,24 @@ class TestPerformanceOptimizations:
         assert serialized == "running"
 
     @pytest.mark.asyncio
-    async def test_memory_efficient_snapshot_storage(self, state_manager, sample_workflow_state, mock_redis):
+    async def test_memory_efficient_snapshot_storage(
+        self, state_manager, sample_workflow_state, mock_redis
+    ):
         """Test memory-efficient snapshot storage with size limits."""
         # Create many snapshots to test size limits
         mock_large_snapshots = []
         for i in range(100):  # Exceed cleanup threshold
-            mock_large_snapshots.append({
-                "snapshot_id": f"snapshot_{i}",
-                "timestamp": time.time() + i,
-                "checkpoint_type": "automatic",
-                "agents_completed": [],
-                "agents_failed": [],
-                "current_phase": "test",
-                "state_data": sample_workflow_state
-            })
+            mock_large_snapshots.append(
+                {
+                    "snapshot_id": f"snapshot_{i}",
+                    "timestamp": time.time() + i,
+                    "checkpoint_type": "automatic",
+                    "agents_completed": [],
+                    "agents_failed": [],
+                    "current_phase": "test",
+                    "state_data": sample_workflow_state,
+                }
+            )
 
         mock_redis.get.return_value = json.dumps(mock_large_snapshots)
 

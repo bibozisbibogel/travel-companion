@@ -608,16 +608,10 @@ class TestItineraryAgent:
     async def test_agent_coordination_with_timeouts(self, itinerary_agent, sample_trip_request):
         """Test agent coordination handles timeouts gracefully."""
         # Mock agents to raise timeout
-        itinerary_agent.flight_agent.process = AsyncMock(
-            side_effect=TimeoutError("Timeout")
-        )
+        itinerary_agent.flight_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
         itinerary_agent.hotel_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
-        itinerary_agent.activity_agent.process = AsyncMock(
-            side_effect=TimeoutError("Timeout")
-        )
-        itinerary_agent.weather_agent.process = AsyncMock(
-            side_effect=TimeoutError("Timeout")
-        )
+        itinerary_agent.activity_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
+        itinerary_agent.weather_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
         itinerary_agent.food_agent.process = AsyncMock(side_effect=TimeoutError("Timeout"))
 
         # Mock circuit breaker to allow calls

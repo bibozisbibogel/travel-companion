@@ -59,7 +59,7 @@ async def execute_workflow(request: WorkflowExecutionRequest) -> WorkflowExecuti
             result = await workflow.execute(
                 input_data=request.input_data,
                 user_id=request.user_id,
-                request_id=request.request_id
+                request_id=request.request_id,
             )
 
         execution_time_ms = (time.time() - start_time) * 1000
@@ -121,6 +121,7 @@ async def execute_workflow_async(
 
         # Generate workflow ID
         import uuid
+
         workflow_id = str(uuid.uuid4())
         request_id = request.request_id or str(uuid.uuid4())
 

@@ -221,7 +221,7 @@ class ErrorRecoveryManager:
         circuit_breaker = self.circuit_breakers.get(agent_name)
         retry_config = self.retry_configs.get(
             agent_name,
-            RetryConfig()  # Default config if not found
+            RetryConfig(),  # Default config if not found
         )
 
         last_exception: Exception | None = None
@@ -271,7 +271,7 @@ class ErrorRecoveryManager:
             raise CriticalAgentFailureError(
                 f"Critical service {agent_name} is temporarily unavailable",
                 agent_name=agent_name,
-                recovery_strategy="circuit_breaker_open"
+                recovery_strategy="circuit_breaker_open",
             )
 
         # Return fallback data for non-critical agents
@@ -288,7 +288,7 @@ class ErrorRecoveryManager:
                 f"Critical service {agent_name} is unavailable",
                 agent_name=agent_name,
                 recovery_strategy="all_retries_exhausted",
-                details={"last_error": str(exception) if exception else "Unknown error"}
+                details={"last_error": str(exception) if exception else "Unknown error"},
             )
 
         # Return fallback data for non-critical agents
@@ -302,16 +302,14 @@ class ErrorRecoveryManager:
 
     def get_all_circuit_breaker_status(self) -> dict[str, dict[str, Any]]:
         """Get status of all circuit breakers."""
-        return {
-            agent_name: cb.get_status()
-            for agent_name, cb in self.circuit_breakers.items()
-        }
+        return {agent_name: cb.get_status() for agent_name, cb in self.circuit_breakers.items()}
 
     def reset_circuit_breaker(self, agent_name: str) -> bool:
         """Reset circuit breaker for an agent (for manual recovery)."""
         circuit_breaker = self.circuit_breakers.get(agent_name)
         if circuit_breaker:
             from travel_companion.utils.circuit_breaker import CircuitState
+
             circuit_breaker.failure_count = 0
             circuit_breaker.last_failure_time = None
             circuit_breaker.next_attempt_time = None
@@ -364,9 +362,7 @@ class WorkflowFallbackOrchestrator:
         self.error_recovery_manager = error_recovery_manager
 
     async def create_minimal_itinerary(
-        self,
-        trip_request: dict[str, Any],
-        successful_agents: dict[str, Any]
+        self, trip_request: dict[str, Any], successful_agents: dict[str, Any]
     ) -> dict[str, Any]:
         """
         Create a minimal itinerary with whatever data is available.
@@ -440,8 +436,7 @@ class WorkflowFallbackOrchestrator:
         tasks = []
         for agent_name, operation in agent_operations.items():
             task = asyncio.create_task(
-                self._execute_agent_with_fallback(agent_name, operation),
-                name=agent_name
+                self._execute_agent_with_fallback(agent_name, operation), name=agent_name
             )
             tasks.append(task)
 
@@ -462,17 +457,10 @@ class WorkflowFallbackOrchestrator:
 
         return await self.create_minimal_itinerary(trip_request, successful_agents)
 
-    async def _execute_agent_with_fallback(
-        self,
-        agent_name: str,
-        operation: Callable
-    ) -> Any:
+    async def _execute_agent_with_fallback(self, agent_name: str, operation: Callable) -> Any:
         """Execute agent operation with fallback handling."""
         try:
-            return await self.error_recovery_manager.execute_with_recovery(
-                agent_name,
-                operation
-            )
+            return await self.error_recovery_manager.execute_with_recovery(agent_name, operation)
         except Exception as e:
             logger.error(f"Agent {agent_name} failed completely: {e}")
             # Return fallback data even for critical agents in degraded mode
@@ -482,4 +470,3 @@ class WorkflowFallbackOrchestrator:
 # Singleton instances for global use
 error_recovery_manager = ErrorRecoveryManager()
 workflow_fallback_orchestrator = WorkflowFallbackOrchestrator(error_recovery_manager)
-

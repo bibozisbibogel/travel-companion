@@ -346,8 +346,7 @@ class BaseWorkflow(ABC):
                 from .state_manager import WorkflowStateManager
 
                 state_manager = WorkflowStateManager(
-                    workflow_id=state["workflow_id"],
-                    redis_ttl_hours=24
+                    workflow_id=state["workflow_id"], redis_ttl_hours=24
                 )
 
                 # Determine checkpoint type based on workflow status
@@ -373,7 +372,9 @@ class BaseWorkflow(ABC):
 
         except Exception as e:
             # Fallback to basic persistence
-            workflow_logger.warning(f"Enhanced state persistence error: {e}, falling back to basic persistence")
+            workflow_logger.warning(
+                f"Enhanced state persistence error: {e}, falling back to basic persistence"
+            )
             await self._basic_persist_state(state)
 
     async def _basic_persist_state(self, state: WorkflowState) -> None:
@@ -574,7 +575,9 @@ class TripPlanningWorkflow(BaseWorkflow):
         """
         return state
 
-    async def _coordinated_execution_node(self, state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
+    async def _coordinated_execution_node(
+        self, state: TripPlanningWorkflowState
+    ) -> TripPlanningWorkflowState:
         """
         Coordinated execution node that manages all agent execution with dependencies.
 
@@ -617,15 +620,13 @@ class TripPlanningWorkflow(BaseWorkflow):
         workflow_logger.log_parallel_execution_starting(
             workflow_id=state["workflow_id"],
             request_id=state["request_id"],
-            agent_count=len(agent_functions)
+            agent_count=len(agent_functions),
         )
 
         try:
             # Execute agents with parallel optimization
             updated_state = await parallel_optimizer.execute_agents_parallel(
-                state=state,
-                agent_functions=agent_functions,
-                dependencies=dependencies
+                state=state, agent_functions=agent_functions, dependencies=dependencies
             )
 
             # Log parallel execution completion
@@ -633,7 +634,7 @@ class TripPlanningWorkflow(BaseWorkflow):
             workflow_logger.log_parallel_execution_completed(
                 workflow_id=state["workflow_id"],
                 request_id=state["request_id"],
-                execution_metrics=execution_metrics
+                execution_metrics=execution_metrics,
             )
 
             return updated_state
@@ -643,7 +644,7 @@ class TripPlanningWorkflow(BaseWorkflow):
                 workflow_id=state["workflow_id"],
                 request_id=state["request_id"],
                 error=str(e),
-                partial_metrics={}
+                partial_metrics={},
             )
 
             # Set error state but allow error handler to process
@@ -661,7 +662,7 @@ class TripPlanningWorkflow(BaseWorkflow):
         workflow_logger.log_error_handling_started(
             workflow_id=state["workflow_id"],
             request_id=state["request_id"],
-            error=state.get("error", "Unknown error")
+            error=state.get("error", "Unknown error"),
         )
 
         # Create error response in output_data
@@ -676,7 +677,7 @@ class TripPlanningWorkflow(BaseWorkflow):
                 "food_recommendations": state.get("food_recommendations", []),
             },
             "execution_metrics": state.get("optimization_metrics", {}),
-            "coordination_metrics": state.get("coordination_metrics", {})
+            "coordination_metrics": state.get("coordination_metrics", {}),
         }
 
         state["output_data"] = error_response
@@ -699,11 +700,15 @@ class TripPlanningWorkflow(BaseWorkflow):
         return [
             # Use coordinator for intelligent routing
             ("initialize_trip", "coordinated_execution"),
-            ("coordinated_execution", route_based_on_preferences, {
-                "continue": "finalize_plan",
-                "retry": "coordinated_execution",
-                "abort": "error_handler"
-            }),
+            (
+                "coordinated_execution",
+                route_based_on_preferences,
+                {
+                    "continue": "finalize_plan",
+                    "retry": "coordinated_execution",
+                    "abort": "error_handler",
+                },
+            ),
         ]
 
     def get_entry_point(self) -> str:
@@ -745,11 +750,9 @@ class TripPlanningWorkflow(BaseWorkflow):
             "input_data": trip_request.model_dump(),
             "output_data": {},
             "intermediate_results": {},
-
             # Trip planning specific fields
             "trip_request": trip_request,
             "trip_id": None,
-
             # Agent tracking
             "agents_completed": [],
             "agents_failed": [],
@@ -757,7 +760,6 @@ class TripPlanningWorkflow(BaseWorkflow):
                 "activity_agent": ["weather_agent"],  # Activities depend on weather
                 "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
             },
-
             # Agent results (initialized empty)
             "flight_results": [],
             "hotel_results": [],
@@ -765,7 +767,6 @@ class TripPlanningWorkflow(BaseWorkflow):
             "weather_data": {},
             "food_recommendations": [],
             "itinerary_data": {},
-
             # Workflow context
             "user_preferences": trip_request.preferences or {},
             "budget_tracking": {"allocated": float(trip_request.requirements.budget), "spent": 0.0},

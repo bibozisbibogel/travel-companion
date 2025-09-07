@@ -80,8 +80,7 @@ async def generate_trip_plan(
         )
 
         return SuccessResponse[TripResponse](
-            data=trip_response,
-            message="Trip plan generated successfully"
+            data=trip_response, message="Trip plan generated successfully"
         )
 
     except TimeoutError as e:

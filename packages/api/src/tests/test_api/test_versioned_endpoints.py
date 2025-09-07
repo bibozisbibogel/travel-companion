@@ -103,26 +103,24 @@ class TestAPIVersioningIntegration:
             "user_id": "test-user-123",
             "request_id": "test-request-456",
             "input_data": {
-                "destination": {
-                    "city": "Paris",
-                    "country": "France"
-                },
+                "destination": {"city": "Paris", "country": "France"},
                 "requirements": {
                     "start_date": "2024-06-01",
                     "end_date": "2024-06-07",
-                    "budget": 2000
+                    "budget": 2000,
                 },
-                "preferences": {"activity_types": ["cultural", "food"], "accommodation_type": "hotel"}
-            }
+                "preferences": {
+                    "activity_types": ["cultural", "food"],
+                    "accommodation_type": "hotel",
+                },
+            },
         }
 
-        with patch(
-            "travel_companion.workflows.orchestrator.TripPlanningWorkflow"
-        ) as mock_workflow:
+        with patch("travel_companion.workflows.orchestrator.TripPlanningWorkflow") as mock_workflow:
             mock_workflow_instance = AsyncMock()
             mock_workflow_instance.execute_trip_planning.return_value = {
                 "trip_id": "test-trip-789",
-                "status": "completed"
+                "status": "completed",
             }
             mock_workflow.return_value = mock_workflow_instance
 

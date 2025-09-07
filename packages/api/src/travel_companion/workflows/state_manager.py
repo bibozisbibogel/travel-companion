@@ -14,6 +14,7 @@ from .orchestrator import TripPlanningWorkflowState
 
 class WorkflowStatus(Enum):
     """Workflow status enumeration."""
+
     INITIALIZED = "initialized"
     RUNNING = "running"
     SUSPENDED = "suspended"
@@ -25,6 +26,7 @@ class WorkflowStatus(Enum):
 
 class CheckpointType(Enum):
     """Checkpoint type enumeration."""
+
     AUTOMATIC = "automatic"
     MANUAL = "manual"
     ERROR = "error"
@@ -91,7 +93,7 @@ class EnhancedWorkflowStateManager:
         self,
         workflow_id: str,
         config: WorkflowPersistenceConfig | None = None,
-        enable_heartbeat: bool = True
+        enable_heartbeat: bool = True,
     ):
         """
         Initialize enhanced state manager.
@@ -126,7 +128,7 @@ class EnhancedWorkflowStateManager:
     async def initialize_workflow(
         self,
         initial_state: TripPlanningWorkflowState,
-        estimated_duration_minutes: int | None = None
+        estimated_duration_minutes: int | None = None,
     ) -> bool:
         """
         Initialize workflow with enhanced tracking and TTL management.
@@ -160,7 +162,7 @@ class EnhancedWorkflowStateManager:
                     "ttl_seconds": ttl,
                     "checkpoint_count": 0,
                     "progress_percentage": 0.0,
-                    "heartbeat_enabled": self.enable_heartbeat
+                    "heartbeat_enabled": self.enable_heartbeat,
                 }
 
                 await self._persist_with_ttl(self.metadata_key, metadata, ttl)
@@ -177,24 +179,21 @@ class EnhancedWorkflowStateManager:
 
                 # Create initial checkpoint
                 await self._create_enhanced_checkpoint(
-                    initial_state,
-                    CheckpointType.AUTOMATIC,
-                    "Workflow initialized"
+                    initial_state, CheckpointType.AUTOMATIC, "Workflow initialized"
                 )
 
                 workflow_logger.log_workflow_initialized(
                     workflow_id=self.workflow_id,
                     request_id=initial_state.get("request_id", "unknown"),
                     ttl_seconds=ttl,
-                    estimated_duration_minutes=estimated_duration_minutes
+                    estimated_duration_minutes=estimated_duration_minutes,
                 )
 
                 return True
 
         except Exception as e:
             workflow_logger.log_workflow_initialization_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
+                workflow_id=self.workflow_id, error=str(e)
             )
             return False
 
@@ -202,7 +201,7 @@ class EnhancedWorkflowStateManager:
         self,
         state: TripPlanningWorkflowState,
         checkpoint_type: CheckpointType = CheckpointType.AUTOMATIC,
-        progress_description: str | None = None
+        progress_description: str | None = None,
     ) -> bool:
         """
         Enhanced state persistence with progress tracking and dynamic TTL.
@@ -237,12 +236,15 @@ class EnhancedWorkflowStateManager:
 
                 # Create checkpoint if needed
                 should_checkpoint = (
-                    checkpoint_type != CheckpointType.AUTOMATIC or
-                    time.time() - self.last_checkpoint_time > self.config.automatic_checkpoint_interval
+                    checkpoint_type != CheckpointType.AUTOMATIC
+                    or time.time() - self.last_checkpoint_time
+                    > self.config.automatic_checkpoint_interval
                 )
 
                 if should_checkpoint:
-                    await self._create_enhanced_checkpoint(state, checkpoint_type, progress_description)
+                    await self._create_enhanced_checkpoint(
+                        state, checkpoint_type, progress_description
+                    )
                     self.last_checkpoint_time = time.time()
 
                 # Update metadata
@@ -260,7 +262,7 @@ class EnhancedWorkflowStateManager:
                     persistence_time_ms=persistence_time_ms,
                     checkpoint_type=checkpoint_type.value,
                     state_size_bytes=len(json.dumps(state, default=self._json_serializer)),
-                    progress_description=progress_description
+                    progress_description=progress_description,
                 )
 
                 return True
@@ -270,14 +272,12 @@ class EnhancedWorkflowStateManager:
                 workflow_id=self.workflow_id,
                 request_id=state.get("request_id", "unknown") if state else "unknown",
                 error=str(e),
-                checkpoint_type=checkpoint_type.value
+                checkpoint_type=checkpoint_type.value,
             )
             return False
 
     async def restore_workflow_state(
-        self,
-        snapshot_id: str | None = None,
-        include_progress: bool = True
+        self, snapshot_id: str | None = None, include_progress: bool = True
     ) -> dict[str, Any] | None:
         """
         Enhanced state restoration with progress information.
@@ -304,7 +304,7 @@ class EnhancedWorkflowStateManager:
                 restored_data = {
                     "state": json.loads(state_data),
                     "snapshot_id": "current",
-                    "restoration_type": "current_state"
+                    "restoration_type": "current_state",
                 }
 
             if not restored_data:
@@ -318,7 +318,7 @@ class EnhancedWorkflowStateManager:
                 "state": restored_data["state"],
                 "snapshot_id": restored_data.get("snapshot_id"),
                 "restoration_type": restored_data.get("restoration_type", "snapshot"),
-                "restoration_time_ms": (time.time() - start_time) * 1000
+                "restoration_time_ms": (time.time() - start_time) * 1000,
             }
 
             if include_progress:
@@ -333,16 +333,14 @@ class EnhancedWorkflowStateManager:
                 request_id=restored_data["state"].get("request_id", "unknown"),
                 restoration_time_ms=result["restoration_time_ms"],
                 snapshot_id=snapshot_id,
-                include_progress=include_progress
+                include_progress=include_progress,
             )
 
             return result
 
         except Exception as e:
             workflow_logger.log_snapshot_restoration_error(
-                workflow_id=self.workflow_id,
-                error=str(e),
-                snapshot_id=snapshot_id or "current"
+                workflow_id=self.workflow_id, error=str(e), snapshot_id=snapshot_id or "current"
             )
             return None
 
@@ -366,9 +364,7 @@ class EnhancedWorkflowStateManager:
 
                 # Create suspension checkpoint
                 await self._create_enhanced_checkpoint(
-                    self.current_state,
-                    CheckpointType.SUSPENSION,
-                    f"Workflow suspended: {reason}"
+                    self.current_state, CheckpointType.SUSPENSION, f"Workflow suspended: {reason}"
                 )
 
                 # Extend TTL for suspended workflow
@@ -387,16 +383,14 @@ class EnhancedWorkflowStateManager:
                     workflow_id=self.workflow_id,
                     request_id=self.current_state.get("request_id", "unknown"),
                     reason=reason,
-                    suspended_ttl=suspended_ttl
+                    suspended_ttl=suspended_ttl,
                 )
 
                 return True
 
         except Exception as e:
             workflow_logger.log_workflow_suspension_error(
-                workflow_id=self.workflow_id,
-                error=str(e),
-                reason=reason
+                workflow_id=self.workflow_id, error=str(e), reason=reason
             )
             return False
 
@@ -434,30 +428,26 @@ class EnhancedWorkflowStateManager:
                 await self._create_enhanced_checkpoint(
                     self.current_state,
                     CheckpointType.AUTOMATIC,
-                    f"Workflow resumed from {snapshot_id or 'current state'}"
+                    f"Workflow resumed from {snapshot_id or 'current state'}",
                 )
 
                 workflow_logger.log_workflow_resumed(
                     workflow_id=self.workflow_id,
                     request_id=self.current_state.get("request_id", "unknown"),
                     snapshot_id=snapshot_id,
-                    active_ttl=active_ttl
+                    active_ttl=active_ttl,
                 )
 
                 return restored_data
 
         except Exception as e:
             workflow_logger.log_workflow_resume_error(
-                workflow_id=self.workflow_id,
-                error=str(e),
-                snapshot_id=snapshot_id
+                workflow_id=self.workflow_id, error=str(e), snapshot_id=snapshot_id
             )
             return None
 
     async def complete_workflow(
-        self,
-        final_state: TripPlanningWorkflowState,
-        completion_summary: str | None = None
+        self, final_state: TripPlanningWorkflowState, completion_summary: str | None = None
     ) -> bool:
         """
         Complete workflow with final state persistence and TTL adjustment.
@@ -482,7 +472,7 @@ class EnhancedWorkflowStateManager:
                 await self._create_enhanced_checkpoint(
                     final_state,
                     CheckpointType.COMPLETION,
-                    completion_summary or "Workflow completed successfully"
+                    completion_summary or "Workflow completed successfully",
                 )
 
                 # Update final metadata
@@ -502,16 +492,14 @@ class EnhancedWorkflowStateManager:
                     workflow_id=self.workflow_id,
                     request_id=final_state.get("request_id", "unknown"),
                     completion_summary=completion_summary,
-                    completed_ttl=completed_ttl
+                    completed_ttl=completed_ttl,
                 )
 
                 return True
 
         except Exception as e:
             workflow_logger.log_workflow_completion_error(
-                workflow_id=self.workflow_id,
-                error=str(e),
-                completion_summary=completion_summary
+                workflow_id=self.workflow_id, error=str(e), completion_summary=completion_summary
             )
             return False
 
@@ -545,7 +533,9 @@ class EnhancedWorkflowStateManager:
                 completed_agents = len(self.current_state.get("agents_completed", []))
                 failed_agents = len(self.current_state.get("agents_failed", []))
 
-                progress_percentage = (completed_agents / total_agents * 100) if total_agents > 0 else 0
+                progress_percentage = (
+                    (completed_agents / total_agents * 100) if total_agents > 0 else 0
+                )
 
                 # Estimate completion time
                 estimated_completion = self._estimate_enhanced_completion_time(
@@ -567,21 +557,17 @@ class EnhancedWorkflowStateManager:
                     "checkpoint_count": metadata.get("checkpoint_count", 0),
                     "ttl_remaining": await self._get_current_ttl(),
                     "detailed_progress": progress,
-                    "performance_metrics": await self._calculate_performance_metrics()
+                    "performance_metrics": await self._calculate_performance_metrics(),
                 }
 
             return {
                 "workflow_id": self.workflow_id,
                 "status": "not_found",
-                "error": "No current state available"
+                "error": "No current state available",
             }
 
         except Exception as e:
-            return {
-                "workflow_id": self.workflow_id,
-                "status": "error",
-                "error": str(e)
-            }
+            return {"workflow_id": self.workflow_id, "status": "error", "error": str(e)}
 
     async def cleanup_old_snapshots(self, max_age_hours: int = 168) -> int:
         """
@@ -611,7 +597,8 @@ class EnhancedWorkflowStateManager:
 
             # Filter remaining by age
             valid_snapshots = recent_snapshots + [
-                snapshot for snapshot in remaining_snapshots
+                snapshot
+                for snapshot in remaining_snapshots
                 if current_time - snapshot["timestamp"] < max_age_seconds
             ]
 
@@ -622,22 +609,19 @@ class EnhancedWorkflowStateManager:
                 await self.redis_client.setex(
                     self.snapshots_key,
                     self._calculate_ttl(self.workflow_status),
-                    json.dumps(valid_snapshots, default=self._json_serializer)
+                    json.dumps(valid_snapshots, default=self._json_serializer),
                 )
 
                 workflow_logger.log_snapshots_cleaned(
                     workflow_id=self.workflow_id,
                     cleaned_count=cleaned_count,
-                    remaining_count=len(valid_snapshots)
+                    remaining_count=len(valid_snapshots),
                 )
 
             return cleaned_count
 
         except Exception as e:
-            workflow_logger.log_snapshot_cleanup_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_snapshot_cleanup_error(workflow_id=self.workflow_id, error=str(e))
             return 0
 
     async def cleanup_expired_workflows(self, max_workflows: int = 100) -> dict[str, Any]:
@@ -666,7 +650,7 @@ class EnhancedWorkflowStateManager:
                 "completed_workflows_cleaned": 0,
                 "failed_cleanups": 0,
                 "cleanup_time_seconds": 0,
-                "errors": []
+                "errors": [],
             }
 
             processed_count = 0
@@ -704,7 +688,7 @@ class EnhancedWorkflowStateManager:
                 expired_cleaned=cleanup_summary["expired_workflows_cleaned"],
                 completed_cleaned=cleanup_summary["completed_workflows_cleaned"],
                 failed_cleanups=cleanup_summary["failed_cleanups"],
-                cleanup_time=cleanup_summary["cleanup_time_seconds"]
+                cleanup_time=cleanup_summary["cleanup_time_seconds"],
             )
 
             return cleanup_summary
@@ -718,14 +702,14 @@ class EnhancedWorkflowStateManager:
                 "completed_workflows_cleaned": 0,
                 "failed_cleanups": 1,
                 "cleanup_time_seconds": 0,
-                "errors": [error_msg]
+                "errors": [error_msg],
             }
 
     async def _create_enhanced_checkpoint(
         self,
         state: TripPlanningWorkflowState,
         checkpoint_type: CheckpointType,
-        description: str = ""
+        description: str = "",
     ) -> str:
         """Create an enhanced checkpoint with comprehensive metadata."""
         snapshot_id = f"{checkpoint_type.value}_{int(time.time())}"
@@ -739,7 +723,7 @@ class EnhancedWorkflowStateManager:
             agents_completed=state.get("agents_completed", []),
             agents_failed=state.get("agents_failed", []),
             current_phase=state.get("current_node", "unknown"),
-            description=description
+            description=description,
         )
 
         await self._store_enhanced_snapshot(snapshot)
@@ -749,7 +733,7 @@ class EnhancedWorkflowStateManager:
             request_id=state.get("request_id", "unknown"),
             snapshot_id=snapshot_id,
             checkpoint_type=checkpoint_type.value,
-            description=description
+            description=description,
         )
 
         return snapshot_id
@@ -768,7 +752,7 @@ class EnhancedWorkflowStateManager:
                 "agents_failed": snapshot.agents_failed,
                 "current_phase": snapshot.current_phase,
                 "state_data": snapshot.state_data,
-                "description": snapshot.description or ""
+                "description": snapshot.description or "",
             }
 
             snapshots.append(snapshot_dict)
@@ -777,32 +761,32 @@ class EnhancedWorkflowStateManager:
             if len(snapshots) > self.config.max_snapshots_per_workflow:
                 # Keep important snapshots (manual, completion, error) and most recent
                 important_snapshots = [
-                    s for s in snapshots
+                    s
+                    for s in snapshots
                     if s["checkpoint_type"] in ["manual", "completion", "error"]
                 ]
 
                 recent_snapshots = sorted(snapshots, key=lambda x: x["timestamp"], reverse=True)
-                recent_snapshots = recent_snapshots[:self.config.max_snapshots_per_workflow // 2]
+                recent_snapshots = recent_snapshots[: self.config.max_snapshots_per_workflow // 2]
 
                 # Combine and deduplicate
                 combined_snapshots = important_snapshots + [
-                    s for s in recent_snapshots
-                    if s not in important_snapshots
+                    s for s in recent_snapshots if s not in important_snapshots
                 ]
 
-                snapshots = combined_snapshots[-self.config.max_snapshots_per_workflow:]
+                snapshots = combined_snapshots[-self.config.max_snapshots_per_workflow :]
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.snapshots_key, snapshots, ttl)
 
         except Exception as e:
             workflow_logger.log_snapshot_storage_error(
-                workflow_id=self.workflow_id,
-                snapshot_id=snapshot.snapshot_id,
-                error=str(e)
+                workflow_id=self.workflow_id, snapshot_id=snapshot.snapshot_id, error=str(e)
             )
 
-    async def _restore_from_enhanced_snapshot(self, snapshot_id: str) -> TripPlanningWorkflowState | None:
+    async def _restore_from_enhanced_snapshot(
+        self, snapshot_id: str
+    ) -> TripPlanningWorkflowState | None:
         """Restore state from a specific snapshot."""
         try:
             snapshots_data = await self.redis_client.get(self.snapshots_key)
@@ -821,13 +805,13 @@ class EnhancedWorkflowStateManager:
 
         except Exception as e:
             workflow_logger.log_snapshot_restoration_error(
-                workflow_id=self.workflow_id,
-                snapshot_id=snapshot_id,
-                error=str(e)
+                workflow_id=self.workflow_id, snapshot_id=snapshot_id, error=str(e)
             )
             return None
 
-    async def _update_enhanced_metadata(self, state: TripPlanningWorkflowState, checkpoint_type: CheckpointType) -> None:
+    async def _update_enhanced_metadata(
+        self, state: TripPlanningWorkflowState, checkpoint_type: CheckpointType
+    ) -> None:
         """Update workflow metadata."""
         metadata = {
             "workflow_id": self.workflow_id,
@@ -842,11 +826,12 @@ class EnhancedWorkflowStateManager:
         await self.redis_client.setex(
             self.metadata_key,
             self._calculate_ttl(self.workflow_status),
-            json.dumps(metadata, default=self._json_serializer)
+            json.dumps(metadata, default=self._json_serializer),
         )
 
     def _workflow_lock(self):
         """Enhanced context manager for workflow-level locking with timeout."""
+
         class WorkflowLock:
             def __init__(self, redis_client, lock_key, timeout=30):
                 self.redis_client = redis_client
@@ -856,6 +841,7 @@ class EnhancedWorkflowStateManager:
 
             async def __aenter__(self):
                 import asyncio
+
                 # Try to acquire lock with timeout
                 for _ in range(self.timeout):
                     if await self.redis_client.set(self.lock_key, "locked", ex=60, nx=True):
@@ -879,9 +865,9 @@ class EnhancedWorkflowStateManager:
             return obj.value
         elif isinstance(obj, CheckpointType):
             return obj.value
-        elif hasattr(obj, 'model_dump'):
+        elif hasattr(obj, "model_dump"):
             return obj.model_dump()
-        elif hasattr(obj, '__dict__'):
+        elif hasattr(obj, "__dict__"):
             return obj.__dict__
         return str(obj)
 
@@ -917,7 +903,7 @@ class EnhancedWorkflowStateManager:
             "average_step_time": progress.get("average_step_time", 0),
             "fastest_step_time": progress.get("fastest_step_time", 0),
             "slowest_step_time": progress.get("slowest_step_time", 0),
-            "total_processing_time": progress.get("total_processing_time", 0)
+            "total_processing_time": progress.get("total_processing_time", 0),
         }
 
         return metrics
@@ -932,21 +918,21 @@ class EnhancedWorkflowStateManager:
             completed_agents = len(self.current_state.get("agents_completed", []))
 
             # Update progress
-            progress.update({
-                "last_update": current_time,
-                "completed_steps": completed_agents,
-                "current_step": self.current_state.get("current_node", "unknown"),
-                "progress_percentage": (completed_agents / progress.get("total_steps", 1)) * 100
-            })
+            progress.update(
+                {
+                    "last_update": current_time,
+                    "completed_steps": completed_agents,
+                    "current_step": self.current_state.get("current_node", "unknown"),
+                    "progress_percentage": (completed_agents / progress.get("total_steps", 1))
+                    * 100,
+                }
+            )
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.progress_key, progress, ttl)
 
         except Exception as e:
-            workflow_logger.log_progress_update_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_progress_update_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _start_heartbeat(self) -> None:
         """Start heartbeat tracking for long-running workflows."""
@@ -955,7 +941,7 @@ class EnhancedWorkflowStateManager:
             "started_at": time.time(),
             "last_heartbeat": time.time(),
             "heartbeat_count": 0,
-            "status": "active"
+            "status": "active",
         }
 
         ttl = self._calculate_ttl(self.workflow_status)
@@ -970,11 +956,13 @@ class EnhancedWorkflowStateManager:
             heartbeat_data = await self.redis_client.get(self.heartbeat_key)
             heartbeat = json.loads(heartbeat_data) if heartbeat_data else {}
 
-            heartbeat.update({
-                "last_heartbeat": time.time(),
-                "heartbeat_count": heartbeat.get("heartbeat_count", 0) + 1,
-                "status": "active"
-            })
+            heartbeat.update(
+                {
+                    "last_heartbeat": time.time(),
+                    "heartbeat_count": heartbeat.get("heartbeat_count", 0) + 1,
+                    "status": "active",
+                }
+            )
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.heartbeat_key, heartbeat, ttl)
@@ -982,10 +970,7 @@ class EnhancedWorkflowStateManager:
             self.last_heartbeat = time.time()
 
         except Exception as e:
-            workflow_logger.log_heartbeat_update_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_heartbeat_update_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _stop_heartbeat(self) -> None:
         """Stop heartbeat for completed/suspended workflows."""
@@ -993,19 +978,13 @@ class EnhancedWorkflowStateManager:
             heartbeat_data = await self.redis_client.get(self.heartbeat_key)
             heartbeat = json.loads(heartbeat_data) if heartbeat_data else {}
 
-            heartbeat.update({
-                "stopped_at": time.time(),
-                "status": "stopped"
-            })
+            heartbeat.update({"stopped_at": time.time(), "status": "stopped"})
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.heartbeat_key, heartbeat, ttl)
 
         except Exception as e:
-            workflow_logger.log_heartbeat_stop_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_heartbeat_stop_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _add_to_workflow_index(self) -> None:
         """Add workflow to global index for tracking."""
@@ -1016,16 +995,13 @@ class EnhancedWorkflowStateManager:
             workflow_index[self.workflow_id] = {
                 "created_at": time.time(),
                 "status": self.workflow_status.value,
-                "last_update": time.time()
+                "last_update": time.time(),
             }
 
             await self.redis_client.set(self.index_key, json.dumps(workflow_index))
 
         except Exception as e:
-            workflow_logger.log_workflow_index_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_workflow_index_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _initialize_progress_tracking(self, state: TripPlanningWorkflowState) -> None:
         """Initialize progress tracking for the workflow."""
@@ -1040,17 +1016,15 @@ class EnhancedWorkflowStateManager:
                 "average_step_time": 0,
                 "fastest_step_time": 0,
                 "slowest_step_time": 0,
-                "total_processing_time": 0
-            }
+                "total_processing_time": 0,
+            },
         }
 
         ttl = self._calculate_ttl(self.workflow_status)
         await self._persist_with_ttl(self.progress_key, progress_data, ttl)
 
     async def _update_progress_tracking(
-        self,
-        state: TripPlanningWorkflowState,
-        description: str | None = None
+        self, state: TripPlanningWorkflowState, description: str | None = None
     ) -> None:
         """Update progress tracking information."""
         if time.time() - self.last_progress_update < self.config.progress_update_interval:
@@ -1064,19 +1038,24 @@ class EnhancedWorkflowStateManager:
             completed_agents = len(state.get("agents_completed", []))
 
             # Update progress
-            progress.update({
-                "last_update": current_time,
-                "completed_steps": completed_agents,
-                "current_step": state.get("current_node", "unknown"),
-                "progress_percentage": (completed_agents / progress.get("total_steps", 1)) * 100
-            })
+            progress.update(
+                {
+                    "last_update": current_time,
+                    "completed_steps": completed_agents,
+                    "current_step": state.get("current_node", "unknown"),
+                    "progress_percentage": (completed_agents / progress.get("total_steps", 1))
+                    * 100,
+                }
+            )
 
             if description:
-                progress["step_history"].append({
-                    "timestamp": current_time,
-                    "step": state.get("current_node", "unknown"),
-                    "description": description
-                })
+                progress["step_history"].append(
+                    {
+                        "timestamp": current_time,
+                        "step": state.get("current_node", "unknown"),
+                        "description": description,
+                    }
+                )
 
                 # Keep only recent history
                 progress["step_history"] = progress["step_history"][-20:]
@@ -1087,12 +1066,11 @@ class EnhancedWorkflowStateManager:
             self.last_progress_update = current_time
 
         except Exception as e:
-            workflow_logger.log_progress_update_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_progress_update_error(workflow_id=self.workflow_id, error=str(e))
 
-    async def _create_snapshot(self, state: TripPlanningWorkflowState, checkpoint_type: str) -> None:
+    async def _create_snapshot(
+        self, state: TripPlanningWorkflowState, checkpoint_type: str
+    ) -> None:
         """Create a state snapshot."""
         snapshot_id = f"{checkpoint_type}_{int(time.time())}"
 
@@ -1104,7 +1082,7 @@ class EnhancedWorkflowStateManager:
             checkpoint_type=checkpoint_type,
             agents_completed=state.get("agents_completed", []),
             agents_failed=state.get("agents_failed", []),
-            current_phase=state.get("current_node", "unknown")
+            current_phase=state.get("current_node", "unknown"),
         )
 
         await self._store_snapshot(snapshot)
@@ -1125,7 +1103,7 @@ class EnhancedWorkflowStateManager:
                 "agents_failed": snapshot.agents_failed,
                 "current_phase": snapshot.current_phase,
                 "state_data": snapshot.state_data,
-                "description": description
+                "description": description,
             }
 
             snapshots.append(snapshot_dict)
@@ -1138,14 +1116,12 @@ class EnhancedWorkflowStateManager:
             await self.redis_client.setex(
                 self.snapshots_key,
                 self._calculate_ttl(self.workflow_status),
-                json.dumps(snapshots, default=self._json_serializer)
+                json.dumps(snapshots, default=self._json_serializer),
             )
 
         except Exception as e:
             workflow_logger.log_snapshot_storage_error(
-                workflow_id=self.workflow_id,
-                snapshot_id=snapshot.snapshot_id,
-                error=str(e)
+                workflow_id=self.workflow_id, snapshot_id=snapshot.snapshot_id, error=str(e)
             )
 
     async def _restore_from_snapshot(self, snapshot_id: str) -> TripPlanningWorkflowState | None:
@@ -1167,13 +1143,13 @@ class EnhancedWorkflowStateManager:
 
         except Exception as e:
             workflow_logger.log_snapshot_restoration_error(
-                workflow_id=self.workflow_id,
-                snapshot_id=snapshot_id,
-                error=str(e)
+                workflow_id=self.workflow_id, snapshot_id=snapshot_id, error=str(e)
             )
             return None
 
-    async def _update_metadata(self, state: TripPlanningWorkflowState, checkpoint_type: str) -> None:
+    async def _update_metadata(
+        self, state: TripPlanningWorkflowState, checkpoint_type: str
+    ) -> None:
         """Update workflow metadata."""
         metadata = {
             "workflow_id": self.workflow_id,
@@ -1188,13 +1164,11 @@ class EnhancedWorkflowStateManager:
         await self.redis_client.setex(
             self.metadata_key,
             self._calculate_ttl(self.workflow_status),
-            json.dumps(metadata, default=self._json_serializer)
+            json.dumps(metadata, default=self._json_serializer),
         )
 
     def _calculate_ttl(
-        self,
-        status: WorkflowStatus,
-        estimated_duration_minutes: int | None = None
+        self, status: WorkflowStatus, estimated_duration_minutes: int | None = None
     ) -> int:
         """Calculate appropriate TTL based on workflow status and duration."""
         if status == WorkflowStatus.RUNNING:
@@ -1202,7 +1176,7 @@ class EnhancedWorkflowStateManager:
             if estimated_duration_minutes:
                 return max(
                     estimated_duration_minutes * 60 * 2,  # 2x estimated duration
-                    self.config.active_workflow_ttl
+                    self.config.active_workflow_ttl,
                 )
             return self.config.active_workflow_ttl
 
@@ -1236,16 +1210,13 @@ class EnhancedWorkflowStateManager:
             workflow_index[self.workflow_id] = {
                 "created_at": time.time(),
                 "status": self.workflow_status.value,
-                "last_update": time.time()
+                "last_update": time.time(),
             }
 
             await self.redis_client.set(self.index_key, json.dumps(workflow_index))
 
         except Exception as e:
-            workflow_logger.log_workflow_index_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_workflow_index_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _initialize_progress_tracking(self, state: TripPlanningWorkflowState) -> None:
         """Initialize progress tracking for the workflow."""
@@ -1260,17 +1231,15 @@ class EnhancedWorkflowStateManager:
                 "average_step_time": 0,
                 "fastest_step_time": 0,
                 "slowest_step_time": 0,
-                "total_processing_time": 0
-            }
+                "total_processing_time": 0,
+            },
         }
 
         ttl = self._calculate_ttl(self.workflow_status)
         await self._persist_with_ttl(self.progress_key, progress_data, ttl)
 
     async def _update_progress_tracking(
-        self,
-        state: TripPlanningWorkflowState,
-        description: str | None = None
+        self, state: TripPlanningWorkflowState, description: str | None = None
     ) -> None:
         """Update progress tracking information."""
         if time.time() - self.last_progress_update < self.config.progress_update_interval:
@@ -1284,19 +1253,24 @@ class EnhancedWorkflowStateManager:
             completed_agents = len(state.get("agents_completed", []))
 
             # Update progress
-            progress.update({
-                "last_update": current_time,
-                "completed_steps": completed_agents,
-                "current_step": state.get("current_node", "unknown"),
-                "progress_percentage": (completed_agents / progress.get("total_steps", 1)) * 100
-            })
+            progress.update(
+                {
+                    "last_update": current_time,
+                    "completed_steps": completed_agents,
+                    "current_step": state.get("current_node", "unknown"),
+                    "progress_percentage": (completed_agents / progress.get("total_steps", 1))
+                    * 100,
+                }
+            )
 
             if description:
-                progress["step_history"].append({
-                    "timestamp": current_time,
-                    "step": state.get("current_node", "unknown"),
-                    "description": description
-                })
+                progress["step_history"].append(
+                    {
+                        "timestamp": current_time,
+                        "step": state.get("current_node", "unknown"),
+                        "description": description,
+                    }
+                )
 
                 # Keep only recent history
                 progress["step_history"] = progress["step_history"][-20:]
@@ -1307,10 +1281,7 @@ class EnhancedWorkflowStateManager:
             self.last_progress_update = current_time
 
         except Exception as e:
-            workflow_logger.log_progress_update_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_progress_update_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _start_heartbeat(self) -> None:
         """Start heartbeat tracking for long-running workflows."""
@@ -1319,7 +1290,7 @@ class EnhancedWorkflowStateManager:
             "started_at": time.time(),
             "last_heartbeat": time.time(),
             "heartbeat_count": 0,
-            "status": "active"
+            "status": "active",
         }
 
         ttl = self._calculate_ttl(self.workflow_status)
@@ -1334,11 +1305,13 @@ class EnhancedWorkflowStateManager:
             heartbeat_data = await self.redis_client.get(self.heartbeat_key)
             heartbeat = json.loads(heartbeat_data) if heartbeat_data else {}
 
-            heartbeat.update({
-                "last_heartbeat": time.time(),
-                "heartbeat_count": heartbeat.get("heartbeat_count", 0) + 1,
-                "status": "active"
-            })
+            heartbeat.update(
+                {
+                    "last_heartbeat": time.time(),
+                    "heartbeat_count": heartbeat.get("heartbeat_count", 0) + 1,
+                    "status": "active",
+                }
+            )
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.heartbeat_key, heartbeat, ttl)
@@ -1346,10 +1319,7 @@ class EnhancedWorkflowStateManager:
             self.last_heartbeat = time.time()
 
         except Exception as e:
-            workflow_logger.log_heartbeat_update_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_heartbeat_update_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _stop_heartbeat(self) -> None:
         """Stop heartbeat for completed/suspended workflows."""
@@ -1357,25 +1327,19 @@ class EnhancedWorkflowStateManager:
             heartbeat_data = await self.redis_client.get(self.heartbeat_key)
             heartbeat = json.loads(heartbeat_data) if heartbeat_data else {}
 
-            heartbeat.update({
-                "stopped_at": time.time(),
-                "status": "stopped"
-            })
+            heartbeat.update({"stopped_at": time.time(), "status": "stopped"})
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.heartbeat_key, heartbeat, ttl)
 
         except Exception as e:
-            workflow_logger.log_heartbeat_stop_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_heartbeat_stop_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _create_enhanced_checkpoint(
         self,
         state: TripPlanningWorkflowState,
         checkpoint_type: CheckpointType,
-        description: str = ""
+        description: str = "",
     ) -> str:
         """Create an enhanced checkpoint with comprehensive metadata."""
         snapshot_id = f"{checkpoint_type.value}_{int(time.time())}"
@@ -1389,7 +1353,7 @@ class EnhancedWorkflowStateManager:
             agents_completed=state.get("agents_completed", []),
             agents_failed=state.get("agents_failed", []),
             current_phase=state.get("current_node", "unknown"),
-            description=description
+            description=description,
         )
 
         await self._store_enhanced_snapshot(snapshot)
@@ -1399,7 +1363,7 @@ class EnhancedWorkflowStateManager:
             request_id=state.get("request_id", "unknown"),
             snapshot_id=snapshot_id,
             checkpoint_type=checkpoint_type.value,
-            description=description
+            description=description,
         )
 
         return snapshot_id
@@ -1418,7 +1382,7 @@ class EnhancedWorkflowStateManager:
                 "agents_failed": snapshot.agents_failed,
                 "current_phase": snapshot.current_phase,
                 "state_data": snapshot.state_data,
-                "description": snapshot.description or ""
+                "description": snapshot.description or "",
             }
 
             snapshots.append(snapshot_dict)
@@ -1427,32 +1391,32 @@ class EnhancedWorkflowStateManager:
             if len(snapshots) > self.config.max_snapshots_per_workflow:
                 # Keep important snapshots (manual, completion, error) and most recent
                 important_snapshots = [
-                    s for s in snapshots
+                    s
+                    for s in snapshots
                     if s["checkpoint_type"] in ["manual", "completion", "error"]
                 ]
 
                 recent_snapshots = sorted(snapshots, key=lambda x: x["timestamp"], reverse=True)
-                recent_snapshots = recent_snapshots[:self.config.max_snapshots_per_workflow // 2]
+                recent_snapshots = recent_snapshots[: self.config.max_snapshots_per_workflow // 2]
 
                 # Combine and deduplicate
                 combined_snapshots = important_snapshots + [
-                    s for s in recent_snapshots
-                    if s not in important_snapshots
+                    s for s in recent_snapshots if s not in important_snapshots
                 ]
 
-                snapshots = combined_snapshots[-self.config.max_snapshots_per_workflow:]
+                snapshots = combined_snapshots[-self.config.max_snapshots_per_workflow :]
 
             ttl = self._calculate_ttl(self.workflow_status)
             await self._persist_with_ttl(self.snapshots_key, snapshots, ttl)
 
         except Exception as e:
             workflow_logger.log_snapshot_storage_error(
-                workflow_id=self.workflow_id,
-                snapshot_id=snapshot.snapshot_id,
-                error=str(e)
+                workflow_id=self.workflow_id, snapshot_id=snapshot.snapshot_id, error=str(e)
             )
 
-    async def _restore_from_enhanced_snapshot(self, snapshot_id: str) -> TripPlanningWorkflowState | None:
+    async def _restore_from_enhanced_snapshot(
+        self, snapshot_id: str
+    ) -> TripPlanningWorkflowState | None:
         """Restore state from a specific snapshot."""
         try:
             snapshots_data = await self.redis_client.get(self.snapshots_key)
@@ -1471,13 +1435,13 @@ class EnhancedWorkflowStateManager:
 
         except Exception as e:
             workflow_logger.log_snapshot_restoration_error(
-                workflow_id=self.workflow_id,
-                snapshot_id=snapshot_id,
-                error=str(e)
+                workflow_id=self.workflow_id, snapshot_id=snapshot_id, error=str(e)
             )
             return None
 
-    async def _update_enhanced_metadata(self, state: TripPlanningWorkflowState, checkpoint_type: CheckpointType) -> None:
+    async def _update_enhanced_metadata(
+        self, state: TripPlanningWorkflowState, checkpoint_type: CheckpointType
+    ) -> None:
         """Update workflow metadata."""
         metadata = {
             "workflow_id": self.workflow_id,
@@ -1492,11 +1456,12 @@ class EnhancedWorkflowStateManager:
         await self.redis_client.setex(
             self.metadata_key,
             self._calculate_ttl(self.workflow_status),
-            json.dumps(metadata, default=self._json_serializer)
+            json.dumps(metadata, default=self._json_serializer),
         )
 
     def _workflow_lock(self):
         """Enhanced context manager for workflow-level locking with timeout."""
+
         class WorkflowLock:
             def __init__(self, redis_client, lock_key, timeout=30):
                 self.redis_client = redis_client
@@ -1506,6 +1471,7 @@ class EnhancedWorkflowStateManager:
 
             async def __aenter__(self):
                 import asyncio
+
                 # Try to acquire lock with timeout
                 for _ in range(self.timeout):
                     if await self.redis_client.set(self.lock_key, "locked", ex=60, nx=True):
@@ -1550,7 +1516,10 @@ class EnhancedWorkflowStateManager:
 
             elif status == WorkflowStatus.FAILED.value:
                 # Clean up failed workflows after shorter retention
-                if current_time - last_update > self.config.failed_workflow_ttl + self.config.expired_workflow_retention:
+                if (
+                    current_time - last_update
+                    > self.config.failed_workflow_ttl + self.config.expired_workflow_retention
+                ):
                     should_cleanup = True
                     cleanup_reason = "failed"
 
@@ -1572,10 +1541,7 @@ class EnhancedWorkflowStateManager:
             return {"cleaned": False, "reason": "active"}
 
         except Exception as e:
-            workflow_logger.log_single_workflow_cleanup_error(
-                workflow_id=workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_single_workflow_cleanup_error(workflow_id=workflow_id, error=str(e))
             return {"cleaned": False, "reason": f"error: {str(e)}"}
 
     async def _force_cleanup_workflow_keys(self, workflow_id: str) -> None:
@@ -1586,7 +1552,7 @@ class EnhancedWorkflowStateManager:
             f"workflow:snapshots:{workflow_id}",
             f"workflow:progress:{workflow_id}",
             f"workflow:heartbeat:{workflow_id}",
-            f"workflow:lock:{workflow_id}"
+            f"workflow:lock:{workflow_id}",
         ]
 
         # Delete all keys in pipeline for efficiency
@@ -1606,7 +1572,7 @@ class EnhancedWorkflowStateManager:
                 "workflow_id": self.workflow_id,
                 "scheduled_at": time.time(),
                 "cleanup_at": time.time() + cleanup_delay,
-                "cleanup_type": "post_completion"
+                "cleanup_type": "post_completion",
             }
 
             self._cleanup_tasks.add(self.workflow_id)
@@ -1614,14 +1580,11 @@ class EnhancedWorkflowStateManager:
             workflow_logger.log_cleanup_scheduled(
                 workflow_id=self.workflow_id,
                 cleanup_delay=cleanup_delay,
-                cleanup_type="post_completion"
+                cleanup_type="post_completion",
             )
 
         except Exception as e:
-            workflow_logger.log_cleanup_scheduling_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_cleanup_scheduling_error(workflow_id=self.workflow_id, error=str(e))
 
     async def _get_enhanced_progress_info(self) -> dict[str, Any]:
         """Get enhanced progress information."""
@@ -1636,10 +1599,7 @@ class EnhancedWorkflowStateManager:
             return progress
 
         except Exception as e:
-            workflow_logger.log_progress_retrieval_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_progress_retrieval_error(workflow_id=self.workflow_id, error=str(e))
             return {}
 
     async def _get_enhanced_metadata(self) -> dict[str, Any]:
@@ -1653,23 +1613,17 @@ class EnhancedWorkflowStateManager:
                 "heartbeat_enabled": self.enable_heartbeat,
                 "last_heartbeat": self.last_heartbeat,
                 "last_checkpoint": self.last_checkpoint_time,
-                "last_progress_update": self.last_progress_update
+                "last_progress_update": self.last_progress_update,
             }
 
             return metadata
 
         except Exception as e:
-            workflow_logger.log_metadata_retrieval_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_metadata_retrieval_error(workflow_id=self.workflow_id, error=str(e))
             return {}
 
     def _estimate_enhanced_completion_time(
-        self,
-        elapsed_time: float,
-        completed_agents: int,
-        total_agents: int
+        self, elapsed_time: float, completed_agents: int, total_agents: int
     ) -> float | None:
         """Enhanced completion time estimation with multiple factors."""
         if completed_agents == 0:
@@ -1700,13 +1654,11 @@ class EnhancedWorkflowStateManager:
 
     # Additional helper methods for backward compatibility
 
-    async def create_manual_checkpoint(self, state: TripPlanningWorkflowState, description: str = "") -> str:
+    async def create_manual_checkpoint(
+        self, state: TripPlanningWorkflowState, description: str = ""
+    ) -> str:
         """Create a manual checkpoint with description (backward compatibility)."""
-        return await self._create_enhanced_checkpoint(
-            state,
-            CheckpointType.MANUAL,
-            description
-        )
+        return await self._create_enhanced_checkpoint(state, CheckpointType.MANUAL, description)
 
     async def list_snapshots(self) -> list[dict[str, Any]]:
         """List all available snapshots for this workflow (backward compatibility)."""
@@ -1728,16 +1680,13 @@ class EnhancedWorkflowStateManager:
                     "agents_failed": snapshot["agents_failed"],
                     "current_phase": snapshot["current_phase"],
                     "age_seconds": time.time() - snapshot["timestamp"],
-                    "description": snapshot.get("description", "")
+                    "description": snapshot.get("description", ""),
                 }
                 for snapshot in snapshots
             ]
 
         except Exception as e:
-            workflow_logger.log_snapshot_listing_error(
-                workflow_id=self.workflow_id,
-                error=str(e)
-            )
+            workflow_logger.log_snapshot_listing_error(workflow_id=self.workflow_id, error=str(e))
             return []
 
     async def get_workflow_progress(self) -> dict[str, Any]:
@@ -1745,9 +1694,7 @@ class EnhancedWorkflowStateManager:
         return await self.get_comprehensive_progress()
 
     async def persist_state(
-        self,
-        state: TripPlanningWorkflowState,
-        checkpoint_type: str = "automatic"
+        self, state: TripPlanningWorkflowState, checkpoint_type: str = "automatic"
     ) -> bool:
         """Persist workflow state (backward compatibility)."""
         # Convert string checkpoint_type to enum
@@ -1761,7 +1708,9 @@ class EnhancedWorkflowStateManager:
 
         return await self.persist_state_with_progress(state, checkpoint_enum)
 
-    async def restore_state(self, snapshot_id: str | None = None) -> TripPlanningWorkflowState | None:
+    async def restore_state(
+        self, snapshot_id: str | None = None
+    ) -> TripPlanningWorkflowState | None:
         """Restore workflow state (backward compatibility)."""
         restored_data = await self.restore_workflow_state(snapshot_id, include_progress=False)
         return restored_data["state"] if restored_data else None

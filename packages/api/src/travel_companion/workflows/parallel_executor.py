@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 class ExecutionPriority(str, Enum):
     """Agent execution priority levels."""
 
-    CRITICAL = "critical"      # Must complete (e.g., weather_agent for activity dependencies)
-    HIGH = "high"             # Important for good results (e.g., flight_agent, hotel_agent)
-    MEDIUM = "medium"         # Enhances experience (e.g., activity_agent, food_agent)
-    LOW = "low"               # Nice to have (e.g., optimization agents)
+    CRITICAL = "critical"  # Must complete (e.g., weather_agent for activity dependencies)
+    HIGH = "high"  # Important for good results (e.g., flight_agent, hotel_agent)
+    MEDIUM = "medium"  # Enhances experience (e.g., activity_agent, food_agent)
+    LOW = "low"  # Nice to have (e.g., optimization agents)
 
 
 @dataclass
@@ -49,7 +49,7 @@ class ParallelExecutionConfig:
     exponential_backoff: bool = True
 
     # Performance thresholds
-    fast_execution_threshold_ms: float = 5000.0   # 5 seconds
+    fast_execution_threshold_ms: float = 5000.0  # 5 seconds
     slow_execution_threshold_ms: float = 20000.0  # 20 seconds
     critical_failure_threshold: int = 2  # Max critical failures before aborting
 
@@ -139,11 +139,15 @@ class WorkflowExecutionMetrics:
         self.total_agents = len(self.agent_metrics)
         self.agents_executed = len([m for m in self.agent_metrics if m.end_time is not None])
         self.agents_succeeded = len([m for m in self.agent_metrics if m.success])
-        self.agents_failed = len([m for m in self.agent_metrics if not m.success and m.end_time is not None])
+        self.agents_failed = len(
+            [m for m in self.agent_metrics if not m.success and m.end_time is not None]
+        )
         self.agents_timeout = len([m for m in self.agent_metrics if m.timeout_occurred])
 
         # Calculate timing metrics
-        execution_times = [m.execution_time_ms for m in self.agent_metrics if m.execution_time_ms is not None]
+        execution_times = [
+            m.execution_time_ms for m in self.agent_metrics if m.execution_time_ms is not None
+        ]
         if execution_times:
             self.total_execution_time_ms = sum(execution_times)
             self.average_execution_time_ms = self.total_execution_time_ms / len(execution_times)
@@ -152,7 +156,9 @@ class WorkflowExecutionMetrics:
         self.fast_executions = len([m for m in self.agent_metrics if m.is_fast_execution])
         self.slow_executions = len([m for m in self.agent_metrics if m.is_slow_execution])
         self.timeout_occurrences = len([m for m in self.agent_metrics if m.timeout_occurred])
-        self.circuit_breaker_activations = len([m for m in self.agent_metrics if m.circuit_breaker_open])
+        self.circuit_breaker_activations = len(
+            [m for m in self.agent_metrics if m.circuit_breaker_open]
+        )
 
 
 class ParallelExecutionQueue:
@@ -181,7 +187,7 @@ class ParallelExecutionQueue:
         agent_name: str,
         agent_function: Callable,
         priority: ExecutionPriority,
-        execution_context: dict[str, Any]
+        execution_context: dict[str, Any],
     ) -> None:
         """
         Enqueue an agent for execution with priority and load balancing.
@@ -210,7 +216,9 @@ class ParallelExecutionQueue:
             f"Agent {agent_name} enqueued with priority {priority.value}, total queued: {total_queued}"
         )
 
-    def _apply_load_balancing(self, agent_name: str, priority: ExecutionPriority) -> ExecutionPriority:
+    def _apply_load_balancing(
+        self, agent_name: str, priority: ExecutionPriority
+    ) -> ExecutionPriority:
         """
         Apply load balancing logic to adjust priority based on current queue state.
 
@@ -229,14 +237,24 @@ class ParallelExecutionQueue:
 
         # If high priority queue is overloaded, demote non-critical agents
         if queue_sizes[ExecutionPriority.HIGH] > 3 and priority == ExecutionPriority.HIGH:
-            if agent_name not in ["flight_agent", "hotel_agent"]:  # Keep critical agents in high priority
-                workflow_logger.info(f"Load balancing: Demoting {agent_name} from HIGH to MEDIUM priority")
+            if agent_name not in [
+                "flight_agent",
+                "hotel_agent",
+            ]:  # Keep critical agents in high priority
+                workflow_logger.info(
+                    f"Load balancing: Demoting {agent_name} from HIGH to MEDIUM priority"
+                )
                 return ExecutionPriority.MEDIUM
 
         # If critical queue has space, promote important agents
-        if queue_sizes[ExecutionPriority.CRITICAL] == 0 and active_counts[ExecutionPriority.CRITICAL] == 0:
+        if (
+            queue_sizes[ExecutionPriority.CRITICAL] == 0
+            and active_counts[ExecutionPriority.CRITICAL] == 0
+        ):
             if agent_name in ["weather_agent"] and priority == ExecutionPriority.HIGH:
-                workflow_logger.info(f"Load balancing: Promoting {agent_name} from HIGH to CRITICAL priority")
+                workflow_logger.info(
+                    f"Load balancing: Promoting {agent_name} from HIGH to CRITICAL priority"
+                )
                 return ExecutionPriority.CRITICAL
 
         return priority
@@ -249,9 +267,12 @@ class ParallelExecutionQueue:
             Tuple of (agent_name, function, context, priority) or None if no agents available
         """
         # Check queues in priority order
-        for priority in [ExecutionPriority.CRITICAL, ExecutionPriority.HIGH,
-                        ExecutionPriority.MEDIUM, ExecutionPriority.LOW]:
-
+        for priority in [
+            ExecutionPriority.CRITICAL,
+            ExecutionPriority.HIGH,
+            ExecutionPriority.MEDIUM,
+            ExecutionPriority.LOW,
+        ]:
             if self.priority_queues[priority]:
                 # Check if we can execute more agents of this priority
                 semaphore = self.execution_semaphores[priority]
@@ -280,13 +301,19 @@ class ParallelExecutionQueue:
 
         avg_queue_size = 0.0
         if self.load_balance_stats["queue_sizes"]:
-            avg_queue_size = sum(self.load_balance_stats["queue_sizes"]) / len(self.load_balance_stats["queue_sizes"])
+            avg_queue_size = sum(self.load_balance_stats["queue_sizes"]) / len(
+                self.load_balance_stats["queue_sizes"]
+            )
 
         return {
             "total_queued": total_queued,
             "total_active": total_active,
-            "queued_by_priority": {p.value: len(self.priority_queues[p]) for p in ExecutionPriority},
-            "active_by_priority": {p.value: len(self.active_executions[p]) for p in ExecutionPriority},
+            "queued_by_priority": {
+                p.value: len(self.priority_queues[p]) for p in ExecutionPriority
+            },
+            "active_by_priority": {
+                p.value: len(self.active_executions[p]) for p in ExecutionPriority
+            },
             "average_queue_size": avg_queue_size,
             "max_queue_size": max(self.load_balance_stats["queue_sizes"], default=0),
             "load_balance_decisions": self.load_balance_stats["decisions"],
@@ -325,9 +352,7 @@ class ParallelExecutionOptimizer:
         """Get or create circuit breaker for an agent."""
         if agent_name not in self.circuit_breakers:
             self.circuit_breakers[agent_name] = CircuitBreaker(
-                failure_threshold=5,
-                recovery_timeout=30.0,
-                expected_exception=Exception
+                failure_threshold=5, recovery_timeout=30.0, expected_exception=Exception
             )
         return self.circuit_breakers[agent_name]
 
@@ -338,16 +363,13 @@ class ParallelExecutionOptimizer:
             "weather_agent": ExecutionPriority.CRITICAL,
             "initialize_trip": ExecutionPriority.CRITICAL,
             "finalize_plan": ExecutionPriority.CRITICAL,
-
             # High priority - core travel components
             "flight_agent": ExecutionPriority.HIGH,
             "hotel_agent": ExecutionPriority.HIGH,
             "itinerary_agent": ExecutionPriority.HIGH,
-
             # Medium priority - enhancing experience
             "activity_agent": ExecutionPriority.MEDIUM,
             "food_agent": ExecutionPriority.MEDIUM,
-
             # Low priority - nice to have
             "optimization_agent": ExecutionPriority.LOW,
             "analytics_agent": ExecutionPriority.LOW,
@@ -369,7 +391,7 @@ class ParallelExecutionOptimizer:
         # Adaptive timeout based on historical performance
         if self.config.adaptive_timeout and agent_name in self.circuit_breakers:
             cb = self.circuit_breakers[agent_name]
-            if hasattr(cb, 'average_response_time') and cb.average_response_time > 0:
+            if hasattr(cb, "average_response_time") and cb.average_response_time > 0:
                 # Add 50% buffer to average response time
                 adaptive_timeout = cb.average_response_time * 1.5
                 return min(max(adaptive_timeout, base_timeout), base_timeout * 2)
@@ -380,7 +402,7 @@ class ParallelExecutionOptimizer:
         self,
         state: TripPlanningWorkflowState,
         agent_functions: dict[str, Callable],
-        dependencies: dict[str, list[str]] | None = None
+        dependencies: dict[str, list[str]] | None = None,
     ) -> TripPlanningWorkflowState:
         """
         Execute agents in parallel with optimization and coordination.
@@ -400,7 +422,7 @@ class ParallelExecutionOptimizer:
             workflow_id=state["workflow_id"],
             request_id=state["request_id"],
             total_agents=len(agent_functions),
-            config=self.config.__dict__
+            config=self.config.__dict__,
         )
 
         try:
@@ -419,7 +441,7 @@ class ParallelExecutionOptimizer:
             workflow_logger.log_parallel_execution_completed(
                 workflow_id=state["workflow_id"],
                 request_id=state["request_id"],
-                execution_metrics=self.workflow_metrics.__dict__
+                execution_metrics=self.workflow_metrics.__dict__,
             )
 
             return updated_state
@@ -429,7 +451,7 @@ class ParallelExecutionOptimizer:
                 workflow_id=state["workflow_id"],
                 request_id=state["request_id"],
                 error=str(e),
-                partial_metrics=self._get_execution_summary() if self.workflow_metrics else {}
+                partial_metrics=self._get_execution_summary() if self.workflow_metrics else {},
             )
             raise RuntimeError(f"Parallel execution failed: {e}") from e
 
@@ -437,7 +459,7 @@ class ParallelExecutionOptimizer:
         self,
         agent_functions: dict[str, Callable],
         state: TripPlanningWorkflowState,
-        dependencies: dict[str, list[str]]
+        dependencies: dict[str, list[str]],
     ) -> None:
         """Queue all agents based on dependencies and priorities."""
 
@@ -458,7 +480,7 @@ class ParallelExecutionOptimizer:
                 agent_name=agent_name,
                 agent_function=agent_function,
                 priority=priority,
-                execution_context={"dependencies": []}  # Don't store state in context
+                execution_context={"dependencies": []},  # Don't store state in context
             )
 
         # Queue dependent agents (will be processed after dependencies complete)
@@ -470,10 +492,12 @@ class ParallelExecutionOptimizer:
                 priority=priority,
                 execution_context={
                     "dependencies": dependencies.get(agent_name, [])  # Only store dependencies
-                }
+                },
             )
 
-    async def _execute_queued_agents(self, initial_state: TripPlanningWorkflowState) -> TripPlanningWorkflowState:
+    async def _execute_queued_agents(
+        self, initial_state: TripPlanningWorkflowState
+    ) -> TripPlanningWorkflowState:
         """Execute all queued agents with parallel coordination."""
         current_state = copy.deepcopy(initial_state)
         dependency_retry_count = {}  # Track how many times we've retried each agent due to dependencies
@@ -500,9 +524,13 @@ class ParallelExecutionOptimizer:
                                     current_state["agents_completed"] = []
                                 if agent_name not in current_state["agents_completed"]:
                                     current_state["agents_completed"].append(agent_name)
-                                    workflow_logger.debug(f"Agent {agent_name} marked as completed for dependency tracking")
+                                    workflow_logger.debug(
+                                        f"Agent {agent_name} marked as completed for dependency tracking"
+                                    )
                         except Exception as e:
-                            workflow_logger.error(f"Failed to get task result for {agent_name}: {e}")
+                            workflow_logger.error(
+                                f"Failed to get task result for {agent_name}: {e}"
+                            )
 
                     await self._process_completed_task(task, current_state)
 
@@ -512,14 +540,16 @@ class ParallelExecutionOptimizer:
                 # No more agents available - check if any are still running or queued
                 if not self.active_tasks:
                     # Check if there are any agents still in queue (possibly waiting for dependencies)
-                    has_queued = any(self.execution_queue.priority_queues[p] for p in ExecutionPriority)
+                    has_queued = any(
+                        self.execution_queue.priority_queues[p] for p in ExecutionPriority
+                    )
                     if not has_queued:
                         break  # All done - no active tasks and no queued agents
 
                     # There are queued agents but no active tasks - possible deadlock
                     # Try to pull agents again in case dependencies were just satisfied
                     # But prevent infinite loop
-                    deadlock_check_count = getattr(self, '_deadlock_check_count', 0)
+                    deadlock_check_count = getattr(self, "_deadlock_check_count", 0)
                     self._deadlock_check_count = deadlock_check_count + 1
 
                     if self._deadlock_check_count > 10:
@@ -544,8 +574,7 @@ class ParallelExecutionOptimizer:
                 # Wait for at least one task to complete
                 if self.active_tasks:
                     done, pending = await asyncio.wait(
-                        self.active_tasks.values(),
-                        return_when=asyncio.FIRST_COMPLETED
+                        self.active_tasks.values(), return_when=asyncio.FIRST_COMPLETED
                     )
                     # Process completed tasks
                     for task in done:
@@ -561,8 +590,8 @@ class ParallelExecutionOptimizer:
                 dependency_retry_count[agent_name] = retry_count
 
                 # Debug logging to understand dependency issues
-                deps = context.get('dependencies', [])
-                completed = current_state.get('agents_completed', [])
+                deps = context.get("dependencies", [])
+                completed = current_state.get("agents_completed", [])
                 self.logger.debug(
                     f"Agent {agent_name} dependencies not satisfied. "
                     f"Required: {deps}, Completed: {completed}, Retry: {retry_count}"
@@ -585,8 +614,12 @@ class ParallelExecutionOptimizer:
                 updated_context = {"dependencies": context.get("dependencies", [])}
                 # Lower priority for agents with unsatisfied dependencies to avoid priority inversion
                 # This allows other runnable agents to execute first
-                lowered_priority = ExecutionPriority.LOW if priority != ExecutionPriority.LOW else priority
-                await self.execution_queue.enqueue_agent(agent_name, agent_function, lowered_priority, updated_context)
+                lowered_priority = (
+                    ExecutionPriority.LOW if priority != ExecutionPriority.LOW else priority
+                )
+                await self.execution_queue.enqueue_agent(
+                    agent_name, agent_function, lowered_priority, updated_context
+                )
 
                 # Small delay to prevent tight loop when only unsatisfiable agents remain
                 await asyncio.sleep(0.001)
@@ -608,12 +641,13 @@ class ParallelExecutionOptimizer:
             self.concurrent_agent_count.append(len(self.active_tasks))
 
         # Wait for all remaining tasks to complete
-        while self.active_tasks or any(self.execution_queue.priority_queues[p] for p in ExecutionPriority):
+        while self.active_tasks or any(
+            self.execution_queue.priority_queues[p] for p in ExecutionPriority
+        ):
             if self.active_tasks:
                 # Wait for any task to complete
                 done, pending = await asyncio.wait(
-                    self.active_tasks.values(),
-                    return_when=asyncio.FIRST_COMPLETED
+                    self.active_tasks.values(), return_when=asyncio.FIRST_COMPLETED
                 )
 
                 # Process completed tasks
@@ -635,9 +669,13 @@ class ParallelExecutionOptimizer:
                                     current_state["agents_completed"] = []
                                 if agent_name not in current_state["agents_completed"]:
                                     current_state["agents_completed"].append(agent_name)
-                                    workflow_logger.debug(f"Agent {agent_name} marked as completed in current_state")
+                                    workflow_logger.debug(
+                                        f"Agent {agent_name} marked as completed in current_state"
+                                    )
                         except Exception as e:
-                            workflow_logger.error(f"Failed to process task result for {agent_name}: {e}")
+                            workflow_logger.error(
+                                f"Failed to process task result for {agent_name}: {e}"
+                            )
 
                     await self._process_completed_task(task, current_state)
             else:
@@ -650,10 +688,7 @@ class ParallelExecutionOptimizer:
         return current_state
 
     def _check_dependencies_satisfied(
-        self,
-        agent_name: str,
-        context: dict[str, Any],
-        current_state: TripPlanningWorkflowState
+        self, agent_name: str, context: dict[str, Any], current_state: TripPlanningWorkflowState
     ) -> bool:
         """Check if agent dependencies are satisfied."""
         dependencies = context.get("dependencies", [])
@@ -680,7 +715,7 @@ class ParallelExecutionOptimizer:
         agent_function: Callable,
         context: dict[str, Any],
         priority: ExecutionPriority,
-        state: TripPlanningWorkflowState
+        state: TripPlanningWorkflowState,
     ) -> ExecutionMetrics:
         """Execute a single agent with comprehensive metrics tracking."""
 
@@ -691,7 +726,7 @@ class ParallelExecutionOptimizer:
             priority=priority,
             start_time=time.time(),
             timeout_seconds=timeout_seconds,
-            queue_time_ms=context.get("queue_time_ms", 0.0)
+            queue_time_ms=context.get("queue_time_ms", 0.0),
         )
 
         circuit_breaker = self._get_circuit_breaker(agent_name)
@@ -707,12 +742,13 @@ class ParallelExecutionOptimizer:
                         if asyncio.iscoroutinefunction(agent_function):
                             return await agent_function(state)
                         else:
-                            return await asyncio.get_event_loop().run_in_executor(None, agent_function, state)
+                            return await asyncio.get_event_loop().run_in_executor(
+                                None, agent_function, state
+                            )
 
                     # Execute with timeout and circuit breaker
                     result = await asyncio.wait_for(
-                        circuit_breaker.call(execute_agent),
-                        timeout=timeout_seconds
+                        circuit_breaker.call(execute_agent), timeout=timeout_seconds
                     )
 
                     # Success - update metrics and state
@@ -738,7 +774,9 @@ class ParallelExecutionOptimizer:
 
                     if attempt < self.config.max_retries:
                         # Retry with exponential backoff
-                        delay = self.config.retry_delay_seconds * (2 ** attempt if self.config.exponential_backoff else 1)
+                        delay = self.config.retry_delay_seconds * (
+                            2**attempt if self.config.exponential_backoff else 1
+                        )
                         await asyncio.sleep(delay)
                         continue
                     else:
@@ -751,9 +789,13 @@ class ParallelExecutionOptimizer:
                     error_msg = f"Agent {agent_name} failed: {str(e)}"
                     metrics.error = error_msg
 
-                    if attempt < self.config.max_retries and not isinstance(e, CircuitBreakerOpenError):
+                    if attempt < self.config.max_retries and not isinstance(
+                        e, CircuitBreakerOpenError
+                    ):
                         # Retry for recoverable errors
-                        delay = self.config.retry_delay_seconds * (2 ** attempt if self.config.exponential_backoff else 1)
+                        delay = self.config.retry_delay_seconds * (
+                            2**attempt if self.config.exponential_backoff else 1
+                        )
                         await asyncio.sleep(delay)
                         continue
                     else:
@@ -777,7 +819,9 @@ class ParallelExecutionOptimizer:
 
         return metrics
 
-    async def _process_completed_task(self, task: asyncio.Task, state: TripPlanningWorkflowState) -> None:
+    async def _process_completed_task(
+        self, task: asyncio.Task, state: TripPlanningWorkflowState
+    ) -> None:
         """Process a completed task and update state."""
         # Find and remove the task from active tasks
         agent_name = None
@@ -827,15 +871,17 @@ class ParallelExecutionOptimizer:
 
             if sequential_time > 0:
                 self.workflow_metrics.parallel_efficiency = (
-                    (sequential_time - self.workflow_metrics.total_execution_time_ms) / sequential_time * 100
+                    (sequential_time - self.workflow_metrics.total_execution_time_ms)
+                    / sequential_time
+                    * 100
                 )
 
         # Calculate concurrent agent statistics
         if self.concurrent_agent_count:
             self.workflow_metrics.max_concurrent_agents = max(self.concurrent_agent_count)
-            self.workflow_metrics.average_concurrent_agents = (
-                sum(self.concurrent_agent_count) / len(self.concurrent_agent_count)
-            )
+            self.workflow_metrics.average_concurrent_agents = sum(
+                self.concurrent_agent_count
+            ) / len(self.concurrent_agent_count)
 
         # Calculate summary metrics
         self.workflow_metrics.calculate_summary_metrics()
@@ -855,27 +901,23 @@ class ParallelExecutionOptimizer:
             "agents_timeout": self.workflow_metrics.agents_timeout,
             "success_rate": (
                 self.workflow_metrics.agents_succeeded / self.workflow_metrics.total_agents
-                if self.workflow_metrics.total_agents > 0 else 0
+                if self.workflow_metrics.total_agents > 0
+                else 0
             ),
-
             # Timing metrics
             "total_execution_time_ms": self.workflow_metrics.total_execution_time_ms,
             "average_execution_time_ms": self.workflow_metrics.average_execution_time_ms,
             "parallel_efficiency_percent": self.workflow_metrics.parallel_efficiency,
-
             # Performance categorization
             "fast_executions": self.workflow_metrics.fast_executions,
             "slow_executions": self.workflow_metrics.slow_executions,
             "timeout_occurrences": self.workflow_metrics.timeout_occurrences,
             "circuit_breaker_activations": self.workflow_metrics.circuit_breaker_activations,
-
             # Concurrency metrics
             "max_concurrent_agents": self.workflow_metrics.max_concurrent_agents,
             "average_concurrent_agents": self.workflow_metrics.average_concurrent_agents,
-
             # Queue and load balancing metrics
             "queue_metrics": queue_metrics,
-
             # Individual agent performance
             "agent_performance": [
                 {
@@ -888,22 +930,23 @@ class ParallelExecutionOptimizer:
                     "timeout_occurred": m.timeout_occurred,
                     "circuit_breaker_open": m.circuit_breaker_open,
                     "performance_category": (
-                        "fast" if m.is_fast_execution else
-                        "slow" if m.is_slow_execution else
-                        "normal"
-                    )
+                        "fast"
+                        if m.is_fast_execution
+                        else "slow"
+                        if m.is_slow_execution
+                        else "normal"
+                    ),
                 }
                 for m in self.workflow_metrics.agent_metrics
             ],
-
             # Configuration used
             "execution_config": {
                 "max_concurrent_agents": self.config.max_concurrent_agents,
                 "default_timeout_seconds": self.config.default_timeout_seconds,
                 "max_retries": self.config.max_retries,
                 "load_balancing_enabled": self.config.enable_load_balancing,
-                "adaptive_timeout_enabled": self.config.adaptive_timeout
-            }
+                "adaptive_timeout_enabled": self.config.adaptive_timeout,
+            },
         }
 
         return summary
@@ -914,7 +957,7 @@ async def execute_agents_with_parallel_optimization(
     state: TripPlanningWorkflowState,
     agent_functions: dict[str, Callable],
     config: ParallelExecutionConfig | None = None,
-    dependencies: dict[str, list[str]] | None = None
+    dependencies: dict[str, list[str]] | None = None,
 ) -> TripPlanningWorkflowState:
     """
     Convenience function to execute agents with parallel optimization.
@@ -933,9 +976,7 @@ async def execute_agents_with_parallel_optimization(
 
 
 def create_optimized_parallel_config(
-    max_concurrent: int = 6,
-    timeout_seconds: int = 30,
-    enable_adaptive: bool = True
+    max_concurrent: int = 6, timeout_seconds: int = 30, enable_adaptive: bool = True
 ) -> ParallelExecutionConfig:
     """
     Create an optimized parallel execution configuration.
@@ -953,5 +994,5 @@ def create_optimized_parallel_config(
         default_timeout_seconds=timeout_seconds,
         adaptive_timeout=enable_adaptive,
         enable_load_balancing=True,
-        exponential_backoff=True
+        exponential_backoff=True,
     )

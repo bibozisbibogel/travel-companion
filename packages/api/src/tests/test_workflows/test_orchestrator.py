@@ -460,7 +460,7 @@ class TestTripPlanningWorkflow:
     def test_define_nodes(self, workflow):
         """Test workflow node definition."""
         # Mock the node functions import for testing
-        with patch.object(workflow, 'define_nodes') as mock_define_nodes:
+        with patch.object(workflow, "define_nodes") as mock_define_nodes:
             mock_define_nodes.return_value = {
                 "initialize_trip": lambda x: x,
                 "weather_agent": lambda x: x,
@@ -550,7 +550,9 @@ class TestTripPlanningWorkflow:
 
         # Check context fields
         assert state["user_preferences"] == sample_trip_request.preferences
-        assert state["budget_tracking"]["allocated"] == float(sample_trip_request.requirements.budget)
+        assert state["budget_tracking"]["allocated"] == float(
+            sample_trip_request.requirements.budget
+        )
         assert state["budget_tracking"]["spent"] == 0.0
         assert "execution_time" in state["optimization_metrics"]
 
@@ -585,13 +587,15 @@ class TestTripPlanningWorkflow:
 
         # Mock graph execution
         final_state = workflow.create_initial_state(sample_trip_request)
-        final_state.update({
-            "status": "completed",
-            "output_data": {"trip_plan": {"flights": [], "hotels": [], "activities": []}},
-            "end_time": final_state["start_time"] + 60,
-        })
+        final_state.update(
+            {
+                "status": "completed",
+                "output_data": {"trip_plan": {"flights": [], "hotels": [], "activities": []}},
+                "end_time": final_state["start_time"] + 60,
+            }
+        )
 
-        with patch.object(workflow, '_execute_with_timeout', return_value=final_state):
+        with patch.object(workflow, "_execute_with_timeout", return_value=final_state):
             result = await workflow.execute_trip_planning(sample_trip_request, "user123", "req456")
 
             # Check result
@@ -625,7 +629,7 @@ class TestTripPlanningWorkflow:
         workflow.redis_client = mock_redis
 
         # Mock timeout
-        with patch.object(workflow, '_execute_with_timeout', side_effect=TimeoutError("Timeout")):
+        with patch.object(workflow, "_execute_with_timeout", side_effect=TimeoutError("Timeout")):
             with pytest.raises(TimeoutError):
                 await workflow.execute_trip_planning(sample_trip_request)
 
@@ -634,7 +638,8 @@ class TestTripPlanningWorkflow:
 
             # Check that at least one call was for the timeout error
             timeout_calls = [
-                call for call in mock_logger.log_workflow_failed.call_args_list
+                call
+                for call in mock_logger.log_workflow_failed.call_args_list
                 if "timeout" in str(call).lower()
             ]
             assert len(timeout_calls) >= 1
@@ -663,7 +668,7 @@ class TestTripPlanningWorkflow:
         workflow.redis_client = mock_redis
 
         # Mock execution failure
-        with patch.object(workflow, '_execute_with_timeout', side_effect=Exception("Test error")):
+        with patch.object(workflow, "_execute_with_timeout", side_effect=Exception("Test error")):
             with pytest.raises(RuntimeError, match="Trip planning workflow execution failed"):
                 await workflow.execute_trip_planning(sample_trip_request)
 
@@ -673,7 +678,8 @@ class TestTripPlanningWorkflow:
 
             # Check that at least one call was for the test error
             error_calls = [
-                call for call in mock_logger.log_workflow_failed.call_args_list
+                call
+                for call in mock_logger.log_workflow_failed.call_args_list
                 if "test error" in str(call).lower()
             ]
             assert len(error_calls) >= 1
@@ -685,18 +691,35 @@ class TestTripPlanningWorkflow:
 
         # Base workflow fields
         base_fields = {
-            "request_id", "workflow_id", "user_id", "status", "error",
-            "start_time", "end_time", "current_node", "input_data",
-            "output_data", "intermediate_results"
+            "request_id",
+            "workflow_id",
+            "user_id",
+            "status",
+            "error",
+            "start_time",
+            "end_time",
+            "current_node",
+            "input_data",
+            "output_data",
+            "intermediate_results",
         }
 
         # Trip-specific fields
         trip_fields = {
-            "trip_request", "trip_id", "agents_completed", "agents_failed",
-            "agent_dependencies", "flight_results", "hotel_results",
-            "activity_results", "weather_data", "food_recommendations",
-            "itinerary_data", "user_preferences", "budget_tracking",
-            "optimization_metrics"
+            "trip_request",
+            "trip_id",
+            "agents_completed",
+            "agents_failed",
+            "agent_dependencies",
+            "flight_results",
+            "hotel_results",
+            "activity_results",
+            "weather_data",
+            "food_recommendations",
+            "itinerary_data",
+            "user_preferences",
+            "budget_tracking",
+            "optimization_metrics",
         }
 
         all_required_fields = base_fields | trip_fields

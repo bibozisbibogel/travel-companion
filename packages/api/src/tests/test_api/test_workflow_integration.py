@@ -116,9 +116,7 @@ class TestTripPlanningIntegration:
             TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock
         ) as mock_execute:
             # Mock timeout error
-            mock_execute.side_effect = TimeoutError(
-                "Workflow execution exceeded timeout"
-            )
+            mock_execute.side_effect = TimeoutError("Workflow execution exceeded timeout")
 
             response = authenticated_client.post(
                 "/api/v1/trips/plan",
@@ -129,9 +127,7 @@ class TestTripPlanningIntegration:
             data = response.json()
             assert data["detail"]["error_code"] == "WORKFLOW_TIMEOUT"
 
-    def test_generate_trip_plan_error(
-        self, authenticated_client: TestClient, sample_trip_request
-    ):
+    def test_generate_trip_plan_error(self, authenticated_client: TestClient, sample_trip_request):
         """Test trip plan generation error handling."""
         with patch.object(
             TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock
@@ -152,11 +148,11 @@ class TestTripPlanningIntegration:
 class TestWorkflowExecutionEndpoints:
     """Test workflow execution endpoints."""
 
-    def test_execute_workflow_sync(
-        self, client: TestClient, workflow_execution_request
-    ):
+    def test_execute_workflow_sync(self, client: TestClient, workflow_execution_request):
         """Test synchronous workflow execution."""
-        with patch.object(TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock) as mock_execute:
+        with patch.object(
+            TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock
+        ) as mock_execute:
             mock_execute.return_value = {
                 "workflow_id": str(uuid4()),
                 "status": "completed",
@@ -174,10 +170,10 @@ class TestWorkflowExecutionEndpoints:
             assert data["workflow_type"] == "TripPlanningWorkflow"
             assert "execution_time_ms" in data
 
-    @pytest.mark.skip(reason="Redis connection causes hanging - needs Redis service running or comprehensive mocking")
-    def test_execute_workflow_async(
-        self, client: TestClient, workflow_execution_request
-    ):
+    @pytest.mark.skip(
+        reason="Redis connection causes hanging - needs Redis service running or comprehensive mocking"
+    )
+    def test_execute_workflow_async(self, client: TestClient, workflow_execution_request):
         """Test asynchronous workflow execution."""
         # This test hangs because WorkflowStateManager tries to connect to Redis
         # during initialization. The Redis connection happens at import time and
@@ -199,7 +195,9 @@ class TestWorkflowStatusEndpoints:
         """Test getting workflow status."""
         workflow_id = str(uuid4())
 
-        with patch.object(TripPlanningWorkflow, "get_workflow_status", new_callable=AsyncMock) as mock_status:
+        with patch.object(
+            TripPlanningWorkflow, "get_workflow_status", new_callable=AsyncMock
+        ) as mock_status:
             mock_status.return_value = {
                 "workflow_id": workflow_id,
                 "status": "running",
@@ -220,7 +218,9 @@ class TestWorkflowStatusEndpoints:
         """Test getting status for non-existent workflow."""
         workflow_id = str(uuid4())
 
-        with patch.object(TripPlanningWorkflow, "get_workflow_status", new_callable=AsyncMock) as mock_status:
+        with patch.object(
+            TripPlanningWorkflow, "get_workflow_status", new_callable=AsyncMock
+        ) as mock_status:
             mock_status.return_value = None
 
             response = client.get(f"/api/v1/workflows/status/{workflow_id}")
@@ -312,8 +312,10 @@ class TestWorkflowManagementEndpoints:
         """Test cancelling a running workflow."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm, \
-             patch("travel_companion.api.v1.workflows.workflow_logger"):
+        with (
+            patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm,
+            patch("travel_companion.api.v1.workflows.workflow_logger"),
+        ):
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
             mock_state_manager.restore_state = AsyncMock(
@@ -357,8 +359,10 @@ class TestWorkflowManagementEndpoints:
         """Test cleaning up workflow data."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm, \
-             patch("travel_companion.api.v1.workflows.workflow_logger"):
+        with (
+            patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm,
+            patch("travel_companion.api.v1.workflows.workflow_logger"),
+        ):
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
             mock_state_manager.cleanup_workflow = AsyncMock(return_value=True)

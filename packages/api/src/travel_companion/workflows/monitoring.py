@@ -477,12 +477,14 @@ class WorkflowPerformanceMonitor:
         if not metrics:
             return
 
-        metrics.state_transitions.append({
-            "from": from_state,
-            "to": to_state,
-            "time_ms": transition_time_ms,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        metrics.state_transitions.append(
+            {
+                "from": from_state,
+                "to": to_state,
+                "time_ms": transition_time_ms,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
         await self._persist_metrics(workflow_id, metrics)
 
@@ -575,10 +577,14 @@ class WorkflowPerformanceMonitor:
         # Calculate aggregates
         return {
             "total_workflows": len(metrics_list),
-            "avg_execution_time_ms": sum(m.total_execution_time_ms for m in metrics_list) / len(metrics_list),
-            "avg_success_rate": sum(m.calculate_success_rate() for m in metrics_list) / len(metrics_list),
-            "avg_error_rate": sum(m.calculate_error_rate() for m in metrics_list) / len(metrics_list),
-            "avg_cache_hit_rate": sum(m.calculate_cache_hit_rate() for m in metrics_list) / len(metrics_list),
+            "avg_execution_time_ms": sum(m.total_execution_time_ms for m in metrics_list)
+            / len(metrics_list),
+            "avg_success_rate": sum(m.calculate_success_rate() for m in metrics_list)
+            / len(metrics_list),
+            "avg_error_rate": sum(m.calculate_error_rate() for m in metrics_list)
+            / len(metrics_list),
+            "avg_cache_hit_rate": sum(m.calculate_cache_hit_rate() for m in metrics_list)
+            / len(metrics_list),
             "total_api_calls": sum(m.total_api_calls for m in metrics_list),
             "total_retries": sum(m.total_retries for m in metrics_list),
             "total_timeouts": sum(m.total_timeouts for m in metrics_list),
@@ -649,7 +655,10 @@ class WorkflowHealthMonitor:
         checks["metrics"] = metrics_health
         if metrics_health["status"] == HealthStatus.UNHEALTHY:
             health_status = HealthStatus.UNHEALTHY
-        elif metrics_health["status"] == HealthStatus.DEGRADED and health_status == HealthStatus.HEALTHY:
+        elif (
+            metrics_health["status"] == HealthStatus.DEGRADED
+            and health_status == HealthStatus.HEALTHY
+        ):
             health_status = HealthStatus.DEGRADED
 
         # Check agent health
@@ -657,7 +666,10 @@ class WorkflowHealthMonitor:
         checks["agents"] = agent_health
         if agent_health["status"] == HealthStatus.UNHEALTHY:
             health_status = HealthStatus.UNHEALTHY
-        elif agent_health["status"] == HealthStatus.DEGRADED and health_status == HealthStatus.HEALTHY:
+        elif (
+            agent_health["status"] == HealthStatus.DEGRADED
+            and health_status == HealthStatus.HEALTHY
+        ):
             health_status = HealthStatus.DEGRADED
 
         return {
@@ -745,7 +757,9 @@ class WorkflowHealthMonitor:
                 "status": status,
                 "message": message,
                 "ping_time_ms": ping_time_ms,
-                "memory_usage_percentage": (used_memory / max_memory * 100) if max_memory > 0 else 0,
+                "memory_usage_percentage": (used_memory / max_memory * 100)
+                if max_memory > 0
+                else 0,
             }
 
         except Exception as e:

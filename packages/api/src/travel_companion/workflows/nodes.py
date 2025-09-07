@@ -59,10 +59,10 @@ def initialize_trip_context(state: TripPlanningWorkflowState) -> TripPlanningWor
             "remaining": budget,
             "allocations": {
                 "flights": budget * 0.4,  # 40% for flights
-                "hotels": budget * 0.3,   # 30% for hotels
+                "hotels": budget * 0.3,  # 30% for hotels
                 "activities": budget * 0.2,  # 20% for activities
-                "food": budget * 0.1,     # 10% for food
-            }
+                "food": budget * 0.1,  # 10% for food
+            },
         }
 
         # Initialize agent execution tracking
@@ -254,9 +254,7 @@ async def execute_flight_agent(state: TripPlanningWorkflowState) -> TripPlanning
         flight_response = await flight_agent.process(flight_request.model_dump())
 
         # Store flight results
-        state["flight_results"] = [
-            flight.model_dump() for flight in flight_response.flights
-        ]
+        state["flight_results"] = [flight.model_dump() for flight in flight_response.flights]
 
         # Update budget tracking with cheapest option
         if flight_response.flights:
@@ -349,12 +347,16 @@ async def execute_hotel_agent(state: TripPlanningWorkflowState) -> TripPlanningW
             check_out_date=trip_request.requirements.end_date,
             guest_count=trip_request.requirements.travelers,
             room_count=1,  # Default, can be calculated based on traveler count
-            max_price_per_night=int(budget_allocation / (trip_request.requirements.end_date - trip_request.requirements.start_date).days),
+            max_price_per_night=int(
+                budget_allocation
+                / (trip_request.requirements.end_date - trip_request.requirements.start_date).days
+            ),
             currency="USD",
         )
 
         # Calculate room count based on traveler count (2 people per room max)
         import math
+
         hotel_request.room_count = math.ceil(trip_request.requirements.travelers / 2)
 
         # Execute hotel agent
@@ -362,13 +364,13 @@ async def execute_hotel_agent(state: TripPlanningWorkflowState) -> TripPlanningW
         hotel_response = await hotel_agent.process(hotel_request.model_dump())
 
         # Store hotel results
-        state["hotel_results"] = [
-            hotel.model_dump() for hotel in hotel_response.hotels
-        ]
+        state["hotel_results"] = [hotel.model_dump() for hotel in hotel_response.hotels]
 
         # Update budget tracking with cheapest option
         if hotel_response.hotels:
-            nights = (trip_request.requirements.end_date - trip_request.requirements.start_date).days
+            nights = (
+                trip_request.requirements.end_date - trip_request.requirements.start_date
+            ).days
             cheapest_hotel = min(hotel_response.hotels, key=lambda h: h.price_per_night)
             total_cost = float(cheapest_hotel.price_per_night) * nights
             state["budget_tracking"]["spent"] += total_cost
@@ -466,7 +468,9 @@ async def execute_activity_agent(state: TripPlanningWorkflowState) -> TripPlanni
             check_in_date=trip_request.requirements.start_date,
             check_out_date=trip_request.requirements.end_date,
             guest_count=trip_request.requirements.travelers,
-            budget_per_person=budget_allocation / trip_request.requirements.travelers if trip_request.requirements.travelers > 0 else budget_allocation,
+            budget_per_person=budget_allocation / trip_request.requirements.travelers
+            if trip_request.requirements.travelers > 0
+            else budget_allocation,
             currency="USD",
             category=None,  # Will be set based on preferences
         )
@@ -476,6 +480,7 @@ async def execute_activity_agent(state: TripPlanningWorkflowState) -> TripPlanni
         if "activity_types" in prefs and prefs["activity_types"]:
             # Map first activity type to category if available
             from travel_companion.models.external import ActivityCategory
+
             activity_type_map = {
                 "cultural": ActivityCategory.CULTURAL,
                 "outdoor": ActivityCategory.NATURE,
@@ -589,7 +594,9 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
         food_request = RestaurantSearchRequest(
             location=trip_request.destination.city,
             party_size=trip_request.requirements.travelers,
-            budget_per_person=budget_allocation / trip_request.requirements.travelers if trip_request.requirements.travelers > 0 else budget_allocation,
+            budget_per_person=budget_allocation / trip_request.requirements.travelers
+            if trip_request.requirements.travelers > 0
+            else budget_allocation,
             currency="USD",
             cuisine_type=None,  # Will be set from preferences
         )
@@ -599,6 +606,7 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
         if "cuisine_types" in prefs and prefs["cuisine_types"]:
             # Map first cuisine type to the cuisine_type field
             from travel_companion.models.external import CuisineType
+
             cuisine_type_map = {
                 "french": CuisineType.FRENCH,
                 "italian": CuisineType.ITALIAN,
@@ -626,29 +634,38 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
         if food_response.restaurants:
             # Calculate estimated daily food cost based on average restaurant prices
             days = (trip_request.requirements.end_date - trip_request.requirements.start_date).days
-            avg_price_per_meal = sum(
-                float(restaurant.average_cost_per_person.amount)
-                for restaurant in food_response.restaurants[:5]  # Top 5 restaurants
-            ) / len(food_response.restaurants[:5])
+            avg_price_per_meal = (
+                sum(
+                    float(restaurant.average_cost_per_person.amount)
+                    for restaurant in food_response.restaurants[:5]  # Top 5 restaurants
+                )
+                / len(food_response.restaurants[:5])
+            )
 
-            estimated_food_cost = avg_price_per_meal * 2 * days * trip_request.requirements.travelers  # 2 meals per day
+            estimated_food_cost = (
+                avg_price_per_meal * 2 * days * trip_request.requirements.travelers
+            )  # 2 meals per day
             state["budget_tracking"]["spent"] += estimated_food_cost
             state["budget_tracking"]["remaining"] -= estimated_food_cost
         else:
             # Fallback budget calculation when no restaurants found
             days = (trip_request.requirements.end_date - trip_request.requirements.start_date).days
             estimated_cost_per_meal = 45.0  # Default estimate
-            estimated_food_cost = estimated_cost_per_meal * 2 * days * trip_request.requirements.travelers  # 2 meals per day
+            estimated_food_cost = (
+                estimated_cost_per_meal * 2 * days * trip_request.requirements.travelers
+            )  # 2 meals per day
             state["budget_tracking"]["spent"] += estimated_food_cost
             state["budget_tracking"]["remaining"] -= estimated_food_cost
 
             # Add a summary entry to food_recommendations for the fallback
-            state["food_recommendations"] = [{
-                "summary": "No specific restaurants found, using estimated food budget",
-                "estimated_cost_per_meal": estimated_cost_per_meal,
-                "estimated_total_cost": estimated_food_cost,
-                "fallback": True
-            }]
+            state["food_recommendations"] = [
+                {
+                    "summary": "No specific restaurants found, using estimated food budget",
+                    "estimated_cost_per_meal": estimated_cost_per_meal,
+                    "estimated_total_cost": estimated_food_cost,
+                    "fallback": True,
+                }
+            ]
 
         # Update tracking
         state["agents_completed"].append(node_name)
@@ -729,9 +746,13 @@ async def execute_itinerary_agent(state: TripPlanningWorkflowState) -> TripPlann
         completed_agents = state.get("agents_completed", [])
 
         # Check if critical agents completed (allow graceful degradation)
-        critical_completed = any(agent in completed_agents for agent in ["flight_agent", "hotel_agent"])
+        critical_completed = any(
+            agent in completed_agents for agent in ["flight_agent", "hotel_agent"]
+        )
         if not critical_completed:
-            raise TravelCompanionError("Critical travel agents (flight or hotel) failed to complete")
+            raise TravelCompanionError(
+                "Critical travel agents (flight or hotel) failed to complete"
+            )
 
         # Create itinerary request with all available data as dictionary
         trip_request = state["trip_request"]
@@ -743,14 +764,12 @@ async def execute_itinerary_agent(state: TripPlanningWorkflowState) -> TripPlann
             "end_date": trip_request.requirements.end_date.isoformat(),
             "traveler_count": trip_request.requirements.travelers,
             "budget_constraints": state["budget_tracking"],
-
             # Agent results
             "flight_options": state.get("flight_results", []),
             "hotel_options": state.get("hotel_results", []),
             "activity_options": state.get("activity_results", []),
             "restaurant_options": state.get("food_recommendations", []),
             "weather_forecast": state.get("weather_data", {}),
-
             # Optimization preferences
             "optimization_criteria": ["budget", "time", "weather"],
             "user_preferences": state.get("user_preferences", {}),
@@ -761,7 +780,7 @@ async def execute_itinerary_agent(state: TripPlanningWorkflowState) -> TripPlann
         itinerary_response = await itinerary_agent.process(itinerary_request)
 
         # Store coordinated itinerary (simplified for implementation)
-        if hasattr(itinerary_response, 'model_dump') and callable(itinerary_response.model_dump):
+        if hasattr(itinerary_response, "model_dump") and callable(itinerary_response.model_dump):
             # Try to get the model dump
             try:
                 itinerary_data = itinerary_response.model_dump()
@@ -785,46 +804,61 @@ async def execute_itinerary_agent(state: TripPlanningWorkflowState) -> TripPlann
         else:
             # Handle mock objects by checking for the specific test setup pattern
             # For test mocks, attributes have .model_dump().return_value structure
-            optimized_itinerary = getattr(itinerary_response, 'optimized_itinerary', {})
-            daily_schedules = getattr(itinerary_response, 'daily_schedules', [])
-            budget_summary = getattr(itinerary_response, 'budget_summary', {})
+            optimized_itinerary = getattr(itinerary_response, "optimized_itinerary", {})
+            daily_schedules = getattr(itinerary_response, "daily_schedules", [])
+            budget_summary = getattr(itinerary_response, "budget_summary", {})
 
             state["itinerary_data"] = {
-                "optimized_itinerary": optimized_itinerary.model_dump.return_value if hasattr(optimized_itinerary, 'model_dump') and hasattr(optimized_itinerary.model_dump, 'return_value') else optimized_itinerary,
+                "optimized_itinerary": optimized_itinerary.model_dump.return_value
+                if hasattr(optimized_itinerary, "model_dump")
+                and hasattr(optimized_itinerary.model_dump, "return_value")
+                else optimized_itinerary,
                 "daily_schedules": [
-                    schedule.model_dump.return_value if hasattr(schedule, 'model_dump') and hasattr(schedule.model_dump, 'return_value') else schedule
+                    schedule.model_dump.return_value
+                    if hasattr(schedule, "model_dump")
+                    and hasattr(schedule.model_dump, "return_value")
+                    else schedule
                     for schedule in daily_schedules
                 ],
-                "budget_summary": budget_summary.model_dump.return_value if hasattr(budget_summary, 'model_dump') and hasattr(budget_summary.model_dump, 'return_value') else budget_summary,
-                "optimization_score": getattr(itinerary_response, 'optimization_score', 0.0),
-                "recommendations": getattr(itinerary_response, 'recommendations', []),
+                "budget_summary": budget_summary.model_dump.return_value
+                if hasattr(budget_summary, "model_dump")
+                and hasattr(budget_summary.model_dump, "return_value")
+                else budget_summary,
+                "optimization_score": getattr(itinerary_response, "optimization_score", 0.0),
+                "recommendations": getattr(itinerary_response, "recommendations", []),
             }
 
         # Update final budget tracking (simplified)
         budget_summary = state["itinerary_data"]["budget_summary"]
-        if hasattr(budget_summary, 'get'):
+        if hasattr(budget_summary, "get"):
             total_cost = budget_summary.get("total_estimated_cost", {}).get("amount", 2500.0)
         else:
             # Handle case where budget_summary is not a dict (e.g., mock object)
             total_cost = 2500.0
 
-        state["budget_tracking"].update({
-            "final_total": float(total_cost),
-            "budget_utilization": float(total_cost) / state["budget_tracking"]["total_budget"],
-            "savings": state["budget_tracking"]["total_budget"] - float(total_cost),
-        })
+        state["budget_tracking"].update(
+            {
+                "final_total": float(total_cost),
+                "budget_utilization": float(total_cost) / state["budget_tracking"]["total_budget"],
+                "savings": state["budget_tracking"]["total_budget"] - float(total_cost),
+            }
+        )
 
         # Update optimization metrics
         optimization_score = state["itinerary_data"]["optimization_score"]
         # Handle case where optimization_score might be a mock object
-        if hasattr(optimization_score, '_mock_name'):
+        if hasattr(optimization_score, "_mock_name"):
             # For mock objects, try to get the actual value if it's a number
-            optimization_score = float(optimization_score) if isinstance(optimization_score, int | float) else 0.0
-        state["optimization_metrics"].update({
-            "itinerary_score": optimization_score,
-            "total_recommendations": len(state["itinerary_data"]["recommendations"]),
-            "daily_schedules_count": len(state["itinerary_data"]["daily_schedules"]),
-        })
+            optimization_score = (
+                float(optimization_score) if isinstance(optimization_score, int | float) else 0.0
+            )
+        state["optimization_metrics"].update(
+            {
+                "itinerary_score": optimization_score,
+                "total_recommendations": len(state["itinerary_data"]["recommendations"]),
+                "daily_schedules_count": len(state["itinerary_data"]["daily_schedules"]),
+            }
+        )
 
         # Update tracking
         state["agents_completed"].append(node_name)
@@ -884,11 +918,14 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
 
         # Calculate final execution metrics
         total_execution_time_ms = (time.time() - state["start_time"]) * 1000
-        state["optimization_metrics"].update({
-            "total_execution_time_ms": total_execution_time_ms,
-            "nodes_executed": len(state["agents_completed"]) + 2,  # +2 for init and finalize
-            "success_rate": len(state["agents_completed"]) / (len(state["agents_completed"]) + len(state["agents_failed"])),
-        })
+        state["optimization_metrics"].update(
+            {
+                "total_execution_time_ms": total_execution_time_ms,
+                "nodes_executed": len(state["agents_completed"]) + 2,  # +2 for init and finalize
+                "success_rate": len(state["agents_completed"])
+                / (len(state["agents_completed"]) + len(state["agents_failed"])),
+            }
+        )
 
         # Use result aggregator for comprehensive plan creation
         try:
@@ -903,7 +940,6 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
                 "trip_plan_id": aggregated_plan.trip_id,
                 "workflow_id": state["workflow_id"],
                 "request_id": state["request_id"],
-
                 # Aggregated trip plan with correlations
                 "trip_plan": {
                     "destination": aggregated_plan.destination,
@@ -911,20 +947,24 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
                     "total_travelers": aggregated_plan.total_travelers,
                     "flights": [flight.model_dump() for flight in aggregated_plan.flights],
                     "hotels": [hotel.model_dump() for hotel in aggregated_plan.hotels],
-                    "activities": [activity.model_dump() for activity in aggregated_plan.activities],
-                    "restaurants": [restaurant.model_dump() for restaurant in aggregated_plan.restaurants],
+                    "activities": [
+                        activity.model_dump() for activity in aggregated_plan.activities
+                    ],
+                    "restaurants": [
+                        restaurant.model_dump() for restaurant in aggregated_plan.restaurants
+                    ],
                     "weather_forecast": aggregated_plan.weather_forecast,
                     "daily_schedule": aggregated_plan.daily_schedule,
                 },
-
                 # Cost analysis
                 "cost_analysis": {
                     "total_estimated_cost": float(aggregated_plan.total_estimated_cost),
-                    "cost_breakdown": {k: float(v) for k, v in aggregated_plan.cost_breakdown.items()},
+                    "cost_breakdown": {
+                        k: float(v) for k, v in aggregated_plan.cost_breakdown.items()
+                    },
                     "average_daily_cost": float(aggregated_plan.average_daily_cost),
                     "budget_utilization": aggregated_plan.budget_utilization,
                 },
-
                 # Quality metrics
                 "quality_metrics": {
                     "overall_quality_score": aggregated_plan.overall_quality_score,
@@ -934,7 +974,6 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
                     "weather_consideration": aggregated_plan.weather_consideration,
                     "schedule_density": aggregated_plan.schedule_density,
                 },
-
                 # Result correlations
                 "correlations": [
                     {
@@ -943,26 +982,28 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
                         "type": corr.correlation_type,
                         "strength": corr.strength,
                         "score": corr.score,
-                        "explanation": corr.explanation
+                        "explanation": corr.explanation,
                     }
                     for corr in aggregated_plan.correlations
                 ],
-
                 # Enhanced execution summary
                 "execution_summary": {
                     "status": "completed" if not state.get("error") else "completed_with_errors",
                     "agents_completed": state.get("agents_completed", []),
                     "agents_failed": state.get("agents_failed", []),
                     "total_execution_time_ms": total_execution_time_ms,
-                    "parallel_optimizations": state["optimization_metrics"].get("parallel_executions", 0),
+                    "parallel_optimizations": state["optimization_metrics"].get(
+                        "parallel_executions", 0
+                    ),
                     "api_calls_made": state["optimization_metrics"].get("total_api_calls", 0),
                 },
-
                 # Additional context
                 "budget_summary": state.get("budget_tracking", {}),
                 "optimization_metrics": state.get("optimization_metrics", {}),
                 "coordination_metrics": state.get("coordination_metrics", {}),
-                "original_request": state["trip_request"].model_dump() if state.get("trip_request") else {},
+                "original_request": state["trip_request"].model_dump()
+                if state.get("trip_request")
+                else {},
                 "user_preferences": state.get("user_preferences", {}),
             }
 
@@ -975,7 +1016,6 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
                 "trip_plan_id": state.get("trip_id", f"trip_{state['workflow_id'][:8]}"),
                 "workflow_id": state["workflow_id"],
                 "request_id": state["request_id"],
-
                 # Basic trip planning results
                 "trip_plan": {
                     "itinerary": state.get("itinerary_data", {}),
@@ -985,30 +1025,31 @@ def finalize_trip_plan(state: TripPlanningWorkflowState) -> TripPlanningWorkflow
                     "restaurant_recommendations": state.get("food_recommendations", []),
                     "weather_forecast": state.get("weather_data", {}),
                 },
-
                 # Execution summary
                 "execution_summary": {
                     "status": "completed" if not state.get("error") else "completed_with_errors",
                     "agents_completed": state.get("agents_completed", []),
                     "agents_failed": state.get("agents_failed", []),
                     "total_execution_time_ms": total_execution_time_ms,
-                    "parallel_optimizations": state["optimization_metrics"].get("parallel_executions", 0),
+                    "parallel_optimizations": state["optimization_metrics"].get(
+                        "parallel_executions", 0
+                    ),
                     "api_calls_made": state["optimization_metrics"].get("total_api_calls", 0),
                 },
-
                 # Basic context
                 "budget_summary": state.get("budget_tracking", {}),
                 "optimization_metrics": state.get("optimization_metrics", {}),
-                "original_request": state["trip_request"].model_dump() if state.get("trip_request") else {},
+                "original_request": state["trip_request"].model_dump()
+                if state.get("trip_request")
+                else {},
                 "user_preferences": state.get("user_preferences", {}),
                 "aggregation_error": str(aggregation_error),
-
                 # Add direct access to results for test compatibility
                 "flight_options": state.get("flight_results", []),
                 "hotel_options": state.get("hotel_results", []),
                 "activity_options": state.get("activity_results", []),
                 "restaurant_recommendations": state.get("food_recommendations", []),
-                "weather_forecast": state.get("weather_data", {})
+                "weather_forecast": state.get("weather_data", {}),
             }
 
         # Set final output data
@@ -1106,4 +1147,3 @@ def route_based_on_preferences(state: TripPlanningWorkflowState) -> dict[str, st
         return {"critical_failure": "finalize_plan"}
 
     return routing
-

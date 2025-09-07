@@ -15,20 +15,20 @@ from .orchestrator import TripPlanningWorkflowState
 class CorrelationStrength(str, Enum):
     """Strength of correlation between agent results."""
 
-    STRONG = "strong"      # Direct dependency or high relevance
+    STRONG = "strong"  # Direct dependency or high relevance
     MODERATE = "moderate"  # Indirect relationship or medium relevance
-    WEAK = "weak"         # Low relevance or optional relationship
-    NONE = "none"         # No meaningful relationship
+    WEAK = "weak"  # Low relevance or optional relationship
+    NONE = "none"  # No meaningful relationship
 
 
 class CorrelationType(str, Enum):
     """Type of correlation between results."""
 
-    TEMPORAL = "temporal"      # Time-based relationships
-    SPATIAL = "spatial"        # Location-based relationships
-    BUDGET = "budget"          # Cost-based relationships
+    TEMPORAL = "temporal"  # Time-based relationships
+    SPATIAL = "spatial"  # Location-based relationships
+    BUDGET = "budget"  # Cost-based relationships
     PREFERENCE = "preference"  # User preference-based relationships
-    LOGICAL = "logical"        # Logical dependencies (e.g., weather -> activities)
+    LOGICAL = "logical"  # Logical dependencies (e.g., weather -> activities)
 
 
 @dataclass
@@ -129,8 +129,7 @@ class AgentResultAggregator:
         start_time = time.time()
 
         workflow_logger.log_aggregation_started(
-            workflow_id=self.workflow_id,
-            request_id=self.request_id
+            workflow_id=self.workflow_id, request_id=self.request_id
         )
 
         try:
@@ -162,7 +161,7 @@ class AgentResultAggregator:
                 request_id=self.request_id,
                 aggregation_time_ms=aggregation_time_ms,
                 total_correlations=len(aggregated_plan.correlations),
-                quality_score=aggregated_plan.overall_quality_score
+                quality_score=aggregated_plan.overall_quality_score,
             )
 
             return aggregated_plan
@@ -174,7 +173,7 @@ class AgentResultAggregator:
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
                 error=str(e),
-                aggregation_time_ms=aggregation_time_ms
+                aggregation_time_ms=aggregation_time_ms,
             )
 
             raise
@@ -269,19 +268,21 @@ class AgentResultAggregator:
 
                 if arrival_date == checkin_date:
                     # Strong temporal correlation for same-day arrival
-                    correlations.append(ResultCorrelation(
-                        from_agent="flight_agent",
-                        to_agent="hotel_agent",
-                        correlation_type=CorrelationType.TEMPORAL,
-                        strength=CorrelationStrength.STRONG,
-                        score=0.9,
-                        explanation=f"Flight {flight.flight_number} arrives on hotel check-in date",
-                        metadata={
-                            "flight_id": str(flight.flight_id),
-                            "hotel_name": hotel.name,
-                            "arrival_time": flight.arrival_time.isoformat(),
-                        }
-                    ))
+                    correlations.append(
+                        ResultCorrelation(
+                            from_agent="flight_agent",
+                            to_agent="hotel_agent",
+                            correlation_type=CorrelationType.TEMPORAL,
+                            strength=CorrelationStrength.STRONG,
+                            score=0.9,
+                            explanation=f"Flight {flight.flight_number} arrives on hotel check-in date",
+                            metadata={
+                                "flight_id": str(flight.flight_id),
+                                "hotel_name": hotel.name,
+                                "arrival_time": flight.arrival_time.isoformat(),
+                            },
+                        )
+                    )
 
         return correlations
 
@@ -293,7 +294,7 @@ class AgentResultAggregator:
         daily_forecasts = weather_forecast.get("daily_forecasts", [])
 
         for activity in plan.activities:
-            for i, daily_weather in enumerate(daily_forecasts[:plan.duration_days]):
+            for i, daily_weather in enumerate(daily_forecasts[: plan.duration_days]):
                 condition = daily_weather.get("condition", "unknown")
 
                 # Determine correlation strength based on activity type and weather
@@ -329,20 +330,22 @@ class AgentResultAggregator:
                     score = 0.4
                     explanation = f"Weather-neutral activity: {activity.name}"
 
-                correlations.append(ResultCorrelation(
-                    from_agent="weather_agent",
-                    to_agent="activity_agent",
-                    correlation_type=CorrelationType.LOGICAL,
-                    strength=strength,
-                    score=score,
-                    explanation=explanation,
-                    metadata={
-                        "activity_id": getattr(activity, "activity_id", "unknown"),
-                        "day": i + 1,
-                        "weather_condition": condition,
-                        "activity_category": activity_category
-                    }
-                ))
+                correlations.append(
+                    ResultCorrelation(
+                        from_agent="weather_agent",
+                        to_agent="activity_agent",
+                        correlation_type=CorrelationType.LOGICAL,
+                        strength=strength,
+                        score=score,
+                        explanation=explanation,
+                        metadata={
+                            "activity_id": getattr(activity, "activity_id", "unknown"),
+                            "day": i + 1,
+                            "weather_condition": condition,
+                            "activity_category": activity_category,
+                        },
+                    )
+                )
 
         return correlations
 
@@ -353,13 +356,15 @@ class AgentResultAggregator:
         for hotel in plan.hotels:
             for activity in plan.activities:
                 # Calculate spatial correlation based on location proximity
-                hotel_location = hotel.address if hasattr(hotel, 'address') else hotel.name
+                hotel_location = hotel.address if hasattr(hotel, "address") else hotel.name
                 activity_location = getattr(activity, "location", "unknown")
 
                 # Simple text-based proximity check (in real implementation, use geocoding)
                 if hotel_location and activity_location:
-                    if hotel_location.lower() in activity_location.lower() or \
-                       activity_location.lower() in hotel_location.lower():
+                    if (
+                        hotel_location.lower() in activity_location.lower()
+                        or activity_location.lower() in hotel_location.lower()
+                    ):
                         strength = CorrelationStrength.STRONG
                         score = 0.8
                         explanation = f"Hotel {hotel.name} is near activity {activity.name}"
@@ -378,20 +383,22 @@ class AgentResultAggregator:
                             score = 0.3
                             explanation = "Hotel and activity in same destination"
 
-                    correlations.append(ResultCorrelation(
-                        from_agent="hotel_agent",
-                        to_agent="activity_agent",
-                        correlation_type=CorrelationType.SPATIAL,
-                        strength=strength,
-                        score=score,
-                        explanation=explanation,
-                        metadata={
-                            "hotel_name": hotel.name,
-                            "activity_name": activity.name,
-                            "hotel_location": hotel_location,
-                            "activity_location": activity_location
-                        }
-                    ))
+                    correlations.append(
+                        ResultCorrelation(
+                            from_agent="hotel_agent",
+                            to_agent="activity_agent",
+                            correlation_type=CorrelationType.SPATIAL,
+                            strength=strength,
+                            score=score,
+                            explanation=explanation,
+                            metadata={
+                                "hotel_name": hotel.name,
+                                "activity_name": activity.name,
+                                "hotel_location": hotel_location,
+                                "activity_location": activity_location,
+                            },
+                        )
+                    )
 
         return correlations
 
@@ -421,19 +428,21 @@ class AgentResultAggregator:
                     score = 0.3
                     explanation = f"Flight over budget ({budget_ratio:.1%} of allocation)"
 
-                correlations.append(ResultCorrelation(
-                    from_agent="flight_agent",
-                    to_agent="budget_tracker",
-                    correlation_type=CorrelationType.BUDGET,
-                    strength=strength,
-                    score=score,
-                    explanation=explanation,
-                    metadata={
-                        "flight_price": float(flight.price),
-                        "budget_allocation": flight_budget,
-                        "budget_ratio": budget_ratio
-                    }
-                ))
+                correlations.append(
+                    ResultCorrelation(
+                        from_agent="flight_agent",
+                        to_agent="budget_tracker",
+                        correlation_type=CorrelationType.BUDGET,
+                        strength=strength,
+                        score=score,
+                        explanation=explanation,
+                        metadata={
+                            "flight_price": float(flight.price),
+                            "budget_allocation": flight_budget,
+                            "budget_ratio": budget_ratio,
+                        },
+                    )
+                )
 
         return correlations
 
@@ -455,44 +464,48 @@ class AgentResultAggregator:
                 )
 
                 if preference_match:
-                    correlations.append(ResultCorrelation(
-                        from_agent="activity_agent",
-                        to_agent="user_preferences",
-                        correlation_type=CorrelationType.PREFERENCE,
-                        strength=CorrelationStrength.STRONG,
-                        score=0.9,
-                        explanation=f"Activity matches user preferences: {activity.name}",
-                        metadata={
-                            "activity_category": activity_category,
-                            "preferred_types": preferred_activities,
-                            "match": True
-                        }
-                    ))
+                    correlations.append(
+                        ResultCorrelation(
+                            from_agent="activity_agent",
+                            to_agent="user_preferences",
+                            correlation_type=CorrelationType.PREFERENCE,
+                            strength=CorrelationStrength.STRONG,
+                            score=0.9,
+                            explanation=f"Activity matches user preferences: {activity.name}",
+                            metadata={
+                                "activity_category": activity_category,
+                                "preferred_types": preferred_activities,
+                                "match": True,
+                            },
+                        )
+                    )
 
         # Cuisine preferences
         preferred_cuisines = preferences.get("cuisine_types", [])
         if preferred_cuisines:
             for restaurant in plan.restaurants:
                 cuisine_match = any(
-                    cuisine.lower() in restaurant.cuisine_type.lower() or
-                    restaurant.cuisine_type.lower() in cuisine.lower()
+                    cuisine.lower() in restaurant.cuisine_type.lower()
+                    or restaurant.cuisine_type.lower() in cuisine.lower()
                     for cuisine in preferred_cuisines
                 )
 
                 if cuisine_match:
-                    correlations.append(ResultCorrelation(
-                        from_agent="food_agent",
-                        to_agent="user_preferences",
-                        correlation_type=CorrelationType.PREFERENCE,
-                        strength=CorrelationStrength.STRONG,
-                        score=0.85,
-                        explanation=f"Restaurant matches cuisine preferences: {restaurant.name}",
-                        metadata={
-                            "restaurant_cuisine": restaurant.cuisine_type,
-                            "preferred_cuisines": preferred_cuisines,
-                            "match": True
-                        }
-                    ))
+                    correlations.append(
+                        ResultCorrelation(
+                            from_agent="food_agent",
+                            to_agent="user_preferences",
+                            correlation_type=CorrelationType.PREFERENCE,
+                            strength=CorrelationStrength.STRONG,
+                            score=0.85,
+                            explanation=f"Restaurant matches cuisine preferences: {restaurant.name}",
+                            metadata={
+                                "restaurant_cuisine": restaurant.cuisine_type,
+                                "preferred_cuisines": preferred_cuisines,
+                                "match": True,
+                            },
+                        )
+                    )
 
         return correlations
 
@@ -526,7 +539,9 @@ class AgentResultAggregator:
 
         # Restaurant costs (estimated per day)
         if plan.restaurants:
-            daily_food_cost = Decimal("50.00") * plan.total_travelers  # Estimate $50 per person per day
+            daily_food_cost = (
+                Decimal("50.00") * plan.total_travelers
+            )  # Estimate $50 per person per day
             cost_breakdown["food"] = daily_food_cost * plan.duration_days
 
         # Calculate totals
@@ -553,23 +568,27 @@ class AgentResultAggregator:
             # Add flight information for arrival/departure days
             if day == 0 and plan.flights:  # Arrival day
                 arrival_flight = min(plan.flights, key=lambda f: f.arrival_time)
-                day_activities.append({
-                    "type": "transport",
-                    "activity": "Flight Arrival",
-                    "time": arrival_flight.arrival_time.strftime("%H:%M"),
-                    "details": f"{arrival_flight.airline} {arrival_flight.flight_number}",
-                    "duration_hours": 0.5
-                })
+                day_activities.append(
+                    {
+                        "type": "transport",
+                        "activity": "Flight Arrival",
+                        "time": arrival_flight.arrival_time.strftime("%H:%M"),
+                        "details": f"{arrival_flight.airline} {arrival_flight.flight_number}",
+                        "duration_hours": 0.5,
+                    }
+                )
 
             if day == plan.duration_days - 1 and plan.flights:  # Departure day
                 departure_flight = min(plan.flights, key=lambda f: f.departure_time)
-                day_activities.append({
-                    "type": "transport",
-                    "activity": "Flight Departure",
-                    "time": departure_flight.departure_time.strftime("%H:%M"),
-                    "details": f"{departure_flight.airline} {departure_flight.flight_number}",
-                    "duration_hours": 0.5
-                })
+                day_activities.append(
+                    {
+                        "type": "transport",
+                        "activity": "Flight Departure",
+                        "time": departure_flight.departure_time.strftime("%H:%M"),
+                        "details": f"{departure_flight.airline} {departure_flight.flight_number}",
+                        "duration_hours": 0.5,
+                    }
+                )
 
             # Add weather-appropriate activities
             weather_forecast = plan.weather_forecast.get("forecast", {})
@@ -587,14 +606,18 @@ class AgentResultAggregator:
                 # Add 2-3 activities per day
                 for i, activity in enumerate(suitable_activities[:3]):
                     activity_time = f"{9 + i * 3:02d}:00"  # Space activities 3 hours apart
-                    day_activities.append({
-                        "type": "activity",
-                        "activity": activity.name,
-                        "time": activity_time,
-                        "details": activity.description if hasattr(activity, "description") else "",
-                        "duration_hours": getattr(activity, "duration_hours", 2.0),
-                        "category": getattr(activity, "category", "general")
-                    })
+                    day_activities.append(
+                        {
+                            "type": "activity",
+                            "activity": activity.name,
+                            "time": activity_time,
+                            "details": activity.description
+                            if hasattr(activity, "description")
+                            else "",
+                            "duration_hours": getattr(activity, "duration_hours", 2.0),
+                            "category": getattr(activity, "category", "general"),
+                        }
+                    )
 
             # Add meal recommendations
             if plan.restaurants:
@@ -602,24 +625,26 @@ class AgentResultAggregator:
                 lunch_restaurant = plan.restaurants[day % len(plan.restaurants)]
                 dinner_restaurant = plan.restaurants[(day + 1) % len(plan.restaurants)]
 
-                day_activities.extend([
-                    {
-                        "type": "dining",
-                        "activity": f"Lunch at {lunch_restaurant.name}",
-                        "time": "12:30",
-                        "details": f"{lunch_restaurant.cuisine_type} cuisine",
-                        "duration_hours": 1.5,
-                        "price_range": lunch_restaurant.price_range
-                    },
-                    {
-                        "type": "dining",
-                        "activity": f"Dinner at {dinner_restaurant.name}",
-                        "time": "19:00",
-                        "details": f"{dinner_restaurant.cuisine_type} cuisine",
-                        "duration_hours": 2.0,
-                        "price_range": dinner_restaurant.price_range
-                    }
-                ])
+                day_activities.extend(
+                    [
+                        {
+                            "type": "dining",
+                            "activity": f"Lunch at {lunch_restaurant.name}",
+                            "time": "12:30",
+                            "details": f"{lunch_restaurant.cuisine_type} cuisine",
+                            "duration_hours": 1.5,
+                            "price_range": lunch_restaurant.price_range,
+                        },
+                        {
+                            "type": "dining",
+                            "activity": f"Dinner at {dinner_restaurant.name}",
+                            "time": "19:00",
+                            "details": f"{dinner_restaurant.cuisine_type} cuisine",
+                            "duration_hours": 2.0,
+                            "price_range": dinner_restaurant.price_range,
+                        },
+                    ]
+                )
 
             # Sort activities by time
             day_activities.sort(key=lambda x: x["time"])
@@ -627,7 +652,7 @@ class AgentResultAggregator:
                 "date": day_date.isoformat(),
                 "weather": daily_forecasts[day] if day < len(daily_forecasts) else {},
                 "activities": day_activities,
-                "total_activities": len(day_activities)
+                "total_activities": len(day_activities),
             }
 
         plan.daily_schedule = daily_schedule
@@ -640,7 +665,7 @@ class AgentResultAggregator:
             "hotels": len(plan.hotels) > 0,
             "activities": len(plan.activities) > 0,
             "restaurants": len(plan.restaurants) > 0,
-            "weather": bool(plan.weather_forecast)
+            "weather": bool(plan.weather_forecast),
         }
 
         plan.completeness_score = sum(agent_results.values()) / len(agent_results)
@@ -654,7 +679,8 @@ class AgentResultAggregator:
 
         # Preference alignment score
         preference_correlations = [
-            corr for corr in plan.correlations
+            corr
+            for corr in plan.correlations
             if corr.correlation_type == CorrelationType.PREFERENCE
         ]
 
@@ -666,8 +692,10 @@ class AgentResultAggregator:
 
         # Weather consideration score
         weather_correlations = [
-            corr for corr in plan.correlations
-            if corr.correlation_type == CorrelationType.LOGICAL and corr.from_agent == "weather_agent"
+            corr
+            for corr in plan.correlations
+            if corr.correlation_type == CorrelationType.LOGICAL
+            and corr.from_agent == "weather_agent"
         ]
 
         if weather_correlations:
@@ -679,11 +707,12 @@ class AgentResultAggregator:
         # Schedule density (activities per day)
         if plan.daily_schedule:
             daily_activity_counts = [
-                day_data["total_activities"]
-                for day_data in plan.daily_schedule.values()
+                day_data["total_activities"] for day_data in plan.daily_schedule.values()
             ]
             average_activities_per_day = sum(daily_activity_counts) / len(daily_activity_counts)
-            plan.schedule_density = min(average_activities_per_day / 6.0, 1.0)  # Max 6 activities per day
+            plan.schedule_density = min(
+                average_activities_per_day / 6.0, 1.0
+            )  # Max 6 activities per day
 
         # Overall quality score (weighted average)
         weights = {
@@ -691,15 +720,15 @@ class AgentResultAggregator:
             "coherence": 0.25,
             "preference_alignment": 0.2,
             "weather_consideration": 0.15,
-            "schedule_density": 0.1
+            "schedule_density": 0.1,
         }
 
         plan.overall_quality_score = (
-            plan.completeness_score * weights["completeness"] +
-            plan.coherence_score * weights["coherence"] +
-            plan.preference_alignment * weights["preference_alignment"] +
-            plan.weather_consideration * weights["weather_consideration"] +
-            plan.schedule_density * weights["schedule_density"]
+            plan.completeness_score * weights["completeness"]
+            + plan.coherence_score * weights["coherence"]
+            + plan.preference_alignment * weights["preference_alignment"]
+            + plan.weather_consideration * weights["weather_consideration"]
+            + plan.schedule_density * weights["schedule_density"]
         )
 
     def _validate_plan_coherence(self, plan: AggregatedTripPlan) -> None:
@@ -718,7 +747,8 @@ class AgentResultAggregator:
 
         # Check correlation coherence
         weak_correlations = [
-            corr for corr in plan.correlations
+            corr
+            for corr in plan.correlations
             if corr.strength == CorrelationStrength.WEAK and corr.score < 0.3
         ]
 
@@ -731,13 +761,11 @@ class AgentResultAggregator:
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
                 issues=issues,
-                quality_score=plan.overall_quality_score
+                quality_score=plan.overall_quality_score,
             )
 
     def _get_weather_suitable_activities(
-        self,
-        activities: list[ActivityOption],
-        weather_condition: str
+        self, activities: list[ActivityOption], weather_condition: str
     ) -> list[ActivityOption]:
         """Filter activities based on weather suitability."""
         outdoor_friendly = ["clear", "sunny", "partly_cloudy", "cloudy"]
@@ -756,14 +784,26 @@ class AgentResultAggregator:
     def _get_outdoor_score(self, activity: ActivityOption) -> float:
         """Get outdoor suitability score for an activity."""
         outdoor_keywords = {"outdoor", "tour", "sightseeing", "walk", "park", "garden", "monument"}
-        activity_text = f"{getattr(activity, 'name', '')} {getattr(activity, 'category', '')}".lower()
+        activity_text = (
+            f"{getattr(activity, 'name', '')} {getattr(activity, 'category', '')}".lower()
+        )
 
         return sum(1 for keyword in outdoor_keywords if keyword in activity_text)
 
     def _get_indoor_score(self, activity: ActivityOption) -> float:
         """Get indoor suitability score for an activity."""
-        indoor_keywords = {"museum", "gallery", "shopping", "theater", "cinema", "indoor", "cultural"}
-        activity_text = f"{getattr(activity, 'name', '')} {getattr(activity, 'category', '')}".lower()
+        indoor_keywords = {
+            "museum",
+            "gallery",
+            "shopping",
+            "theater",
+            "cinema",
+            "indoor",
+            "cultural",
+        }
+        activity_text = (
+            f"{getattr(activity, 'name', '')} {getattr(activity, 'category', '')}".lower()
+        )
 
         return sum(1 for keyword in indoor_keywords if keyword in activity_text)
 
@@ -779,7 +819,7 @@ class AgentResultAggregator:
             "outdoor": Decimal("10.00"),
             "adventure": Decimal("60.00"),
             "shopping": Decimal("25.00"),
-            "general": Decimal("20.00")
+            "general": Decimal("20.00"),
         }
 
         for cat_key, cost in cost_estimates.items():

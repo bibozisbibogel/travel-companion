@@ -32,7 +32,9 @@ class TestTripPlanEndpoint:
         }
 
         # Mock the workflow execution to prevent hanging
-        with patch.object(TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock) as mock_execute:
+        with patch.object(
+            TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock
+        ) as mock_execute:
             mock_execute.return_value = {
                 "trip_id": str(uuid4()),
                 "itinerary_data": None,  # Set to None for testing (plan field can be None)

@@ -143,9 +143,7 @@ class TestErrorRecoveryManager:
         """Test successful execution without retries."""
         mock_operation = AsyncMock(return_value="success")
 
-        result = await recovery_manager.execute_with_recovery(
-            "flight_agent", mock_operation
-        )
+        result = await recovery_manager.execute_with_recovery("flight_agent", mock_operation)
 
         assert result == "success"
         mock_operation.assert_called_once()
@@ -153,15 +151,10 @@ class TestErrorRecoveryManager:
     @pytest.mark.asyncio
     async def test_retry_on_transient_failure(self, recovery_manager):
         """Test retry mechanism on transient failures."""
-        mock_operation = AsyncMock(side_effect=[
-            Exception("Temporary failure"),
-            "success"
-        ])
+        mock_operation = AsyncMock(side_effect=[Exception("Temporary failure"), "success"])
 
-        with patch('asyncio.sleep'):  # Speed up test
-            result = await recovery_manager.execute_with_recovery(
-                "flight_agent", mock_operation
-            )
+        with patch("asyncio.sleep"):  # Speed up test
+            result = await recovery_manager.execute_with_recovery("flight_agent", mock_operation)
 
         assert result == "success"
         assert mock_operation.call_count == 2
@@ -171,11 +164,9 @@ class TestErrorRecoveryManager:
         """Test that critical agent failures raise exceptions."""
         mock_operation = AsyncMock(side_effect=Exception("Persistent failure"))
 
-        with patch('asyncio.sleep'):  # Speed up test
+        with patch("asyncio.sleep"):  # Speed up test
             with pytest.raises(CriticalAgentFailureError) as exc_info:
-                await recovery_manager.execute_with_recovery(
-                    "flight_agent", mock_operation
-                )
+                await recovery_manager.execute_with_recovery("flight_agent", mock_operation)
 
         assert "flight_agent" in str(exc_info.value)
         assert "all_retries_exhausted" in exc_info.value.details["recovery_strategy"]
@@ -185,10 +176,8 @@ class TestErrorRecoveryManager:
         """Test that non-critical agent failures return fallback data."""
         mock_operation = AsyncMock(side_effect=Exception("Persistent failure"))
 
-        with patch('asyncio.sleep'):  # Speed up test
-            result = await recovery_manager.execute_with_recovery(
-                "activity_agent", mock_operation
-            )
+        with patch("asyncio.sleep"):  # Speed up test
+            result = await recovery_manager.execute_with_recovery("activity_agent", mock_operation)
 
         assert result["fallback"] is True
         assert "activities" in result
@@ -199,14 +188,13 @@ class TestErrorRecoveryManager:
         # Mock circuit breaker to be open
         circuit_breaker = recovery_manager.circuit_breakers["flight_agent"]
         from travel_companion.utils.circuit_breaker import CircuitState
+
         circuit_breaker.state = CircuitState.OPEN
 
         mock_operation = AsyncMock()
 
         with pytest.raises(CriticalAgentFailureError):
-            await recovery_manager.execute_with_recovery(
-                "flight_agent", mock_operation
-            )
+            await recovery_manager.execute_with_recovery("flight_agent", mock_operation)
 
         # Operation should not be called when circuit is open
         mock_operation.assert_not_called()
@@ -217,13 +205,12 @@ class TestErrorRecoveryManager:
         # Mock circuit breaker to be open
         circuit_breaker = recovery_manager.circuit_breakers["activity_agent"]
         from travel_companion.utils.circuit_breaker import CircuitState
+
         circuit_breaker.state = CircuitState.OPEN
 
         mock_operation = AsyncMock()
 
-        result = await recovery_manager.execute_with_recovery(
-            "activity_agent", mock_operation
-        )
+        result = await recovery_manager.execute_with_recovery("activity_agent", mock_operation)
 
         assert result["fallback"] is True
         mock_operation.assert_not_called()
@@ -252,6 +239,7 @@ class TestErrorRecoveryManager:
         circuit_breaker = recovery_manager.circuit_breakers["flight_agent"]
         circuit_breaker.failure_count = 5
         from travel_companion.utils.circuit_breaker import CircuitState
+
         circuit_breaker.state = CircuitState.OPEN
 
         success = recovery_manager.reset_circuit_breaker("flight_agent")
@@ -259,6 +247,7 @@ class TestErrorRecoveryManager:
         assert success is True
         assert circuit_breaker.failure_count == 0
         from travel_companion.utils.circuit_breaker import CircuitState
+
         assert circuit_breaker.state == CircuitState.CLOSED
 
     def test_reset_nonexistent_circuit_breaker(self, recovery_manager):
@@ -284,6 +273,7 @@ class TestErrorRecoveryManager:
         # Open circuit breaker for critical agent
         circuit_breaker = recovery_manager.circuit_breakers["flight_agent"]
         from travel_companion.utils.circuit_breaker import CircuitState
+
         circuit_breaker.state = CircuitState.OPEN
 
         health = await recovery_manager.health_check()
@@ -297,6 +287,7 @@ class TestErrorRecoveryManager:
         """Test health check when majority of agents are down."""
         # Open circuit breakers for multiple agents
         from travel_companion.utils.circuit_breaker import CircuitState
+
         for agent_name in ["flight_agent", "hotel_agent", "activity_agent", "weather_agent"]:
             circuit_breaker = recovery_manager.circuit_breakers[agent_name]
             circuit_breaker.state = CircuitState.OPEN
@@ -332,9 +323,7 @@ class TestWorkflowFallbackOrchestrator:
             "activity_agent": {"fallback": True, "activities": []},
         }
 
-        result = await orchestrator.create_minimal_itinerary(
-            trip_request, successful_agents
-        )
+        result = await orchestrator.create_minimal_itinerary(trip_request, successful_agents)
 
         assert result["trip_id"] == "test-trip-123"
         assert result["status"] == "partial"
@@ -362,9 +351,7 @@ class TestWorkflowFallbackOrchestrator:
             "hotel_agent": hotel_mock,
         }
 
-        result = await orchestrator.execute_degraded_workflow(
-            trip_request, agent_operations
-        )
+        result = await orchestrator.execute_degraded_workflow(trip_request, agent_operations)
 
         assert result["trip_id"] == "test-trip-456"
         assert result["status"] == "partial"
@@ -376,14 +363,12 @@ class TestWorkflowFallbackOrchestrator:
         """Test executing agent with fallback handling."""
         # Mock successful operation
         success_operation = AsyncMock(return_value={"data": "success"})
-        result = await orchestrator._execute_agent_with_fallback(
-            "weather_agent", success_operation
-        )
+        result = await orchestrator._execute_agent_with_fallback("weather_agent", success_operation)
         assert result == {"data": "success"}
 
         # Mock failed operation
         failed_operation = AsyncMock(side_effect=Exception("API failure"))
-        with patch('asyncio.sleep'):  # Speed up test
+        with patch("asyncio.sleep"):  # Speed up test
             result = await orchestrator._execute_agent_with_fallback(
                 "weather_agent", failed_operation
             )
@@ -420,16 +405,16 @@ class TestIntegrationScenarios:
         return WorkflowFallbackOrchestrator(recovery_manager)
 
     @pytest.mark.asyncio
-    async def test_complete_workflow_with_mixed_failures(
-        self, recovery_manager, orchestrator
-    ):
+    async def test_complete_workflow_with_mixed_failures(self, recovery_manager, orchestrator):
         """Test complete workflow execution with mixed success/failure scenarios."""
         # Mock operations with different failure patterns
         flight_operation = AsyncMock(return_value={"flights": ["flight1", "flight2"]})
-        hotel_operation = AsyncMock(side_effect=[
-            Exception("Temporary failure"),
-            {"hotels": ["hotel1"]}  # Succeeds on retry
-        ])
+        hotel_operation = AsyncMock(
+            side_effect=[
+                Exception("Temporary failure"),
+                {"hotels": ["hotel1"]},  # Succeeds on retry
+            ]
+        )
         activity_operation = AsyncMock(side_effect=Exception("Persistent failure"))
         weather_operation = AsyncMock(return_value={"forecast": [{"temp": 22}]})
 
@@ -448,10 +433,8 @@ class TestIntegrationScenarios:
             "budget": 3000,
         }
 
-        with patch('asyncio.sleep'):  # Speed up test
-            result = await orchestrator.execute_degraded_workflow(
-                trip_request, agent_operations
-            )
+        with patch("asyncio.sleep"):  # Speed up test
+            result = await orchestrator.execute_degraded_workflow(trip_request, agent_operations)
 
         # Verify results
         assert result["trip_id"] == "integration-test"
@@ -481,7 +464,7 @@ class TestIntegrationScenarios:
 
         # Execute multiple times to trigger circuit breaker
         results = []
-        with patch('asyncio.sleep'):  # Speed up test
+        with patch("asyncio.sleep"):  # Speed up test
             for _i in range(10):
                 try:
                     result = await recovery_manager.execute_with_recovery(

@@ -471,7 +471,6 @@ class WorkflowLogger:
             },
         )
 
-
     def log_workflow_failed(
         self,
         workflow_id: str,

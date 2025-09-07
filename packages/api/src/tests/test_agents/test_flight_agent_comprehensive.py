@@ -157,7 +157,9 @@ class TestFlightAgentComprehensive:
         with patch("asyncio.wait_for") as mock_wait_for:
             mock_wait_for.side_effect = TimeoutError("Test timeout")
 
-            with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
+            with patch.object(
+                flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client
+            ):
                 flights = await flight_agent.search_flights(sample_flight_request)
 
         # Should fall back to mock data due to timeout

@@ -65,7 +65,9 @@ class AgentDependencyResolver:
     while respecting dependency constraints.
     """
 
-    def __init__(self, dependency_map: dict[str, list[str]], critical_agents: set[str] | None = None):
+    def __init__(
+        self, dependency_map: dict[str, list[str]], critical_agents: set[str] | None = None
+    ):
         """
         Initialize dependency resolver.
 
@@ -80,7 +82,7 @@ class AgentDependencyResolver:
             ExecutionPhase.INITIALIZATION: [],
             ExecutionPhase.PARALLEL_EXECUTION: [],
             ExecutionPhase.COORDINATION: [],
-            ExecutionPhase.FINALIZATION: []
+            ExecutionPhase.FINALIZATION: [],
         }
 
         # Initialize agent execution info
@@ -102,17 +104,14 @@ class AgentDependencyResolver:
             is_critical = agent in self.critical_agents
 
             self.agents[agent] = AgentExecutionInfo(
-                agent_name=agent,
-                dependencies=dependencies,
-                is_critical=is_critical
+                agent_name=agent, dependencies=dependencies, is_critical=is_critical
             )
 
     def _calculate_execution_phases(self) -> None:
         """Calculate execution phases for optimal parallel execution."""
         # Phase 1: Initialization - agents with no dependencies
         initialization_agents = [
-            agent for agent, info in self.agents.items()
-            if not info.dependencies
+            agent for agent, info in self.agents.items() if not info.dependencies
         ]
 
         # Phase 2: Parallel execution - agents that can run after initialization
@@ -143,7 +142,7 @@ class AgentDependencyResolver:
             ExecutionPhase.INITIALIZATION: initialization_agents,
             ExecutionPhase.PARALLEL_EXECUTION: parallel_agents,
             ExecutionPhase.COORDINATION: coordination_agents,
-            ExecutionPhase.FINALIZATION: finalization_agents
+            ExecutionPhase.FINALIZATION: finalization_agents,
         }
 
     def get_ready_agents(self) -> list[str]:
@@ -253,7 +252,8 @@ class AgentDependencyResolver:
             "success_rate": completed / total_agents if total_agents > 0 else 0,
             "total_execution_time_ms": total_execution_time,
             "critical_failures": [
-                info.agent_name for info in self.agents.values()
+                info.agent_name
+                for info in self.agents.values()
                 if info.status == AgentStatus.FAILED and info.is_critical
             ],
             "execution_phases": {
@@ -266,10 +266,10 @@ class AgentDependencyResolver:
                     "error": info.error,
                     "retry_count": info.retry_count,
                     "phase": info.execution_phase.value,
-                    "is_critical": info.is_critical
+                    "is_critical": info.is_critical,
                 }
                 for agent_name, info in self.agents.items()
-            }
+            },
         }
 
     def get_agents_by_phase(self, phase: ExecutionPhase) -> list[str]:
@@ -309,8 +309,7 @@ class WorkflowCoordinator:
         critical_agents = {"initialize_trip", "itinerary_agent", "finalize_plan"}
 
         self.dependency_resolver = AgentDependencyResolver(
-            dependency_map=dependency_map,
-            critical_agents=critical_agents
+            dependency_map=dependency_map, critical_agents=critical_agents
         )
 
         # Execution coordination
@@ -318,7 +317,9 @@ class WorkflowCoordinator:
         self.parallel_execution_tasks: dict[str, asyncio.Task] = {}
         self.state_transitions: list[dict[str, Any]] = []
 
-    async def coordinate_execution(self, node_functions: dict[str, Any]) -> TripPlanningWorkflowState:
+    async def coordinate_execution(
+        self, node_functions: dict[str, Any]
+    ) -> TripPlanningWorkflowState:
         """
         Coordinate the execution of all workflow nodes with dependency management.
 
@@ -331,7 +332,7 @@ class WorkflowCoordinator:
         workflow_logger.log_coordination_started(
             workflow_id=self.workflow_id,
             request_id=self.request_id,
-            total_agents=len(self.dependency_resolver.agents)
+            total_agents=len(self.dependency_resolver.agents),
         )
 
         try:
@@ -349,7 +350,7 @@ class WorkflowCoordinator:
             workflow_logger.log_coordination_completed(
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
-                execution_summary=execution_summary
+                execution_summary=execution_summary,
             )
 
             return self.state
@@ -359,7 +360,7 @@ class WorkflowCoordinator:
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
                 error=str(e),
-                execution_summary=self.dependency_resolver.get_execution_summary()
+                execution_summary=self.dependency_resolver.get_execution_summary(),
             )
 
             self.state["status"] = "failed"
@@ -369,7 +370,9 @@ class WorkflowCoordinator:
     async def _execute_initialization_phase(self, node_functions: dict[str, Any]) -> None:
         """Execute initialization phase agents."""
         self.current_phase = ExecutionPhase.INITIALIZATION
-        initialization_agents = self.dependency_resolver.get_agents_by_phase(ExecutionPhase.INITIALIZATION)
+        initialization_agents = self.dependency_resolver.get_agents_by_phase(
+            ExecutionPhase.INITIALIZATION
+        )
 
         for agent_name in initialization_agents:
             if agent_name in node_functions:
@@ -378,7 +381,9 @@ class WorkflowCoordinator:
     async def _execute_parallel_phase(self, node_functions: dict[str, Any]) -> None:
         """Execute parallel phase agents concurrently."""
         self.current_phase = ExecutionPhase.PARALLEL_EXECUTION
-        parallel_agents = self.dependency_resolver.get_agents_by_phase(ExecutionPhase.PARALLEL_EXECUTION)
+        parallel_agents = self.dependency_resolver.get_agents_by_phase(
+            ExecutionPhase.PARALLEL_EXECUTION
+        )
 
         # Create tasks for parallel execution
         tasks = []
@@ -397,16 +402,16 @@ class WorkflowCoordinator:
             # Process results and handle any exceptions
             for (agent_name, _task), result in zip(tasks, results, strict=False):
                 if isinstance(result, Exception):
-                    self.dependency_resolver.mark_agent_failed(
-                        agent_name, str(result)
-                    )
+                    self.dependency_resolver.mark_agent_failed(agent_name, str(result))
                     if not self.dependency_resolver.can_continue_workflow():
                         raise result
 
     async def _execute_coordination_phase(self, node_functions: dict[str, Any]) -> None:
         """Execute coordination phase agents."""
         self.current_phase = ExecutionPhase.COORDINATION
-        coordination_agents = self.dependency_resolver.get_agents_by_phase(ExecutionPhase.COORDINATION)
+        coordination_agents = self.dependency_resolver.get_agents_by_phase(
+            ExecutionPhase.COORDINATION
+        )
 
         for agent_name in coordination_agents:
             if agent_name in node_functions:
@@ -414,14 +419,14 @@ class WorkflowCoordinator:
                 if self._check_agent_dependencies(agent_name):
                     await self._execute_single_agent(agent_name, node_functions[agent_name])
                 else:
-                    self.dependency_resolver.mark_agent_skipped(
-                        agent_name, "Dependencies not met"
-                    )
+                    self.dependency_resolver.mark_agent_skipped(agent_name, "Dependencies not met")
 
     async def _execute_finalization_phase(self, node_functions: dict[str, Any]) -> None:
         """Execute finalization phase agents."""
         self.current_phase = ExecutionPhase.FINALIZATION
-        finalization_agents = self.dependency_resolver.get_agents_by_phase(ExecutionPhase.FINALIZATION)
+        finalization_agents = self.dependency_resolver.get_agents_by_phase(
+            ExecutionPhase.FINALIZATION
+        )
 
         for agent_name in finalization_agents:
             if agent_name in node_functions:
@@ -447,7 +452,7 @@ class WorkflowCoordinator:
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
                 agent_name=agent_name,
-                phase=self.current_phase.value
+                phase=self.current_phase.value,
             )
 
             # Execute agent function
@@ -471,7 +476,7 @@ class WorkflowCoordinator:
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
                 agent_name=agent_name,
-                execution_time_ms=execution_time_ms
+                execution_time_ms=execution_time_ms,
             )
 
         except Exception as e:
@@ -488,7 +493,7 @@ class WorkflowCoordinator:
                 request_id=self.request_id,
                 agent_name=agent_name,
                 error=error_msg,
-                execution_time_ms=execution_time_ms
+                execution_time_ms=execution_time_ms,
             )
 
             # Check if this is a critical failure
@@ -501,7 +506,7 @@ class WorkflowCoordinator:
                 request_id=self.request_id,
                 agent_name=agent_name,
                 error=error_msg,
-                workflow_continuing=True
+                workflow_continuing=True,
             )
 
     def _check_agent_dependencies(self, agent_name: str) -> bool:
@@ -532,7 +537,7 @@ class WorkflowCoordinator:
         agent_name: str,
         transition_type: str,
         execution_time_ms: float | None = None,
-        error: str | None = None
+        error: str | None = None,
     ) -> None:
         """Record a state transition for audit and debugging."""
         transition = {
@@ -541,7 +546,7 @@ class WorkflowCoordinator:
             "transition_type": transition_type,
             "phase": self.current_phase.value,
             "execution_time_ms": execution_time_ms,
-            "error": error
+            "error": error,
         }
 
         self.state_transitions.append(transition)
@@ -564,7 +569,8 @@ class WorkflowCoordinator:
         phase_timings = {}
         for phase in ExecutionPhase:
             phase_transitions = [
-                t for t in self.state_transitions
+                t
+                for t in self.state_transitions
                 if t["phase"] == phase.value and t["execution_time_ms"] is not None
             ]
 
@@ -573,7 +579,7 @@ class WorkflowCoordinator:
                 phase_timings[phase.value] = {
                     "total_time_ms": total_time,
                     "agent_count": len(phase_transitions),
-                    "average_time_ms": total_time / len(phase_transitions)
+                    "average_time_ms": total_time / len(phase_transitions),
                 }
 
         return {
@@ -581,5 +587,5 @@ class WorkflowCoordinator:
             "phase_timings": phase_timings,
             "total_state_transitions": len(self.state_transitions),
             "parallel_tasks_count": len(self.parallel_execution_tasks),
-            "current_phase": self.current_phase.value
+            "current_phase": self.current_phase.value,
         }

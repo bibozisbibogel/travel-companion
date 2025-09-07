@@ -295,11 +295,7 @@ class CircuitBreakerOpenError(WorkflowError):
         if next_attempt_time:
             enhanced_details["next_attempt_time"] = next_attempt_time
         super().__init__(
-            message,
-            WorkflowErrorCode.CIRCUIT_BREAKER_OPEN,
-            agent_name,
-            None,
-            enhanced_details
+            message, WorkflowErrorCode.CIRCUIT_BREAKER_OPEN, agent_name, None, enhanced_details
         )
 
 
@@ -317,11 +313,7 @@ class CriticalAgentFailureError(WorkflowError):
         if recovery_strategy:
             enhanced_details["recovery_strategy"] = recovery_strategy
         super().__init__(
-            message,
-            WorkflowErrorCode.CRITICAL_SERVICE_FAILED,
-            agent_name,
-            None,
-            enhanced_details
+            message, WorkflowErrorCode.CRITICAL_SERVICE_FAILED, agent_name, None, enhanced_details
         )
 
 

@@ -52,10 +52,7 @@ class TestTripPlanningNodes:
         """Create sample trip request for testing."""
         return TripPlanRequest(
             destination=TripDestination(
-                city="Paris",
-                country="France",
-                country_code="FR",
-                airport_code="CDG"
+                city="Paris", country="France", country_code="FR", airport_code="CDG"
             ),
             requirements=TripRequirements(
                 budget=Decimal("3000.00"),
@@ -68,7 +65,7 @@ class TestTripPlanningNodes:
                 "cabin_class": "business",
                 "cuisine_types": ["french", "italian"],
                 "activity_types": ["cultural", "museums"],
-            }
+            },
         )
 
     @pytest.fixture
@@ -86,11 +83,9 @@ class TestTripPlanningNodes:
             "input_data": sample_trip_request.model_dump(),
             "output_data": {},
             "intermediate_results": {},
-
             # Trip planning specific fields
             "trip_request": sample_trip_request,
             "trip_id": None,
-
             # Agent execution tracking
             "agents_completed": [],
             "agents_failed": [],
@@ -98,7 +93,6 @@ class TestTripPlanningNodes:
                 "activity_agent": ["weather_agent"],
                 "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
             },
-
             # Agent results (initialized empty)
             "flight_results": [],
             "hotel_results": [],
@@ -106,7 +100,6 @@ class TestTripPlanningNodes:
             "weather_data": {},
             "food_recommendations": [],
             "itinerary_data": {},
-
             # Workflow context
             "user_preferences": {},
             "budget_tracking": {},
@@ -137,9 +130,9 @@ class TestTripPlanningNodes:
         # Check budget allocations
         allocations = budget_tracking["allocations"]
         assert allocations["flights"] == 1200.0  # 40%
-        assert allocations["hotels"] == 900.0    # 30%
-        assert allocations["activities"] == 600.0 # 20%
-        assert allocations["food"] == 300.0      # 10%
+        assert allocations["hotels"] == 900.0  # 30%
+        assert allocations["activities"] == 600.0  # 20%
+        assert allocations["food"] == 300.0  # 10%
 
         # Check user preferences
         user_prefs = result["user_preferences"]
@@ -170,14 +163,13 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.WeatherAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_weather_agent_success(self, mock_logger, mock_weather_agent_class, sample_workflow_state):
+    async def test_execute_weather_agent_success(
+        self, mock_logger, mock_weather_agent_class, sample_workflow_state
+    ):
         """Test successful weather agent execution."""
         # Mock weather response
         mock_weather_location = WeatherLocation(
-            name="Paris",
-            latitude=48.8566,
-            longitude=2.3522,
-            country="France"
+            name="Paris", latitude=48.8566, longitude=2.3522, country="France"
         )
 
         mock_forecast = WeatherForecast(
@@ -194,9 +186,9 @@ class TestTripPlanningNodes:
                 precipitation=0.0,
                 precipitation_probability=0.1,
                 condition=WeatherCondition.CLEAR,
-                condition_description="Sunny and clear"
+                condition_description="Sunny and clear",
             ),
-            daily_forecasts=[]
+            daily_forecasts=[],
         )
 
         mock_response = WeatherSearchResponse(
@@ -204,7 +196,7 @@ class TestTripPlanningNodes:
             historical_data=[],
             search_time_ms=250,
             search_metadata={},
-            data_source="openweather"
+            data_source="openweather",
         )
 
         mock_weather_agent = AsyncMock()
@@ -226,7 +218,9 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.WeatherAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_weather_agent_api_error(self, mock_logger, mock_weather_agent_class, sample_workflow_state):
+    async def test_execute_weather_agent_api_error(
+        self, mock_logger, mock_weather_agent_class, sample_workflow_state
+    ):
         """Test weather agent execution with API error (graceful degradation)."""
         mock_weather_agent = AsyncMock()
         mock_weather_agent.process.side_effect = ExternalAPIError("Weather API unavailable")
@@ -242,13 +236,15 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.FlightAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_flight_agent_success(self, mock_logger, mock_flight_agent_class, sample_workflow_state):
+    async def test_execute_flight_agent_success(
+        self, mock_logger, mock_flight_agent_class, sample_workflow_state
+    ):
         """Test successful flight agent execution."""
         # Initialize budget tracking
         sample_workflow_state["budget_tracking"] = {
             "allocations": {"flights": 1200.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
 
         # Mock flight response
@@ -265,13 +261,11 @@ class TestTripPlanningNodes:
             price=Decimal("800.00"),
             currency="USD",
             travel_class=TravelClass.BUSINESS,
-            booking_url="https://example.com/book"
+            booking_url="https://example.com/book",
         )
 
         mock_response = FlightSearchResponse(
-            flights=[mock_flight],
-            search_time_ms=500,
-            search_metadata={}
+            flights=[mock_flight], search_time_ms=500, search_metadata={}
         )
 
         mock_flight_agent = AsyncMock()
@@ -290,13 +284,15 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.HotelAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_hotel_agent_success(self, mock_logger, mock_hotel_agent_class, sample_workflow_state):
+    async def test_execute_hotel_agent_success(
+        self, mock_logger, mock_hotel_agent_class, sample_workflow_state
+    ):
         """Test successful hotel agent execution."""
         # Initialize budget tracking
         sample_workflow_state["budget_tracking"] = {
             "allocations": {"hotels": 900.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
 
         # Mock hotel response
@@ -313,17 +309,15 @@ class TestTripPlanningNodes:
                 longitude=2.3522,
                 address="Central Paris",
                 city="Paris",
-                country="France"
+                country="France",
             ),
             price_per_night=Decimal("150.00"),
             rating=4.0,
-            amenities=["wifi", "pool"]
+            amenities=["wifi", "pool"],
         )
 
         mock_response = HotelSearchResponse(
-            hotels=[mock_hotel],
-            search_time_ms=400,
-            search_metadata={}
+            hotels=[mock_hotel], search_time_ms=400, search_metadata={}
         )
 
         mock_hotel_agent = AsyncMock()
@@ -343,20 +337,22 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.ActivityAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_activity_agent_with_weather_dependency(self, mock_logger, mock_activity_agent_class, sample_workflow_state):
+    async def test_execute_activity_agent_with_weather_dependency(
+        self, mock_logger, mock_activity_agent_class, sample_workflow_state
+    ):
         """Test activity agent execution using weather data for filtering."""
         # Initialize budget tracking and weather data
         sample_workflow_state["budget_tracking"] = {
             "allocations": {"activities": 600.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
         sample_workflow_state["weather_data"] = {
             "forecast": {
                 "daily_forecasts": [
                     {"condition": "sunny"},
                     {"condition": "partly_cloudy"},
-                    {"condition": "rainy"}
+                    {"condition": "rainy"},
                 ]
             }
         }
@@ -379,15 +375,13 @@ class TestTripPlanningNodes:
                 longitude=2.3376,
                 address="Rue de Rivoli",
                 city="Paris",
-                country="France"
+                country="France",
             ),
-            provider="tripadvisor"
+            provider="tripadvisor",
         )
 
         mock_response = ActivitySearchResponse(
-            activities=[mock_activity],
-            search_time_ms=300,
-            search_metadata={}
+            activities=[mock_activity], search_time_ms=300, search_metadata={}
         )
 
         mock_activity_agent = AsyncMock()
@@ -406,13 +400,15 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.FoodAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_food_agent_success(self, mock_logger, mock_food_agent_class, sample_workflow_state):
+    async def test_execute_food_agent_success(
+        self, mock_logger, mock_food_agent_class, sample_workflow_state
+    ):
         """Test successful food agent execution."""
         # Initialize budget tracking
         sample_workflow_state["budget_tracking"] = {
             "allocations": {"food": 300.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
 
         # Mock food response using RestaurantSearchResponse
@@ -420,7 +416,7 @@ class TestTripPlanningNodes:
             restaurants=[],  # Simplified for test - no need to create full restaurant objects
             search_time_ms=200,
             search_metadata={},
-            total_results=0
+            total_results=0,
         )
 
         mock_food_agent = AsyncMock()
@@ -440,10 +436,17 @@ class TestTripPlanningNodes:
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.ItineraryAgent")
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_itinerary_agent_success(self, mock_logger, mock_itinerary_agent_class, sample_workflow_state):
+    async def test_execute_itinerary_agent_success(
+        self, mock_logger, mock_itinerary_agent_class, sample_workflow_state
+    ):
         """Test successful itinerary agent execution with all dependencies."""
         # Setup completed agents and their results
-        sample_workflow_state["agents_completed"] = ["flight_agent", "hotel_agent", "activity_agent", "food_agent"]
+        sample_workflow_state["agents_completed"] = [
+            "flight_agent",
+            "hotel_agent",
+            "activity_agent",
+            "food_agent",
+        ]
         sample_workflow_state["flight_results"] = [{"flight_id": "FL123"}]
         sample_workflow_state["hotel_results"] = [{"hotel_id": "HTL123"}]
         sample_workflow_state["activity_results"] = [{"activity_id": "ACT123"}]
@@ -453,10 +456,18 @@ class TestTripPlanningNodes:
 
         # Mock itinerary response with simple structure
         mock_response = MagicMock()
-        mock_response.optimized_itinerary.model_dump.return_value = {"trip_id": "trip_123", "optimization_score": 8.5}
+        mock_response.optimized_itinerary.model_dump.return_value = {
+            "trip_id": "trip_123",
+            "optimization_score": 8.5,
+        }
         mock_response.daily_schedules = [MagicMock()]
-        mock_response.daily_schedules[0].model_dump.return_value = {"date": "2024-06-15", "estimated_cost": 200.0}
-        mock_response.budget_summary.model_dump.return_value = {"total_estimated_cost": {"amount": 2800.0, "currency": "USD"}}
+        mock_response.daily_schedules[0].model_dump.return_value = {
+            "date": "2024-06-15",
+            "estimated_cost": 200.0,
+        }
+        mock_response.budget_summary.model_dump.return_value = {
+            "total_estimated_cost": {"amount": 2800.0, "currency": "USD"}
+        }
         mock_response.optimization_score = 8.5
         mock_response.recommendations = []
 
@@ -478,7 +489,9 @@ class TestTripPlanningNodes:
 
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_execute_itinerary_agent_missing_critical_agents(self, mock_logger, sample_workflow_state):
+    async def test_execute_itinerary_agent_missing_critical_agents(
+        self, mock_logger, sample_workflow_state
+    ):
         """Test itinerary agent execution when critical agents failed."""
         # No critical agents completed
         sample_workflow_state["agents_completed"] = ["weather_agent"]
@@ -496,7 +509,7 @@ class TestTripPlanningNodes:
         sample_workflow_state["start_time"] = time.time() - 10  # 10 seconds ago
         sample_workflow_state["optimization_metrics"] = {
             "parallel_executions": 3,
-            "total_api_calls": 4
+            "total_api_calls": 4,
         }
         sample_workflow_state["flight_results"] = [{"flight_id": "FL123"}]
         sample_workflow_state["hotel_results"] = [{"hotel_id": "HTL123"}]
@@ -518,7 +531,11 @@ class TestTripPlanningNodes:
 
         execution_summary = output["execution_summary"]
         assert execution_summary["status"] == "completed"
-        assert execution_summary["agents_completed"] == ["weather_agent", "flight_agent", "hotel_agent"]
+        assert execution_summary["agents_completed"] == [
+            "weather_agent",
+            "flight_agent",
+            "hotel_agent",
+        ]
         assert execution_summary["agents_failed"] == ["activity_agent"]
         assert execution_summary["parallel_optimizations"] == 3
 
@@ -567,30 +584,23 @@ class TestTripPlanningNodes:
         """Test that parallel agents can be executed concurrently."""
         # Initialize budget tracking
         sample_workflow_state["budget_tracking"] = {
-            "allocations": {
-                "flights": 1200.0,
-                "hotels": 900.0,
-                "activities": 600.0,
-                "food": 300.0
-            },
+            "allocations": {"flights": 1200.0, "hotels": 900.0, "activities": 600.0, "food": 300.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
 
         # Mock all agents to return empty but successful responses
-        with patch("travel_companion.workflows.nodes.FlightAgent") as mock_flight, \
-             patch("travel_companion.workflows.nodes.HotelAgent") as mock_hotel, \
-             patch("travel_companion.workflows.nodes.ActivityAgent") as mock_activity, \
-             patch("travel_companion.workflows.nodes.FoodAgent") as mock_food:
-
+        with (
+            patch("travel_companion.workflows.nodes.FlightAgent") as mock_flight,
+            patch("travel_companion.workflows.nodes.HotelAgent") as mock_hotel,
+            patch("travel_companion.workflows.nodes.ActivityAgent") as mock_activity,
+            patch("travel_companion.workflows.nodes.FoodAgent") as mock_food,
+        ):
             # Setup mocks
             for mock_agent_class in [mock_flight, mock_hotel, mock_activity, mock_food]:
                 mock_agent = AsyncMock()
                 mock_agent.process.return_value = MagicMock(
-                    flights=[],
-                    hotels=[],
-                    activities=[],
-                    restaurants=[]
+                    flights=[], hotels=[], activities=[], restaurants=[]
                 )
                 mock_agent_class.return_value = mock_agent
 
@@ -601,7 +611,7 @@ class TestTripPlanningNodes:
                 execute_flight_agent(sample_workflow_state.copy()),
                 execute_hotel_agent(sample_workflow_state.copy()),
                 execute_activity_agent(sample_workflow_state.copy()),
-                execute_food_agent(sample_workflow_state.copy())
+                execute_food_agent(sample_workflow_state.copy()),
             ]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -620,13 +630,15 @@ class TestTripPlanningNodes:
 
     @pytest.mark.asyncio
     @patch("travel_companion.workflows.nodes.workflow_logger")
-    async def test_error_recovery_and_graceful_degradation(self, mock_logger, sample_workflow_state):
+    async def test_error_recovery_and_graceful_degradation(
+        self, mock_logger, sample_workflow_state
+    ):
         """Test error recovery and graceful degradation across multiple agents."""
         # Initialize budget tracking
         sample_workflow_state["budget_tracking"] = {
             "allocations": {"activities": 600.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
 
         # Mock activity agent to fail with API error
@@ -655,10 +667,10 @@ class TestTripPlanningNodes:
         assert abs(total_allocation - total_budget) < 0.01  # Allow for floating point precision
 
         # Verify individual percentages
-        assert allocations["flights"] / total_budget == 0.4    # 40%
-        assert allocations["hotels"] / total_budget == 0.3     # 30%
-        assert allocations["activities"] / total_budget == 0.2 # 20%
-        assert allocations["food"] / total_budget == 0.1       # 10%
+        assert allocations["flights"] / total_budget == 0.4  # 40%
+        assert allocations["hotels"] / total_budget == 0.3  # 30%
+        assert allocations["activities"] / total_budget == 0.2  # 20%
+        assert allocations["food"] / total_budget == 0.1  # 10%
 
     @pytest.mark.asyncio
     async def test_dependency_management_weather_to_activities(self, sample_workflow_state):
@@ -668,22 +680,20 @@ class TestTripPlanningNodes:
             "forecast": {
                 "daily_forecasts": [
                     {"condition": "sunny", "temperature": 25},
-                    {"condition": "rainy", "temperature": 18}
+                    {"condition": "rainy", "temperature": 18},
                 ]
             }
         }
         sample_workflow_state["budget_tracking"] = {
             "allocations": {"activities": 600.0},
             "spent": 0.0,
-            "remaining": 3000.0
+            "remaining": 3000.0,
         }
 
         with patch("travel_companion.workflows.nodes.ActivityAgent") as mock_activity_agent_class:
             mock_activity_agent = AsyncMock()
             mock_response = ActivitySearchResponse(
-                activities=[],
-                search_time_ms=300,
-                search_metadata={}
+                activities=[], search_time_ms=300, search_metadata={}
             )
             mock_activity_agent.process.return_value = mock_response
             mock_activity_agent_class.return_value = mock_activity_agent

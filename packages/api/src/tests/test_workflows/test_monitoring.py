@@ -221,7 +221,7 @@ class TestStructuredWorkflowLogger:
         retrieved_context = logger.get_correlation_context("test-workflow")
         assert retrieved_context == context
 
-    @patch('travel_companion.workflows.monitoring.structlog.get_logger')
+    @patch("travel_companion.workflows.monitoring.structlog.get_logger")
     def test_log_with_correlation(self, mock_get_logger):
         """Test logging with correlation context."""
         mock_logger = MagicMock()
@@ -245,7 +245,7 @@ class TestStructuredWorkflowLogger:
         assert "extra_field" in call_args[1]
         assert call_args[1]["extra_field"] == "extra_value"
 
-    @patch('travel_companion.workflows.monitoring.structlog.get_logger')
+    @patch("travel_companion.workflows.monitoring.structlog.get_logger")
     def test_log_state_transition(self, mock_get_logger):
         """Test logging state transitions."""
         mock_logger = MagicMock()
@@ -457,10 +457,12 @@ class TestWorkflowHealthMonitor:
         """Test checking Redis health."""
         mock_redis = AsyncMock(spec=Redis)
         mock_redis.ping = AsyncMock()
-        mock_redis.info = AsyncMock(return_value={
-            "used_memory": 1000000,
-            "maxmemory": 2000000,
-        })
+        mock_redis.info = AsyncMock(
+            return_value={
+                "used_memory": 1000000,
+                "maxmemory": 2000000,
+            }
+        )
 
         mock_redis_manager = MagicMock()
         mock_redis_manager.get_client = AsyncMock(return_value=mock_redis)
@@ -484,10 +486,12 @@ class TestWorkflowHealthMonitor:
             return True
 
         mock_redis.ping = slow_ping
-        mock_redis.info = AsyncMock(return_value={
-            "used_memory": 1000000,
-            "maxmemory": 2000000,
-        })
+        mock_redis.info = AsyncMock(
+            return_value={
+                "used_memory": 1000000,
+                "maxmemory": 2000000,
+            }
+        )
 
         mock_redis_manager = MagicMock()
         mock_redis_manager.get_client = AsyncMock(return_value=mock_redis)
@@ -504,10 +508,12 @@ class TestWorkflowHealthMonitor:
         """Test comprehensive system health check."""
         mock_redis = AsyncMock(spec=Redis)
         mock_redis.ping = AsyncMock()
-        mock_redis.info = AsyncMock(return_value={
-            "used_memory": 1000000,
-            "maxmemory": 2000000,
-        })
+        mock_redis.info = AsyncMock(
+            return_value={
+                "used_memory": 1000000,
+                "maxmemory": 2000000,
+            }
+        )
 
         # Mock scan_iter for metrics check
         async def mock_scan_iter(pattern):
@@ -552,9 +558,7 @@ class TestWorkflowHealthMonitor:
         mock_metrics.failed_agents = 1
         mock_metrics.total_execution_time_ms = 5000
 
-        monitor.performance_monitor.get_workflow_metrics = AsyncMock(
-            return_value=mock_metrics
-        )
+        monitor.performance_monitor.get_workflow_metrics = AsyncMock(return_value=mock_metrics)
 
         workflow_health = await monitor.check_workflow_health("test-workflow")
 
@@ -613,7 +617,7 @@ class TestWorkflowDebugLogger:
         logger = WorkflowDebugLogger(enable_debug=True)
         context = CorrelationContext(workflow_id="test-workflow")
 
-        with patch.object(logger.logger, 'log_with_correlation') as mock_log:
+        with patch.object(logger.logger, "log_with_correlation") as mock_log:
             # Should log when exceeding threshold
             logger.log_performance_bottleneck(
                 "test-workflow",

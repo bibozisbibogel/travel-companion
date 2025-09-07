@@ -40,7 +40,7 @@ class TestParallelExecutionConfig:
             max_concurrent_agents=10,
             default_timeout_seconds=60,
             max_retries=5,
-            enable_load_balancing=False
+            enable_load_balancing=False,
         )
 
         assert config.max_concurrent_agents == 10
@@ -55,9 +55,7 @@ class TestExecutionMetrics:
     def test_execution_metrics_creation(self):
         """Test creating execution metrics."""
         metrics = ExecutionMetrics(
-            agent_name="test_agent",
-            priority=ExecutionPriority.HIGH,
-            start_time=time.time()
+            agent_name="test_agent", priority=ExecutionPriority.HIGH, start_time=time.time()
         )
 
         assert metrics.agent_name == "test_agent"
@@ -70,9 +68,7 @@ class TestExecutionMetrics:
         """Test execution time calculation."""
         start_time = time.time()
         metrics = ExecutionMetrics(
-            agent_name="test_agent",
-            priority=ExecutionPriority.MEDIUM,
-            start_time=start_time
+            agent_name="test_agent", priority=ExecutionPriority.MEDIUM, start_time=start_time
         )
 
         # Simulate execution
@@ -91,7 +87,7 @@ class TestExecutionMetrics:
             agent_name="fast_agent",
             priority=ExecutionPriority.HIGH,
             start_time=time.time(),
-            execution_time_ms=3000.0  # 3 seconds
+            execution_time_ms=3000.0,  # 3 seconds
         )
         assert fast_metrics.is_fast_execution is True
         assert fast_metrics.is_slow_execution is False
@@ -101,7 +97,7 @@ class TestExecutionMetrics:
             agent_name="slow_agent",
             priority=ExecutionPriority.LOW,
             start_time=time.time(),
-            execution_time_ms=25000.0  # 25 seconds
+            execution_time_ms=25000.0,  # 25 seconds
         )
         assert slow_metrics.is_fast_execution is False
         assert slow_metrics.is_slow_execution is True
@@ -125,9 +121,30 @@ class TestWorkflowExecutionMetrics:
 
         # Add some agent metrics
         agent_metrics = [
-            ExecutionMetrics("agent1", ExecutionPriority.HIGH, time.time(), end_time=time.time() + 3.0, execution_time_ms=3000.0, success=True),  # Fast
-            ExecutionMetrics("agent2", ExecutionPriority.MEDIUM, time.time(), end_time=time.time() + 15.0, execution_time_ms=15000.0, success=True),  # Normal
-            ExecutionMetrics("agent3", ExecutionPriority.LOW, time.time(), end_time=time.time() + 25.0, execution_time_ms=25000.0, success=False),  # Slow
+            ExecutionMetrics(
+                "agent1",
+                ExecutionPriority.HIGH,
+                time.time(),
+                end_time=time.time() + 3.0,
+                execution_time_ms=3000.0,
+                success=True,
+            ),  # Fast
+            ExecutionMetrics(
+                "agent2",
+                ExecutionPriority.MEDIUM,
+                time.time(),
+                end_time=time.time() + 15.0,
+                execution_time_ms=15000.0,
+                success=True,
+            ),  # Normal
+            ExecutionMetrics(
+                "agent3",
+                ExecutionPriority.LOW,
+                time.time(),
+                end_time=time.time() + 25.0,
+                execution_time_ms=25000.0,
+                success=False,
+            ),  # Slow
         ]
 
         workflow_metrics.agent_metrics = agent_metrics
@@ -164,7 +181,7 @@ class TestParallelExecutionQueue:
             agent_name="test_agent",
             agent_function=mock_function,
             priority=ExecutionPriority.HIGH,
-            execution_context=context
+            execution_context=context,
         )
 
         assert len(execution_queue.priority_queues[ExecutionPriority.HIGH]) == 1
@@ -176,8 +193,12 @@ class TestParallelExecutionQueue:
 
         # Enqueue agents with different priorities
         await execution_queue.enqueue_agent("low_agent", mock_function, ExecutionPriority.LOW, {})
-        await execution_queue.enqueue_agent("critical_agent", mock_function, ExecutionPriority.CRITICAL, {})
-        await execution_queue.enqueue_agent("medium_agent", mock_function, ExecutionPriority.MEDIUM, {})
+        await execution_queue.enqueue_agent(
+            "critical_agent", mock_function, ExecutionPriority.CRITICAL, {}
+        )
+        await execution_queue.enqueue_agent(
+            "medium_agent", mock_function, ExecutionPriority.MEDIUM, {}
+        )
 
         # Should retrieve critical first
         next_agent = await execution_queue.get_next_agent()
@@ -200,10 +221,14 @@ class TestParallelExecutionQueue:
 
         # Fill high priority queue to trigger load balancing
         for i in range(4):
-            await execution_queue.enqueue_agent(f"high_agent_{i}", mock_function, ExecutionPriority.HIGH, {})
+            await execution_queue.enqueue_agent(
+                f"high_agent_{i}", mock_function, ExecutionPriority.HIGH, {}
+            )
 
         # This agent should be demoted to medium priority due to load balancing
-        await execution_queue.enqueue_agent("activity_agent", mock_function, ExecutionPriority.HIGH, {})
+        await execution_queue.enqueue_agent(
+            "activity_agent", mock_function, ExecutionPriority.HIGH, {}
+        )
 
         # Verify load balancing occurred
         assert execution_queue.load_balance_stats["decisions"] > 0
@@ -232,7 +257,7 @@ class TestParallelExecutionOptimizer:
             high_priority_timeout_seconds=5,
             medium_priority_timeout_seconds=5,
             low_priority_timeout_seconds=5,
-            max_retries=1
+            max_retries=1,
         )
 
     @pytest.fixture
@@ -246,11 +271,8 @@ class TestParallelExecutionOptimizer:
         trip_request = TripPlanRequest(
             destination=TripDestination(city="Paris", country="France", country_code="FR"),
             requirements=TripRequirements(
-                start_date=date(2024, 6, 1),
-                end_date=date(2024, 6, 7),
-                travelers=2,
-                budget=5000.0
-            )
+                start_date=date(2024, 6, 1), end_date=date(2024, 6, 7), travelers=2, budget=5000.0
+            ),
         )
 
         return TripPlanningWorkflowState(
@@ -278,7 +300,7 @@ class TestParallelExecutionOptimizer:
             itinerary_data={},
             user_preferences={},
             budget_tracking={"total_budget": 5000.0},
-            optimization_metrics={}
+            optimization_metrics={},
         )
 
     def test_agent_priority_determination(self, optimizer):
@@ -298,6 +320,7 @@ class TestParallelExecutionOptimizer:
 
     async def test_successful_parallel_execution(self, optimizer, sample_state):
         """Test successful parallel execution of agents."""
+
         # Mock agent functions
         async def mock_weather_agent(state):
             await asyncio.sleep(0.1)
@@ -309,16 +332,11 @@ class TestParallelExecutionOptimizer:
             state["flight_results"] = [{"flight": "test"}]
             return state
 
-        agent_functions = {
-            "weather_agent": mock_weather_agent,
-            "flight_agent": mock_flight_agent
-        }
+        agent_functions = {"weather_agent": mock_weather_agent, "flight_agent": mock_flight_agent}
 
         # Execute with parallel optimization
         result_state = await optimizer.execute_agents_parallel(
-            state=sample_state,
-            agent_functions=agent_functions,
-            dependencies={}
+            state=sample_state, agent_functions=agent_functions, dependencies={}
         )
 
         # Verify results
@@ -345,18 +363,14 @@ class TestParallelExecutionOptimizer:
 
         agent_functions = {
             "weather_agent": mock_weather_agent,
-            "activity_agent": mock_activity_agent
+            "activity_agent": mock_activity_agent,
         }
 
-        dependencies = {
-            "activity_agent": ["weather_agent"]
-        }
+        dependencies = {"activity_agent": ["weather_agent"]}
 
         # Execute with dependencies
         result_state = await optimizer.execute_agents_parallel(
-            state=sample_state,
-            agent_functions=agent_functions,
-            dependencies=dependencies
+            state=sample_state, agent_functions=agent_functions, dependencies=dependencies
         )
 
         # Verify execution order
@@ -365,6 +379,7 @@ class TestParallelExecutionOptimizer:
 
     async def test_timeout_handling(self, optimizer, sample_state):
         """Test timeout handling for slow agents."""
+
         async def slow_agent(state):
             await asyncio.sleep(10)  # Longer than config timeout (5s)
             return state
@@ -373,9 +388,7 @@ class TestParallelExecutionOptimizer:
 
         # Execute and expect timeout handling
         result_state = await optimizer.execute_agents_parallel(
-            state=sample_state,
-            agent_functions=agent_functions,
-            dependencies={}
+            state=sample_state, agent_functions=agent_functions, dependencies={}
         )
 
         # Verify timeout was handled
@@ -398,9 +411,7 @@ class TestParallelExecutionOptimizer:
         for _ in range(3):
             try:
                 await optimizer.execute_agents_parallel(
-                    state=sample_state,
-                    agent_functions=agent_functions,
-                    dependencies={}
+                    state=sample_state, agent_functions=agent_functions, dependencies={}
                 )
             except Exception:
                 pass
@@ -425,9 +436,7 @@ class TestParallelExecutionOptimizer:
 
         # Execute with retries
         result_state = await optimizer.execute_agents_parallel(
-            state=sample_state,
-            agent_functions=agent_functions,
-            dependencies={}
+            state=sample_state, agent_functions=agent_functions, dependencies={}
         )
 
         # Verify retry succeeded
@@ -440,6 +449,7 @@ class TestParallelExecutionOptimizer:
         # Clear pre-existing agents
         sample_state["agents_completed"] = []
         sample_state["agents_failed"] = []
+
         async def fast_agent(state):
             await asyncio.sleep(0.001)  # Very fast
             state["fast_result"] = "done"
@@ -450,16 +460,11 @@ class TestParallelExecutionOptimizer:
             state["slow_result"] = "done"
             return state
 
-        agent_functions = {
-            "fast_agent": fast_agent,
-            "slow_agent": slow_agent
-        }
+        agent_functions = {"fast_agent": fast_agent, "slow_agent": slow_agent}
 
         # Execute agents
         result_state = await optimizer.execute_agents_parallel(
-            state=sample_state,
-            agent_functions=agent_functions,
-            dependencies={}
+            state=sample_state, agent_functions=agent_functions, dependencies={}
         )
 
         # Verify metrics collection
@@ -474,7 +479,9 @@ class TestParallelExecutionOptimizer:
         # Check individual agent metrics
         agent_performances = {ap["agent_name"]: ap for ap in metrics["agent_performance"]}
         assert agent_performances["fast_agent"]["performance_category"] == "fast"
-        assert agent_performances["slow_agent"]["performance_category"] == "fast"  # 100ms is still fast (<5s)
+        assert (
+            agent_performances["slow_agent"]["performance_category"] == "fast"
+        )  # 100ms is still fast (<5s)
 
 
 class TestUtilityFunctions:
@@ -507,7 +514,7 @@ class TestUtilityFunctions:
             itinerary_data={},
             user_preferences={},
             budget_tracking={"total_budget": 5000.0},
-            optimization_metrics={}
+            optimization_metrics={},
         )
 
         async def mock_agent(state):
@@ -518,8 +525,7 @@ class TestUtilityFunctions:
 
         # Execute using convenience function
         result_state = await execute_agents_with_parallel_optimization(
-            state=sample_state,
-            agent_functions=agent_functions
+            state=sample_state, agent_functions=agent_functions
         )
 
         assert "test_result" in result_state
@@ -528,9 +534,7 @@ class TestUtilityFunctions:
     def test_create_optimized_parallel_config(self):
         """Test creating optimized configuration."""
         config = create_optimized_parallel_config(
-            max_concurrent=8,
-            timeout_seconds=45,
-            enable_adaptive=False
+            max_concurrent=8, timeout_seconds=45, enable_adaptive=False
         )
 
         assert config.max_concurrent_agents == 8
@@ -550,7 +554,7 @@ class TestIntegrationScenarios:
             default_timeout_seconds=10,
             max_retries=2,
             enable_load_balancing=True,
-            adaptive_timeout=True
+            adaptive_timeout=True,
         )
         return ParallelExecutionOptimizer(config)
 
@@ -560,12 +564,12 @@ class TestIntegrationScenarios:
         trip_request = TripPlanRequest(
             destination=TripDestination(city="Tokyo", country="Japan", country_code="JP"),
             requirements=TripRequirements(
-                start_date=date(2024, 8, 15),
-                end_date=date(2024, 8, 22),
-                travelers=4,
-                budget=8000.0
+                start_date=date(2024, 8, 15), end_date=date(2024, 8, 22), travelers=4, budget=8000.0
             ),
-            preferences={"activity_types": ["cultural", "outdoor"], "cuisine_types": ["japanese", "international"]}
+            preferences={
+                "activity_types": ["cultural", "outdoor"],
+                "cuisine_types": ["japanese", "international"],
+            },
         )
 
         return TripPlanningWorkflowState(
@@ -586,7 +590,7 @@ class TestIntegrationScenarios:
             agents_failed=[],
             agent_dependencies={
                 "activity_agent": ["weather_agent"],
-                "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"]
+                "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
             },
             flight_results=[],
             hotel_results=[],
@@ -596,7 +600,7 @@ class TestIntegrationScenarios:
             itinerary_data={},
             user_preferences=trip_request.preferences or {},
             budget_tracking={"total_budget": 8000.0, "allocated": 8000.0, "spent": 0.0},
-            optimization_metrics={}
+            optimization_metrics={},
         )
 
     async def test_full_trip_planning_workflow(self, integration_optimizer, complex_state):
@@ -610,7 +614,7 @@ class TestIntegrationScenarios:
             await asyncio.sleep(0.02)  # Simulate API call
             state["weather_data"] = {
                 "forecast": {"daily_forecasts": [{"condition": "sunny"}, {"condition": "cloudy"}]},
-                "temperature_range": {"min": 18, "max": 28}
+                "temperature_range": {"min": 18, "max": 28},
             }
             return state
 
@@ -618,7 +622,7 @@ class TestIntegrationScenarios:
             await asyncio.sleep(0.05)  # Simulate longer API call
             state["flight_results"] = [
                 {"airline": "JAL", "price": 1200, "duration": "14h"},
-                {"airline": "ANA", "price": 1150, "duration": "15h"}
+                {"airline": "ANA", "price": 1150, "duration": "15h"},
             ]
             budget = state.get("budget_tracking", {})
             budget["spent"] = budget.get("spent", 0) + 1150
@@ -628,7 +632,7 @@ class TestIntegrationScenarios:
             await asyncio.sleep(0.04)
             state["hotel_results"] = [
                 {"name": "Tokyo Hotel", "price_per_night": {"amount": 200}, "rating": 4.5},
-                {"name": "Shibuya Inn", "price_per_night": {"amount": 150}, "rating": 4.0}
+                {"name": "Shibuya Inn", "price_per_night": {"amount": 150}, "rating": 4.0},
             ]
             budget = state.get("budget_tracking", {})
             budget["spent"] = budget.get("spent", 0) + 1400  # 7 nights * 200
@@ -640,12 +644,17 @@ class TestIntegrationScenarios:
             weather_data = state.get("weather_data", {})
             activities = [
                 {"name": "Tokyo Tower", "estimated_cost": {"amount": 50}, "type": "cultural"},
-                {"name": "Senso-ji Temple", "estimated_cost": {"amount": 0}, "type": "cultural"}
+                {"name": "Senso-ji Temple", "estimated_cost": {"amount": 0}, "type": "cultural"},
             ]
 
             # Add outdoor activities if weather is good
-            if weather_data.get("forecast", {}).get("daily_forecasts", [{}])[0].get("condition") == "sunny":
-                activities.append({"name": "Ueno Park", "estimated_cost": {"amount": 10}, "type": "outdoor"})
+            if (
+                weather_data.get("forecast", {}).get("daily_forecasts", [{}])[0].get("condition")
+                == "sunny"
+            ):
+                activities.append(
+                    {"name": "Ueno Park", "estimated_cost": {"amount": 10}, "type": "outdoor"}
+                )
 
             state["activity_results"] = activities
             return state
@@ -653,15 +662,28 @@ class TestIntegrationScenarios:
         async def food_agent(state):
             await asyncio.sleep(0.03)
             state["food_recommendations"] = [
-                {"name": "Sushi Jiro", "average_cost_per_person": {"amount": 300}, "cuisine": "japanese"},
-                {"name": "Ramen Ichiran", "average_cost_per_person": {"amount": 25}, "cuisine": "japanese"}
+                {
+                    "name": "Sushi Jiro",
+                    "average_cost_per_person": {"amount": 300},
+                    "cuisine": "japanese",
+                },
+                {
+                    "name": "Ramen Ichiran",
+                    "average_cost_per_person": {"amount": 25},
+                    "cuisine": "japanese",
+                },
             ]
             return state
 
         async def itinerary_agent(state):
             await asyncio.sleep(0.06)  # Longest processing time
             # Verify all dependencies are met
-            required_keys = ["flight_results", "hotel_results", "activity_results", "food_recommendations"]
+            required_keys = [
+                "flight_results",
+                "hotel_results",
+                "activity_results",
+                "food_recommendations",
+            ]
             for key in required_keys:
                 if not state.get(key):
                     raise Exception(f"Missing required data: {key}")
@@ -669,7 +691,7 @@ class TestIntegrationScenarios:
             state["itinerary_data"] = {
                 "daily_schedules": [{"day": 1, "activities": ["arrival", "hotel_checkin"]}],
                 "optimization_score": 0.85,
-                "total_estimated_cost": 3500.0
+                "total_estimated_cost": 3500.0,
             }
             return state
 
@@ -680,21 +702,19 @@ class TestIntegrationScenarios:
             "hotel_agent": hotel_agent,
             "activity_agent": activity_agent,
             "food_agent": food_agent,
-            "itinerary_agent": itinerary_agent
+            "itinerary_agent": itinerary_agent,
         }
 
         # Define dependencies
         dependencies = {
             "activity_agent": ["weather_agent"],
-            "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"]
+            "itinerary_agent": ["flight_agent", "hotel_agent", "activity_agent", "food_agent"],
         }
 
         # Execute complete workflow
         start_time = time.time()
         result_state = await integration_optimizer.execute_agents_parallel(
-            state=complex_state,
-            agent_functions=agent_functions,
-            dependencies=dependencies
+            state=complex_state, agent_functions=agent_functions, dependencies=dependencies
         )
         execution_time = time.time() - start_time
 
@@ -739,6 +759,7 @@ class TestIntegrationScenarios:
                 await asyncio.sleep(delay)
                 state[f"{name}_results"] = [{"test": "data"}]
                 return state
+
             return agent
 
         async def failing_agent(state):
@@ -757,16 +778,14 @@ class TestIntegrationScenarios:
 
         # Execute with some failures
         result_state = await integration_optimizer.execute_agents_parallel(
-            state=complex_state,
-            agent_functions=agent_functions,
-            dependencies={}
+            state=complex_state, agent_functions=agent_functions, dependencies={}
         )
 
         # Verify partial success handling
         metrics = result_state["parallel_execution_metrics"]
         assert metrics["agents_succeeded"] == 3  # weather, hotel, activity
-        assert metrics["agents_failed"] == 2     # flight, food
-        assert metrics["success_rate"] == 0.6   # 3/5
+        assert metrics["agents_failed"] == 2  # flight, food
+        assert metrics["success_rate"] == 0.6  # 3/5
 
         # Verify successful agents completed
         assert "weather_results" in result_state
