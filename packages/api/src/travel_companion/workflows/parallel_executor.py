@@ -167,7 +167,7 @@ class ParallelExecutionQueue:
     def __init__(self, config: ParallelExecutionConfig):
         """Initialize execution queue."""
         self.config = config
-        self.priority_queues: dict[ExecutionPriority, list[tuple[str, Callable, dict]]] = {
+        self.priority_queues: dict[ExecutionPriority, list[tuple[str, Callable[..., Any], dict[str, Any]]]] = {
             priority: [] for priority in ExecutionPriority
         }
         self.active_executions: dict[ExecutionPriority, set[str]] = {
@@ -180,12 +180,12 @@ class ParallelExecutionQueue:
             ExecutionPriority.LOW: asyncio.Semaphore(config.max_concurrent_low),
         }
         self.queue_times: dict[str, float] = {}
-        self.load_balance_stats = {"decisions": 0, "queue_sizes": []}
+        self.load_balance_stats: dict[str, Any] = {"decisions": 0, "queue_sizes": []}
 
     async def enqueue_agent(
         self,
         agent_name: str,
-        agent_function: Callable,
+        agent_function: Callable[..., Any],
         priority: ExecutionPriority,
         execution_context: dict[str, Any],
     ) -> None:
@@ -259,7 +259,7 @@ class ParallelExecutionQueue:
 
         return priority
 
-    async def get_next_agent(self) -> tuple[str, Callable, dict, ExecutionPriority] | None:
+    async def get_next_agent(self) -> tuple[str, Callable[..., Any], dict[str, Any], ExecutionPriority] | None:
         """
         Get the next agent to execute based on priority and availability.
 
@@ -339,7 +339,7 @@ class ParallelExecutionOptimizer:
         self.execution_queue = ParallelExecutionQueue(self.config)
         self.circuit_breakers: dict[str, CircuitBreaker] = {}
         self.workflow_metrics: WorkflowExecutionMetrics | None = None
-        self.active_tasks: dict[str, asyncio.Task] = {}
+        self.active_tasks: dict[str, asyncio.Task[Any]] = {}
 
         # Performance tracking
         self.concurrent_agent_count: list[int] = []
@@ -401,7 +401,7 @@ class ParallelExecutionOptimizer:
     async def execute_agents_parallel(
         self,
         state: TripPlanningWorkflowState,
-        agent_functions: dict[str, Callable],
+        agent_functions: dict[str, Callable[..., Any]],
         dependencies: dict[str, list[str]] | None = None,
     ) -> TripPlanningWorkflowState:
         """
@@ -457,7 +457,7 @@ class ParallelExecutionOptimizer:
 
     async def _queue_all_agents(
         self,
-        agent_functions: dict[str, Callable],
+        agent_functions: dict[str, Callable[..., Any]],
         state: TripPlanningWorkflowState,
         dependencies: dict[str, list[str]],
     ) -> None:
@@ -712,7 +712,7 @@ class ParallelExecutionOptimizer:
     async def _execute_single_agent_with_metrics(
         self,
         agent_name: str,
-        agent_function: Callable,
+        agent_function: Callable[..., Any],
         context: dict[str, Any],
         priority: ExecutionPriority,
         state: TripPlanningWorkflowState,
@@ -820,7 +820,7 @@ class ParallelExecutionOptimizer:
         return metrics
 
     async def _process_completed_task(
-        self, task: asyncio.Task, state: TripPlanningWorkflowState
+        self, task: asyncio.Task[Any], state: TripPlanningWorkflowState
     ) -> None:
         """Process a completed task and update state."""
         # Find and remove the task from active tasks
@@ -955,7 +955,7 @@ class ParallelExecutionOptimizer:
 # Utility functions for workflow integration
 async def execute_agents_with_parallel_optimization(
     state: TripPlanningWorkflowState,
-    agent_functions: dict[str, Callable],
+    agent_functions: dict[str, Callable[..., Any]],
     config: ParallelExecutionConfig | None = None,
     dependencies: dict[str, list[str]] | None = None,
 ) -> TripPlanningWorkflowState:

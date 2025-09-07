@@ -105,6 +105,8 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     "include_historical": search_request.include_historical,
                 },
                 data_source="OpenWeatherMap",
+                cached=False,
+                cache_expires_at=None,
             )
 
             self.logger.info(

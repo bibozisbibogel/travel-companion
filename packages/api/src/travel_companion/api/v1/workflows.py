@@ -139,7 +139,7 @@ async def execute_workflow_async(
         await state_manager.persist_state(initial_state, "automatic")
 
         # Execute workflow in background
-        async def run_workflow():
+        async def run_workflow() -> None:
             try:
                 workflow_logger.log_workflow_started(
                     workflow_id=workflow_id,

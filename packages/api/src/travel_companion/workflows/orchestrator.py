@@ -14,7 +14,37 @@ from langgraph.graph import StateGraph
 
 from ..core.config import get_settings
 from ..core.redis import get_redis_manager
-from ..models.trip import ActivityOption, FlightOption, HotelOption, TripPlanRequest
+from ..models.external import ActivityOption as ExternalActivityOption, FlightOption as ExternalFlightOption, HotelOption as ExternalHotelOption
+from ..models.trip import TripPlanRequest
+
+
+class BudgetAllocations(TypedDict):
+    """Budget allocation breakdown."""
+    flights: float
+    hotels: float
+    activities: float
+    food: float
+
+
+class BudgetTracking(TypedDict):
+    """Budget tracking structure."""
+    total_budget: float
+    allocated: float
+    spent: float
+    remaining: float
+    allocations: BudgetAllocations
+
+class BudgetTrackingOptional(TypedDict, total=False):
+    """Optional budget tracking fields."""
+    final_total: float
+    budget_utilization: float
+    savings: float
+
+class BudgetTrackingComplete(BudgetTracking, BudgetTrackingOptional):
+    """Complete budget tracking with optional fields."""
+    pass
+
+
 from ..utils.logging import workflow_logger
 
 
@@ -47,17 +77,19 @@ class TripPlanningWorkflowState(WorkflowState):
     agent_dependencies: dict[str, list[str]]
 
     # Agent results
-    flight_results: list[FlightOption]
-    hotel_results: list[HotelOption]
-    activity_results: list[ActivityOption]
+    flight_results: list[ExternalFlightOption]
+    hotel_results: list[ExternalHotelOption]
+    activity_results: list[ExternalActivityOption]
     weather_data: dict[str, Any]
     food_recommendations: list[dict[str, Any]]
     itinerary_data: dict[str, Any]
 
     # Workflow context
     user_preferences: dict[str, Any]
-    budget_tracking: dict[str, float]
+    budget_tracking: BudgetTrackingComplete
     optimization_metrics: dict[str, float]
+    state_transitions: list[dict[str, Any]]
+    parallel_execution_metrics: dict[str, Any] | None
 
 
 class BaseWorkflow(ABC):
@@ -771,6 +803,8 @@ class TripPlanningWorkflow(BaseWorkflow):
             "user_preferences": trip_request.preferences or {},
             "budget_tracking": {"allocated": float(trip_request.requirements.budget), "spent": 0.0},
             "optimization_metrics": {"execution_time": 0.0, "success_rate": 0.0},
+            "state_transitions": [],
+            "parallel_execution_metrics": None,
         }
 
         return initial_state

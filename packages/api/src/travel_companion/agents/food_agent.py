@@ -9,6 +9,7 @@ from travel_companion.models.external import (
     DietaryRestriction,
     PopularDish,
     PriceRange,
+    RestaurantOption,
     RestaurantSearchRequest,
     RestaurantSearchResponse,
 )
@@ -22,7 +23,7 @@ from travel_companion.utils.errors import ExternalAPIError
 class FoodAgent(BaseAgent[RestaurantSearchResponse]):
     """Food and restaurant recommendation agent with multiple API integrations."""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize food agent with API clients and circuit breakers."""
         super().__init__(**kwargs)
 
@@ -33,13 +34,13 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         # Circuit breakers for each API
         self.yelp_circuit_breaker = CircuitBreaker(
-            name="yelp_api", failure_threshold=5, timeout=30, reset_timeout=60
+            name="yelp_api", failure_threshold=5, recovery_timeout=60
         )
         self.google_circuit_breaker = CircuitBreaker(
-            name="google_places_api", failure_threshold=5, timeout=30, reset_timeout=60
+            name="google_places_api", failure_threshold=5, recovery_timeout=60
         )
         self.zomato_circuit_breaker = CircuitBreaker(
-            name="zomato_api", failure_threshold=5, timeout=30, reset_timeout=60
+            name="zomato_api", failure_threshold=5, recovery_timeout=60
         )
 
         self.logger.info("FoodAgent initialized with API clients and circuit breakers")
@@ -87,7 +88,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             api_results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Process and aggregate results
-            all_restaurants = []
+            all_restaurants: list[RestaurantOption] = []
             api_metadata = {}
 
             for i, result in enumerate(api_results):
@@ -96,9 +97,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 if isinstance(result, Exception):
                     self.logger.warning(f"{api_name} API failed: {result}")
                     api_metadata[api_name] = {"status": "failed", "error": str(result)}
-                elif result:
+                elif result and not isinstance(result, BaseException):
                     all_restaurants.extend(result)
-                    api_metadata[api_name] = {"status": "success", "results_count": len(result)}
+                    api_metadata[api_name] = {"status": "success", "results_count": str(len(result))}
                 else:
                     api_metadata[api_name] = {"status": "no_results"}
 
@@ -119,6 +120,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 total_results=len(final_restaurants),
                 search_time_ms=search_time_ms,
                 cached=False,
+                cache_expires_at=None,
             )
 
             # Cache the result for future requests
@@ -134,7 +136,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.error(f"Restaurant search failed: {e}")
             raise ExternalAPIError(f"Restaurant search failed: {e}") from e
 
-    async def _search_yelp(self, request: RestaurantSearchRequest) -> list:
+    async def _search_yelp(self, request: RestaurantSearchRequest) -> list[RestaurantOption]:
         """Search restaurants using Yelp Fusion API with circuit breaker."""
         try:
             async with self.yelp_circuit_breaker:
@@ -143,7 +145,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.warning(f"Yelp search failed: {e}")
             return []
 
-    async def _search_google_places(self, request: RestaurantSearchRequest) -> list:
+    async def _search_google_places(self, request: RestaurantSearchRequest) -> list[RestaurantOption]:
         """Search restaurants using Google Places API with circuit breaker."""
         try:
             async with self.google_circuit_breaker:
@@ -152,7 +154,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.warning(f"Google Places search failed: {e}")
             return []
 
-    async def _search_zomato(self, request: RestaurantSearchRequest) -> list:
+    async def _search_zomato(self, request: RestaurantSearchRequest) -> list[RestaurantOption]:
         """Search restaurants using Zomato API with circuit breaker."""
         try:
             async with self.zomato_circuit_breaker:
@@ -161,13 +163,13 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.warning(f"Zomato search failed: {e}")
             return []
 
-    def _deduplicate_restaurants(self, restaurants: list) -> list:
+    def _deduplicate_restaurants(self, restaurants: list[RestaurantOption]) -> list[RestaurantOption]:
         """Remove duplicate restaurants based on name and location proximity."""
         if not restaurants:
             return restaurants
 
         unique_restaurants = []
-        seen_combinations = set()
+        seen_combinations: set[tuple[str, str]] = set()
 
         for restaurant in restaurants:
             # Create identifier based on name similarity and location proximity
@@ -199,7 +201,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         )
         return unique_restaurants
 
-    def _rank_restaurants(self, restaurants: list, request: RestaurantSearchRequest) -> list:
+    def _rank_restaurants(self, restaurants: list[RestaurantOption], request: RestaurantSearchRequest) -> list[RestaurantOption]:
         """Rank restaurants based on ratings, price, and user preferences."""
         if not restaurants:
             return restaurants
@@ -325,7 +327,12 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             # Build search request for local specialties
             specialty_search = RestaurantSearchRequest(
                 location=location,
+                latitude=None,
+                longitude=None,
                 cuisine_type=CuisineType.LOCAL_SPECIALTY if not cuisine_type else None,
+                price_range=None,
+                budget_per_person=None,
+                meal_type=None,
                 max_results=20,
             )
 
@@ -473,6 +480,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="New York Style Pizza",
                         description="Thin crust pizza with classic toppings",
                         is_specialty=True,
+                        price=None,
                     )
                 )
                 dishes.append(
@@ -480,6 +488,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="Pastrami on Rye",
                         description="Classic NY deli sandwich",
                         is_specialty=True,
+                        price=None,
                     )
                 )
         elif "chicago" in location_lower:
@@ -489,6 +498,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="Chicago Deep Dish Pizza",
                         description="Thick crust pizza with layers of cheese and toppings",
                         is_specialty=True,
+                        price=None,
                     )
                 )
         elif "philadelphia" in location_lower:
@@ -498,6 +508,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="Philly Cheesesteak",
                         description="Grilled sandwich with steak and cheese",
                         is_specialty=True,
+                        price=None,
                     )
                 )
 

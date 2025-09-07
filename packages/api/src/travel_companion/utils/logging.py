@@ -1033,22 +1033,36 @@ class WorkflowLogger:
     def log_workflow_completed(
         self,
         workflow_id: str,
-        request_id: str,
-        completion_summary: str | None,
-        completed_ttl: int,
+        request_id: str | None = None,
+        completion_summary: str | None = None,
+        completed_ttl: int | None = None,
+        workflow_type: str | None = None,
+        execution_time_ms: float | None = None,
+        output_data: dict[str, Any] | None = None,
     ) -> None:
         """Log workflow completion with enhanced tracking."""
+        details: dict[str, Any] = {"enhanced_tracking": True}
+        if completion_summary is not None:
+            details["completion_summary"] = completion_summary
+        if completed_ttl is not None:
+            details["completed_ttl"] = completed_ttl
+        if workflow_type is not None:
+            details["workflow_type"] = workflow_type
+        if execution_time_ms is not None:
+            details["execution_time_ms"] = execution_time_ms
+        if output_data is not None:
+            details["output_data_summary"] = {
+                "keys": list(output_data.keys()) if output_data else [],
+                "size": len(str(output_data)) if output_data else 0
+            }
+        
         self.logger.info(
             "Workflow completed successfully",
             extra={
                 "event_type": WorkflowEvent.WORKFLOW_COMPLETED,
                 "workflow_id": workflow_id,
-                "request_id": request_id,
-                "details": {
-                    "completion_summary": completion_summary,
-                    "completed_ttl": completed_ttl,
-                    "enhanced_tracking": True,
-                },
+                "request_id": request_id or "unknown",
+                "details": details,
             },
         )
 
@@ -1438,8 +1452,10 @@ class WorkflowLogger:
         """Log workflow data cleanup."""
         self.logger.info(
             "workflow.cleanup",
-            workflow_id=workflow_id,
-            cleanup_scope=cleanup_scope,
+            extra={
+                "workflow_id": workflow_id,
+                "cleanup_scope": cleanup_scope,
+            }
         )
 
     def log_workflow_cancelled(
@@ -1451,9 +1467,45 @@ class WorkflowLogger:
         """Log workflow cancellation."""
         self.logger.warning(
             "workflow.cancelled",
-            workflow_id=workflow_id,
-            request_id=request_id,
-            cancellation_reason=cancellation_reason,
+            extra={
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "cancellation_reason": cancellation_reason,
+            }
+        )
+    
+    def log_plan_coherence_issues(
+        self, 
+        workflow_id: str,
+        issues: list[str],
+        severity: str = "warning"
+    ) -> None:
+        """Log plan coherence issues."""
+        self.logger.warning(
+            f"Plan coherence issues detected: {len(issues)} issues",
+            extra={
+                "event_type": "plan_coherence_check",
+                "workflow_id": workflow_id,
+                "issues": issues,
+                "severity": severity,
+            }
+        )
+    
+    def log_error_handling_started(
+        self,
+        workflow_id: str,
+        error_type: str,
+        error_message: str
+    ) -> None:
+        """Log when error handling starts."""
+        self.logger.info(
+            f"Error handling started for {error_type}",
+            extra={
+                "event_type": "error_handling_started",
+                "workflow_id": workflow_id,
+                "error_type": error_type,
+                "error_message": error_message,
+            }
         )
 
 

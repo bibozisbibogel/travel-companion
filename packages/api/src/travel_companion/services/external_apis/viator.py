@@ -181,7 +181,8 @@ class ViatorAPIClient:
         if request.category:
             viator_category = self._map_category_to_viator(request.category)
             if viator_category:
-                params["category_id"] = viator_category
+                # Convert category string to int if needed by API
+                params["category_id"] = viator_category  # Keep as string for Viator API
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -272,6 +273,7 @@ class ViatorAPIClient:
                 name=product.title,
                 description=product.description,
                 category=category,
+                trip_id=None,  # Will be set when associated with a trip
                 location=location_obj,
                 duration_minutes=duration_minutes,
                 price=price,
@@ -346,9 +348,9 @@ class ViatorAPIClient:
 
                     match = re.search(r"(\d+(?:\.\d+)?)\s*hour", duration_lower)
                     if match:
-                        hours = float(match.group(1))
+                        duration_hours: int = int(float(match.group(1)))
 
-                return int(hours * 60)
+                return int(duration_hours * 60)
 
             elif "day" in duration_lower:
                 days = 1

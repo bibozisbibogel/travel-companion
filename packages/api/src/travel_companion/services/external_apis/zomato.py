@@ -119,7 +119,7 @@ class ZomatoClient:
     async def _get_location_by_coordinates(self, latitude: float, longitude: float) -> int | None:
         """Get Zomato location ID by coordinates."""
         try:
-            params = {"lat": latitude, "lon": longitude}
+            params: dict[str, str | float] = {"lat": latitude, "lon": longitude}
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 headers = {"user-key": self.api_key}
@@ -135,7 +135,8 @@ class ZomatoClient:
 
             location_suggestions = data.get("location_suggestions", [])
             if location_suggestions:
-                return location_suggestions[0].get("entity_id")
+                entity_id = location_suggestions[0].get("entity_id")
+                return int(entity_id) if entity_id is not None else None
 
             return None
 
@@ -146,7 +147,7 @@ class ZomatoClient:
     async def _get_location_by_name(self, location_name: str) -> int | None:
         """Get Zomato location ID by name."""
         try:
-            params = {"query": location_name, "count": 1}
+            params: dict[str, str | int] = {"query": location_name, "count": 1}
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 headers = {"user-key": self.api_key}
@@ -162,7 +163,8 @@ class ZomatoClient:
 
             location_suggestions = data.get("location_suggestions", [])
             if location_suggestions:
-                return location_suggestions[0].get("entity_id")
+                entity_id = location_suggestions[0].get("entity_id")
+                return int(entity_id) if entity_id is not None else None
 
             return None
 
@@ -232,8 +234,10 @@ class ZomatoClient:
                 longitude=float(location_data.get("longitude", 0)),
                 address=location_data.get("address"),
                 city=location_data.get("city"),
+                state=location_data.get("state"),
                 country=location_data.get("country_name"),
                 postal_code=location_data.get("zipcode"),
+                neighborhood=location_data.get("locality"),
             )
 
             # Map price range from Zomato price range (1-4)
@@ -256,12 +260,21 @@ class ZomatoClient:
             if timings:
                 hours = RestaurantHours(
                     monday=timings if timings != "Closed" else "Closed",
+                    tuesday=None,
+                    wednesday=None,
+                    thursday=None,
+                    friday=None,
+                    saturday=None,
+                    sunday=None,
                     is_open_now=restaurant_data.get("is_delivering_now", False),
                 )
 
             # Extract contact info
             contact = RestaurantContact(
-                phone=restaurant_data.get("phone_numbers"), website=restaurant_data.get("menu_url")
+                phone=restaurant_data.get("phone_numbers"), 
+                email=None,
+                website=restaurant_data.get("menu_url"),
+                reservation_url=None,
             )
 
             # Extract photos
@@ -315,6 +328,8 @@ class ZomatoClient:
                 photos=photos,
                 booking_url=restaurant_data.get("url"),
                 provider="zomato",
+                trip_id=None,  # Will be set by the workflow orchestrator
+                distance_km=None,  # Will be calculated if needed
             )
 
         except Exception as e:
@@ -359,7 +374,7 @@ class ZomatoClient:
         return CuisineType.OTHER
 
     def _extract_dietary_accommodations(
-        self, highlights: list, cuisines: str
+        self, highlights: list[str], cuisines: str
     ) -> list[DietaryRestriction]:
         """Extract dietary accommodations from restaurant highlights and cuisines."""
         accommodations = []
@@ -409,13 +424,14 @@ class ZomatoClient:
                 self._requests_count += 1
                 response.raise_for_status()
 
-                return response.json()
+                data = response.json()
+                return dict(data) if data else {}
 
         except Exception as e:
             self.logger.error(f"Failed to get Zomato restaurant details for {restaurant_id}: {e}")
             raise ExternalAPIError(f"Failed to get restaurant details: {e}") from e
 
-    async def get_reviews(self, restaurant_id: str, count: int = 5) -> list[dict]:
+    async def get_reviews(self, restaurant_id: str, count: int = 5) -> list[dict[str, Any]]:
         """Get restaurant reviews from Zomato.
 
         Args:
@@ -426,7 +442,7 @@ class ZomatoClient:
             List of restaurant reviews
         """
         try:
-            params = {
+            params: dict[str, str | int] = {
                 "res_id": restaurant_id,
                 "start": 0,
                 "count": min(count, 10),  # Max 10 reviews per call
@@ -443,7 +459,8 @@ class ZomatoClient:
                 response.raise_for_status()
 
                 data = response.json()
-                return data.get("user_reviews", [])
+                reviews = data.get("user_reviews", [])
+                return list(reviews) if reviews else []
 
         except Exception as e:
             self.logger.error(f"Failed to get Zomato reviews for {restaurant_id}: {e}")

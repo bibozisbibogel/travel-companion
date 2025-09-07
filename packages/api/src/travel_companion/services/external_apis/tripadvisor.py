@@ -332,6 +332,7 @@ class TripAdvisorAPIClient:
                 name=attraction.name,
                 description=attraction.description,
                 category=category,
+                trip_id=None,  # Will be set when associated with a trip
                 location=location,
                 duration_minutes=self._estimate_duration(category),  # Estimate based on category
                 price=price,

@@ -182,6 +182,7 @@ class YelpClient:
                 state=location_data.get("state"),
                 country=location_data.get("country"),
                 postal_code=location_data.get("zip_code"),
+                neighborhood=location_data.get("neighborhood"),
             )
 
             # Map price range from Yelp $ system
@@ -208,7 +209,10 @@ class YelpClient:
 
             # Extract contact info
             contact = RestaurantContact(
-                phone=business.get("display_phone"), website=business.get("url")
+                phone=business.get("display_phone"),
+                email=None,
+                website=business.get("url"),
+                reservation_url=None,
             )
 
             # Calculate distance if coordinates provided
@@ -237,9 +241,10 @@ class YelpClient:
                 currency=request.currency,
                 hours=hours,
                 contact=contact,
-                photos=[business.get("image_url")] if business.get("image_url") else [],
+                photos=[business["image_url"]] if business.get("image_url") else [],
                 booking_url=business.get("url"),
                 provider="yelp",
+                trip_id=None,  # Will be set by the workflow orchestrator
                 distance_km=distance_km,
             )
 
@@ -247,7 +252,7 @@ class YelpClient:
             self.logger.error(f"Failed to parse Yelp business {business.get('id', 'unknown')}: {e}")
             return None
 
-    def _determine_cuisine_type(self, categories: list[dict]) -> CuisineType:
+    def _determine_cuisine_type(self, categories: list[dict[str, str]]) -> CuisineType:
         """Determine primary cuisine type from Yelp categories."""
         # Map Yelp category aliases back to our cuisine types
         category_map = {
@@ -281,10 +286,10 @@ class YelpClient:
         # Default to OTHER if no specific match
         return CuisineType.OTHER
 
-    def _parse_hours(self, hours_data: list[dict], is_open_now: bool) -> RestaurantHours:
+    def _parse_hours(self, hours_data: list[dict[str, str]], is_open_now: bool) -> RestaurantHours:
         """Parse Yelp hours data into RestaurantHours model."""
         days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        hours_dict = {}
+        hours_dict: dict[str, str | None] = {}
 
         # Initialize all days
         for day in days:
@@ -292,7 +297,7 @@ class YelpClient:
 
         # Parse hours data
         for hour_entry in hours_data:
-            day_index = hour_entry.get("day", 0)  # 0=Monday, 1=Tuesday, etc.
+            day_index = int(hour_entry.get("day", 0))  # 0=Monday, 1=Tuesday, etc.
             if 0 <= day_index < 7:
                 day_name = days[day_index]
                 start_time = hour_entry.get("start", "")
@@ -326,7 +331,8 @@ class YelpClient:
                 self._requests_today += 1
                 response.raise_for_status()
 
-                return response.json()
+                data = response.json()
+                return dict(data) if data else {}
 
         except Exception as e:
             self.logger.error(f"Failed to get Yelp business details for {business_id}: {e}")

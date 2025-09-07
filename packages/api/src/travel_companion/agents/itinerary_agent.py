@@ -72,19 +72,19 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         # Circuit breakers for agent coordination
         self.flight_circuit = CircuitBreaker(
-            name="flight_agent", failure_threshold=3, timeout=30, reset_timeout=60
+            name="flight_agent", failure_threshold=3, recovery_timeout=60
         )
         self.hotel_circuit = CircuitBreaker(
-            name="hotel_agent", failure_threshold=3, timeout=30, reset_timeout=60
+            name="hotel_agent", failure_threshold=3, recovery_timeout=60
         )
         self.activity_circuit = CircuitBreaker(
-            name="activity_agent", failure_threshold=3, timeout=30, reset_timeout=60
+            name="activity_agent", failure_threshold=3, recovery_timeout=60
         )
         self.weather_circuit = CircuitBreaker(
-            name="weather_agent", failure_threshold=3, timeout=30, reset_timeout=60
+            name="weather_agent", failure_threshold=3, recovery_timeout=60
         )
         self.food_circuit = CircuitBreaker(
-            name="food_agent", failure_threshold=3, timeout=30, reset_timeout=60
+            name="food_agent", failure_threshold=3, recovery_timeout=60
         )
 
         # Agent coordination configuration

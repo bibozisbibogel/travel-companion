@@ -314,7 +314,7 @@ class WorkflowCoordinator:
 
         # Execution coordination
         self.current_phase = ExecutionPhase.INITIALIZATION
-        self.parallel_execution_tasks: dict[str, asyncio.Task] = {}
+        self.parallel_execution_tasks: dict[str, asyncio.Task[Any]] = {}
         self.state_transitions: list[dict[str, Any]] = []
 
     async def coordinate_execution(

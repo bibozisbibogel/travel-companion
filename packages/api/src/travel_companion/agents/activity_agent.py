@@ -84,6 +84,8 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
                     "category": search_request.category,
                     "guest_count": search_request.guest_count,
                 },
+                cached=False,
+                cache_expires_at=None,
             )
 
             # Cache the result with advanced caching

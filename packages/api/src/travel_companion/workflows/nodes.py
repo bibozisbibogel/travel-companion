@@ -1,6 +1,8 @@
 """Trip planning workflow node implementations."""
 
 import time
+from datetime import datetime
+from decimal import Decimal
 
 from ..agents.activity_agent import ActivityAgent
 from ..agents.flight_agent import FlightAgent
@@ -142,8 +144,10 @@ async def execute_weather_agent(state: TripPlanningWorkflowState) -> TripPlannin
         trip_request = state["trip_request"]
         weather_request = WeatherSearchRequest(
             location=trip_request.destination.city,
-            start_date=trip_request.requirements.start_date,
-            end_date=trip_request.requirements.end_date,
+            latitude=None,  # Optional field
+            longitude=None,  # Optional field  
+            start_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
+            end_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             include_historical=True,
         )
 
@@ -241,8 +245,8 @@ async def execute_flight_agent(state: TripPlanningWorkflowState) -> TripPlanning
         flight_request = FlightSearchRequest(
             origin=getattr(trip_request, "origin", "JFK"),  # Default origin if not specified
             destination=trip_request.destination.airport_code or "CDG",
-            departure_date=trip_request.requirements.start_date,
-            return_date=trip_request.requirements.end_date,
+            departure_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
+            return_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             passengers=trip_request.requirements.travelers,
             currency="USD",
         )
@@ -254,7 +258,7 @@ async def execute_flight_agent(state: TripPlanningWorkflowState) -> TripPlanning
         flight_response = await flight_agent.process(flight_request.model_dump())
 
         # Store flight results
-        state["flight_results"] = [flight.model_dump() for flight in flight_response.flights]
+        state["flight_results"] = flight_response.flights
 
         # Update budget tracking with cheapest option
         if flight_response.flights:
@@ -343,11 +347,11 @@ async def execute_hotel_agent(state: TripPlanningWorkflowState) -> TripPlanningW
 
         hotel_request = HotelSearchRequest(
             location=trip_request.destination.city,
-            check_in_date=trip_request.requirements.start_date,
-            check_out_date=trip_request.requirements.end_date,
+            check_in_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
+            check_out_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             guest_count=trip_request.requirements.travelers,
             room_count=1,  # Default, can be calculated based on traveler count
-            max_price_per_night=int(
+            budget_per_night=Decimal(
                 budget_allocation
                 / (trip_request.requirements.end_date - trip_request.requirements.start_date).days
             ),
@@ -364,7 +368,7 @@ async def execute_hotel_agent(state: TripPlanningWorkflowState) -> TripPlanningW
         hotel_response = await hotel_agent.process(hotel_request.model_dump())
 
         # Store hotel results
-        state["hotel_results"] = [hotel.model_dump() for hotel in hotel_response.hotels]
+        state["hotel_results"] = hotel_response.hotels
 
         # Update budget tracking with cheapest option
         if hotel_response.hotels:
@@ -465,13 +469,14 @@ async def execute_activity_agent(state: TripPlanningWorkflowState) -> TripPlanni
 
         activity_request = ActivitySearchRequest(
             location=trip_request.destination.city,
-            check_in_date=trip_request.requirements.start_date,
-            check_out_date=trip_request.requirements.end_date,
+            check_in_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
+            check_out_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             guest_count=trip_request.requirements.travelers,
-            budget_per_person=budget_allocation / trip_request.requirements.travelers
+            budget_per_person=Decimal(str(budget_allocation / trip_request.requirements.travelers))
             if trip_request.requirements.travelers > 0
-            else budget_allocation,
+            else Decimal(str(budget_allocation)),
             currency="USD",
+            duration_hours=4,  # Default duration
             category=None,  # Will be set based on preferences
         )
 
@@ -490,18 +495,22 @@ async def execute_activity_agent(state: TripPlanningWorkflowState) -> TripPlanni
                 "shopping": ActivityCategory.SHOPPING,
                 "relaxation": ActivityCategory.RELAXATION,
             }
-            first_type = prefs["activity_types"][0].lower()
-            if first_type in activity_type_map:
-                activity_request.category = activity_type_map[first_type]
+            activity_types = prefs["activity_types"]
+            if isinstance(activity_types, list) and activity_types:
+                first_type = activity_types[0].lower()
+                if first_type in activity_type_map:
+                    activity_request.category = activity_type_map[first_type]
+            elif isinstance(activity_types, str):
+                first_type = activity_types.lower()
+                if first_type in activity_type_map:
+                    activity_request.category = activity_type_map[first_type]
 
         # Execute activity agent
         activity_agent = ActivityAgent()
         activity_response = await activity_agent.process(activity_request.model_dump())
 
         # Store activity results
-        state["activity_results"] = [
-            activity.model_dump() for activity in activity_response.activities
-        ]
+        state["activity_results"] = activity_response.activities
 
         # Update budget tracking with estimated activity costs
         if activity_response.activities:
@@ -593,11 +602,15 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
 
         food_request = RestaurantSearchRequest(
             location=trip_request.destination.city,
+            latitude=None,  # Will be geocoded by the agent
+            longitude=None,  # Will be geocoded by the agent
             party_size=trip_request.requirements.travelers,
-            budget_per_person=budget_allocation / trip_request.requirements.travelers
+            budget_per_person=Decimal(str(budget_allocation / trip_request.requirements.travelers))
             if trip_request.requirements.travelers > 0
-            else budget_allocation,
+            else Decimal(str(budget_allocation)),
             currency="USD",
+            price_range=None,  # Will be determined from budget
+            meal_type="dinner",  # Default to dinner
             cuisine_type=None,  # Will be set from preferences
         )
 
@@ -617,9 +630,15 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
                 "american": CuisineType.AMERICAN,
                 "mediterranean": CuisineType.MEDITERRANEAN,
             }
-            first_cuisine = prefs["cuisine_types"][0].lower()
-            if first_cuisine in cuisine_type_map:
-                food_request.cuisine_type = cuisine_type_map[first_cuisine]
+            cuisine_types = prefs["cuisine_types"]
+            if isinstance(cuisine_types, list) and cuisine_types:
+                first_cuisine = cuisine_types[0].lower()
+                if first_cuisine in cuisine_type_map:
+                    food_request.cuisine_type = cuisine_type_map[first_cuisine]
+            elif isinstance(cuisine_types, str):
+                first_cuisine = cuisine_types.lower()
+                if first_cuisine in cuisine_type_map:
+                    food_request.cuisine_type = cuisine_type_map[first_cuisine]
 
         # Execute food agent
         food_agent = FoodAgent()
@@ -636,10 +655,11 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
             days = (trip_request.requirements.end_date - trip_request.requirements.start_date).days
             avg_price_per_meal = (
                 sum(
-                    float(restaurant.average_cost_per_person.amount)
+                    float(restaurant.average_cost_per_person)
                     for restaurant in food_response.restaurants[:5]  # Top 5 restaurants
+                    if restaurant.average_cost_per_person is not None
                 )
-                / len(food_response.restaurants[:5])
+                / max(1, len([r for r in food_response.restaurants[:5] if r.average_cost_per_person is not None]))
             )
 
             estimated_food_cost = (

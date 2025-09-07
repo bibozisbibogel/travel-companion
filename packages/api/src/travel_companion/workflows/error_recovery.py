@@ -149,7 +149,7 @@ class FallbackData:
 class ErrorRecoveryManager:
     """Manages error recovery strategies and fallback workflows."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.circuit_breakers: dict[str, CircuitBreaker] = {}
         self.retry_configs: dict[str, RetryConfig] = {}
         self.agent_priorities: dict[str, AgentPriority] = {}
@@ -169,12 +169,13 @@ class ErrorRecoveryManager:
 
         for agent_name, config in cb_configs.items():
             self.circuit_breakers[agent_name] = CircuitBreaker(
+                failure_threshold=config["failure_threshold"],
+                recovery_timeout=config["recovery_timeout"],
                 name=agent_name,
-                **config,
             )
 
         # Retry configurations per agent
-        retry_configs = {
+        retry_configs: dict[str, RetryConfig] = {
             "flight_agent": RetryConfig(max_attempts=3, base_delay=2.0, max_delay=30.0),
             "hotel_agent": RetryConfig(max_attempts=3, base_delay=2.0, max_delay=30.0),
             "activity_agent": RetryConfig(max_attempts=2, base_delay=1.0, max_delay=15.0),
@@ -183,8 +184,8 @@ class ErrorRecoveryManager:
             "itinerary_agent": RetryConfig(max_attempts=2, base_delay=3.0, max_delay=45.0),
         }
 
-        for agent_name, config in retry_configs.items():
-            self.retry_configs[agent_name] = config
+        for agent_name, retry_config in retry_configs.items():
+            self.retry_configs[agent_name] = retry_config
 
         # Agent priority levels
         self.agent_priorities = {
@@ -202,7 +203,7 @@ class ErrorRecoveryManager:
         operation: Callable[..., T],
         *args: Any,
         **kwargs: Any,
-    ) -> T:
+    ) -> T | dict[str, Any]:
         """
         Execute agent operation with comprehensive error recovery.
 
@@ -229,6 +230,7 @@ class ErrorRecoveryManager:
         for attempt in range(1, retry_config.max_attempts + 1):
             try:
                 # Try circuit breaker if available
+                result: T
                 if circuit_breaker:
                     result = await circuit_breaker.call(operation, *args, **kwargs)
                 else:
@@ -262,7 +264,7 @@ class ErrorRecoveryManager:
         # This shouldn't be reached, but handle gracefully
         return await self._handle_final_failure(agent_name, last_exception)
 
-    async def _handle_circuit_breaker_open(self, agent_name: str) -> Any:
+    async def _handle_circuit_breaker_open(self, agent_name: str) -> dict[str, Any]:
         """Handle circuit breaker open scenario."""
         priority = self.agent_priorities.get(agent_name, AgentPriority.MEDIUM)
 
@@ -278,7 +280,7 @@ class ErrorRecoveryManager:
         logger.info(f"Using fallback data for {agent_name} (circuit breaker open)")
         return FallbackData.get_fallback_data(agent_name.replace("_agent", ""))
 
-    async def _handle_final_failure(self, agent_name: str, exception: Exception | None) -> Any:
+    async def _handle_final_failure(self, agent_name: str, exception: Exception | None) -> dict[str, Any]:
         """Handle final failure after all retry attempts."""
         priority = self.agent_priorities.get(agent_name, AgentPriority.MEDIUM)
 
@@ -320,7 +322,7 @@ class ErrorRecoveryManager:
 
     async def health_check(self) -> dict[str, Any]:
         """Perform health check on all managed agents."""
-        health_status = {
+        health_status: dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "overall_status": "healthy",
             "agents": {},
@@ -332,7 +334,7 @@ class ErrorRecoveryManager:
             agent_status = {
                 "status": "healthy" if circuit_breaker.is_closed else "unhealthy",
                 "circuit_breaker": circuit_breaker.get_status(),
-                "priority": self.agent_priorities.get(agent_name, "unknown").value,
+                "priority": self.agent_priorities.get(agent_name, AgentPriority.MEDIUM).value,
             }
 
             if not circuit_breaker.is_closed:
@@ -362,7 +364,7 @@ class WorkflowFallbackOrchestrator:
         self.error_recovery_manager = error_recovery_manager
 
     async def create_minimal_itinerary(
-        self, trip_request: dict[str, Any], successful_agents: dict[str, Any]
+        self, trip_request: dict[str, Any], successful_agents: dict[str, dict[str, Any] | None]
     ) -> dict[str, Any]:
         """
         Create a minimal itinerary with whatever data is available.
@@ -372,7 +374,7 @@ class WorkflowFallbackOrchestrator:
         """
         logger.info("Creating minimal itinerary with partial agent results")
 
-        minimal_itinerary = {
+        minimal_itinerary: dict[str, Any] = {
             "trip_id": trip_request.get("trip_id"),
             "destination": trip_request.get("destination"),
             "start_date": trip_request.get("start_date"),
@@ -393,7 +395,8 @@ class WorkflowFallbackOrchestrator:
         # Identify missing critical data
         required_agents = ["flight_agent", "hotel_agent"]
         for agent in required_agents:
-            if agent not in successful_agents or successful_agents[agent].get("fallback"):
+            agent_result = successful_agents.get(agent)
+            if agent not in successful_agents or (agent_result and agent_result.get("fallback")):
                 minimal_itinerary["missing_data"].append(agent.replace("_agent", ""))
 
         # Add general recommendations
@@ -419,7 +422,7 @@ class WorkflowFallbackOrchestrator:
     async def execute_degraded_workflow(
         self,
         trip_request: dict[str, Any],
-        agent_operations: dict[str, Callable],
+        agent_operations: dict[str, Callable[..., Any]],
     ) -> dict[str, Any]:
         """
         Execute workflow with graceful degradation for failed agents.
@@ -457,7 +460,7 @@ class WorkflowFallbackOrchestrator:
 
         return await self.create_minimal_itinerary(trip_request, successful_agents)
 
-    async def _execute_agent_with_fallback(self, agent_name: str, operation: Callable) -> Any:
+    async def _execute_agent_with_fallback(self, agent_name: str, operation: Callable[..., Any]) -> Any:
         """Execute agent operation with fallback handling."""
         try:
             return await self.error_recovery_manager.execute_with_recovery(agent_name, operation)

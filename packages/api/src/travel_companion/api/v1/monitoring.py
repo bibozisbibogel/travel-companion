@@ -163,6 +163,14 @@ async def get_metrics(
         return MetricsResponse(
             time_window_hours=time_window_hours,
             workflow_type=workflow_type,
+            total_workflows=0,
+            avg_execution_time_ms=0,
+            avg_success_rate=0,
+            avg_error_rate=0,
+            avg_cache_hit_rate=0,
+            total_api_calls=0,
+            total_retries=0,
+            total_timeouts=0,
         )
 
     return MetricsResponse(**metrics)
