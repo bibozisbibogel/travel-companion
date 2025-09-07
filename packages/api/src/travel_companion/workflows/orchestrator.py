@@ -14,12 +14,22 @@ from langgraph.graph import StateGraph
 
 from ..core.config import get_settings
 from ..core.redis import get_redis_manager
-from ..models.external import ActivityOption as ExternalActivityOption, FlightOption as ExternalFlightOption, HotelOption as ExternalHotelOption
+from ..models.external import (
+    ActivityOption as ExternalActivityOption,
+)
+from ..models.external import (
+    FlightOption as ExternalFlightOption,
+)
+from ..models.external import (
+    HotelOption as ExternalHotelOption,
+)
 from ..models.trip import TripPlanRequest
+from ..utils.logging import workflow_logger
 
 
 class BudgetAllocations(TypedDict):
     """Budget allocation breakdown."""
+
     flights: float
     hotels: float
     activities: float
@@ -28,24 +38,26 @@ class BudgetAllocations(TypedDict):
 
 class BudgetTracking(TypedDict):
     """Budget tracking structure."""
+
     total_budget: float
     allocated: float
     spent: float
     remaining: float
     allocations: BudgetAllocations
 
+
 class BudgetTrackingOptional(TypedDict, total=False):
     """Optional budget tracking fields."""
+
     final_total: float
     budget_utilization: float
     savings: float
 
+
 class BudgetTrackingComplete(BudgetTracking, BudgetTrackingOptional):
     """Complete budget tracking with optional fields."""
+
     pass
-
-
-from ..utils.logging import workflow_logger
 
 
 class WorkflowState(TypedDict):
@@ -375,10 +387,14 @@ class BaseWorkflow(ABC):
         try:
             # Use enhanced state manager for TripPlanningWorkflow
             if isinstance(state, dict) and "trip_request" in state:
-                from .state_manager import WorkflowStateManager
+                from ..core.redis import get_redis_manager
+                from .state_manager import EnhancedWorkflowStateManager
 
-                state_manager = WorkflowStateManager(
-                    workflow_id=state["workflow_id"], redis_ttl_hours=24
+                redis_manager = get_redis_manager()
+                state_manager = EnhancedWorkflowStateManager(
+                    redis_client=redis_manager.client,
+                    workflow_id=state["workflow_id"],
+                    request_id=state.get("request_id", ""),
                 )
 
                 # Determine checkpoint type based on workflow status
@@ -390,8 +406,19 @@ class BaseWorkflow(ABC):
                 elif state.get("current_node") in ["initialize_trip", "finalize_plan"]:
                     checkpoint_type = "manual"
 
-                # Persist with enhanced features
-                success = await state_manager.persist_state(state, checkpoint_type)
+                # Import CheckpointType and persist with enhanced features
+                from .state_manager import CheckpointType
+
+                # Map string checkpoint type to enum
+                checkpoint_enum = CheckpointType.AUTOMATIC
+                if checkpoint_type == "error":
+                    checkpoint_enum = CheckpointType.ERROR
+                elif checkpoint_type == "completion":
+                    checkpoint_enum = CheckpointType.COMPLETION
+                elif checkpoint_type == "manual":
+                    checkpoint_enum = CheckpointType.MANUAL
+
+                success = await state_manager.persist_state(state, checkpoint_enum)  # type: ignore[arg-type]
 
                 if not success:
                     workflow_logger.warning(
@@ -662,12 +689,19 @@ class TripPlanningWorkflow(BaseWorkflow):
             )
 
             # Log parallel execution completion
-            execution_metrics = updated_state.get("parallel_execution_metrics", {})
-            workflow_logger.log_parallel_execution_completed(
-                workflow_id=state["workflow_id"],
-                request_id=state["request_id"],
-                execution_metrics=execution_metrics,
-            )
+            execution_metrics = updated_state.get("parallel_execution_metrics")
+            if execution_metrics:
+                workflow_logger.log_parallel_execution_completed(
+                    workflow_id=state["workflow_id"],
+                    request_id=state["request_id"],
+                    execution_metrics=execution_metrics,
+                )
+            else:
+                workflow_logger.log_parallel_execution_completed(
+                    workflow_id=state["workflow_id"],
+                    request_id=state["request_id"],
+                    execution_metrics={},
+                )
 
             return updated_state
 
@@ -691,10 +725,15 @@ class TripPlanningWorkflow(BaseWorkflow):
         Handles workflow errors and prepares appropriate error responses.
         """
         # Log error handling
+        error_msg = (
+            state.get("error", "Unknown error")
+            if isinstance(state.get("error"), str)
+            else "Unknown error"
+        )
         workflow_logger.log_error_handling_started(
             workflow_id=state["workflow_id"],
-            request_id=state["request_id"],
-            error=state.get("error", "Unknown error"),
+            error_type="workflow_error",
+            error_message=error_msg if error_msg else "Unknown error",
         )
 
         # Create error response in output_data
@@ -727,20 +766,11 @@ class TripPlanningWorkflow(BaseWorkflow):
             List of workflow transitions (simplified for coordinator-based execution)
         """
         # Import coordination functions
-        from .nodes import route_based_on_preferences
 
         return [
             # Use coordinator for intelligent routing
             ("initialize_trip", "coordinated_execution"),
-            (
-                "coordinated_execution",
-                route_based_on_preferences,
-                {
-                    "continue": "finalize_plan",
-                    "retry": "coordinated_execution",
-                    "abort": "error_handler",
-                },
-            ),
+            ("coordinated_execution", "finalize_plan"),
         ]
 
     def get_entry_point(self) -> str:
@@ -801,7 +831,18 @@ class TripPlanningWorkflow(BaseWorkflow):
             "itinerary_data": {},
             # Workflow context
             "user_preferences": trip_request.preferences or {},
-            "budget_tracking": {"allocated": float(trip_request.requirements.budget), "spent": 0.0},
+            "budget_tracking": {
+                "total_budget": float(trip_request.requirements.budget),
+                "allocated": float(trip_request.requirements.budget),
+                "spent": 0.0,
+                "remaining": float(trip_request.requirements.budget),
+                "allocations": {
+                    "flights": 0.0,
+                    "hotels": 0.0,
+                    "activities": 0.0,
+                    "food": 0.0,
+                },
+            },
             "optimization_metrics": {"execution_time": 0.0, "success_rate": 0.0},
             "state_transitions": [],
             "parallel_execution_metrics": None,

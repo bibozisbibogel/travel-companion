@@ -1,19 +1,14 @@
 """Workflow state management with Redis persistence and progress tracking."""
 
-import asyncio
-import hashlib
 import json
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, TypedDict
 
 import redis.asyncio as redis
-from langgraph.checkpoint.base import Checkpoint
 
-from travel_companion.core.config import settings
 from travel_companion.utils.logging import WorkflowLogger
 
 # Initialize workflow logger
@@ -93,6 +88,14 @@ class TripPlanningWorkflowState(TypedDict, total=False):
     updated_at: str
     completed_at: str | None
     current_step: str | None
+    recovered_from: str | None
+    recovery_timestamp: str | None
+
+    # Workflow lifecycle
+    suspension_reason: str | None
+    suspended_at: str | None
+    resumed_at: str | None
+    completion_message: str | None
 
 
 @dataclass
@@ -182,6 +185,7 @@ class EnhancedWorkflowStateManager:
         self.last_checkpoint_time = 0.0
         self.last_progress_update = 0.0
         self.last_heartbeat = 0.0
+        self.progress_data: dict[str, Any] | None = None
 
         # Performance metrics
         self.operation_count = 0
@@ -191,19 +195,82 @@ class EnhancedWorkflowStateManager:
         self._cleanup_tasks: set[str] = set()
 
         # Initialize logger
-        workflow_logger.log_workflow_state_manager_initialized(
-            workflow_id=workflow_id, request_id=request_id, config=self.config.__dict__
+        workflow_logger.info(
+            "Workflow state manager initialized",
+            extra={
+                "workflow_id": workflow_id,
+                "request_id": request_id,
+                "config": self.config.__dict__,
+            },
         )
 
     # Core state persistence methods
 
+    async def initialize_workflow(
+        self, state: TripPlanningWorkflowState, estimated_duration_minutes: int | None = None
+    ) -> bool:
+        """Initialize a new workflow with state and metadata."""
+        try:
+            # Set initial status
+            state["status"] = "active"
+            state["created_at"] = datetime.now(UTC).isoformat()
+            state["updated_at"] = datetime.now(UTC).isoformat()
+            self.workflow_status = WorkflowStatus.ACTIVE
+
+            # Calculate TTL based on estimated duration
+            if estimated_duration_minutes:
+                # Use 2x estimated duration as TTL for safety
+                ttl = max(estimated_duration_minutes * 60 * 2, self.config.active_workflow_ttl)
+            else:
+                ttl = self.config.active_workflow_ttl
+            self.ttl = ttl
+
+            # Initialize progress tracking
+            await self._initialize_progress_tracking(state)
+
+            # Start heartbeat
+            if self.enable_heartbeat:
+                await self._start_heartbeat()
+
+            # Persist initial state
+            result = await self.persist_state(state, CheckpointType.AUTOMATIC)
+
+            # Add to workflow index
+            await self._add_to_workflow_index()
+
+            return result
+
+        except Exception as e:
+            workflow_logger.error(
+                "Failed to initialize workflow",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
+            return False
+
     async def persist_state(
         self,
         state: TripPlanningWorkflowState,
-        checkpoint_type: CheckpointType = CheckpointType.AUTOMATIC,
+        checkpoint_type: CheckpointType | str = CheckpointType.AUTOMATIC,
     ) -> bool:
         """Persist workflow state with automatic checkpointing and progress tracking."""
         try:
+            # Handle backward compatibility for string checkpoint types
+            if isinstance(checkpoint_type, str):
+                # Map string to CheckpointType enum
+                checkpoint_type_map = {
+                    "automatic": CheckpointType.AUTOMATIC,
+                    "manual": CheckpointType.MANUAL,
+                    "phase_transition": CheckpointType.PHASE_TRANSITION,
+                    "error": CheckpointType.ERROR,
+                    "completion": CheckpointType.COMPLETION,
+                }
+                checkpoint_type = checkpoint_type_map.get(
+                    checkpoint_type.lower(), CheckpointType.AUTOMATIC
+                )
+
             # Update state timestamp
             state["updated_at"] = datetime.now(UTC).isoformat()
 
@@ -219,6 +286,12 @@ class EnhancedWorkflowStateManager:
 
             # Persist to Redis with TTL
             await self.redis_client.setex(self.state_key, ttl, serialized_state)
+
+            # Check if TTL needs extension
+            current_ttl = await self._get_current_ttl()
+            if current_ttl > 0 and current_ttl < 600:  # Less than 10 minutes
+                # Extend TTL
+                await self.redis_client.expire(self.state_key, ttl)
 
             # Update metadata
             await self._update_metadata(state, checkpoint_type)
@@ -241,19 +314,22 @@ class EnhancedWorkflowStateManager:
             self.operation_count += 1
             self.current_state = state
 
-            workflow_logger.log_workflow_state_persisted(
+            workflow_logger.log_state_persisted(
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
-                checkpoint_type=checkpoint_type.value,
-                state_size=self.state_size_bytes,
-                status=self.workflow_status.value,
+                persistence_time_ms=0,  # Placeholder
             )
 
             return True
 
         except Exception as e:
-            workflow_logger.log_workflow_state_persistence_error(
-                workflow_id=self.workflow_id, request_id=self.request_id, error=str(e)
+            workflow_logger.log_state_persistence_error(
+                workflow_id=self.workflow_id,
+                request_id=self.request_id,
+                error=str(e),
+                checkpoint_type=checkpoint_type.value
+                if isinstance(checkpoint_type, CheckpointType)
+                else str(checkpoint_type),
             )
             return False
 
@@ -262,6 +338,7 @@ class EnhancedWorkflowStateManager:
     ) -> TripPlanningWorkflowState | None:
         """Restore workflow state from Redis or snapshot."""
         try:
+            state: TripPlanningWorkflowState | None = None
             if snapshot_id:
                 # Restore from specific snapshot
                 state = await self._restore_from_snapshot(snapshot_id)
@@ -272,21 +349,22 @@ class EnhancedWorkflowStateManager:
                     return None
                 state = json.loads(state_data)
 
-            self.current_state = state
-            self._update_workflow_status(state)
+            if state:
+                self.current_state = state
+                self._update_workflow_status(state)
 
-            workflow_logger.log_workflow_state_restored(
-                workflow_id=self.workflow_id,
-                request_id=self.request_id,
-                snapshot_id=snapshot_id,
-                status=self.workflow_status.value,
-            )
+                workflow_logger.log_state_restored(
+                    workflow_id=self.workflow_id,
+                    request_id=self.request_id,
+                    restoration_time_ms=0,  # Placeholder
+                    restored_keys=list(state.keys()),
+                )
 
             return state
 
         except Exception as e:
-            workflow_logger.log_workflow_state_restoration_error(
-                workflow_id=self.workflow_id, request_id=self.request_id, error=str(e)
+            workflow_logger.log_snapshot_restoration_error(
+                workflow_id=self.workflow_id, snapshot_id=snapshot_id or "current", error=str(e)
             )
             return None
 
@@ -295,43 +373,301 @@ class EnhancedWorkflowStateManager:
         state: TripPlanningWorkflowState,
         checkpoint_type: CheckpointType = CheckpointType.AUTOMATIC,
     ) -> bool:
-        """Enhanced state persistence with detailed progress tracking."""
-        success = await self.persist_state(state, checkpoint_type)
+        """Persist state with progress tracking (wrapper for backward compatibility)."""
+        return await self.persist_state(state, checkpoint_type)
 
-        if success and self.config.enable_progress_tracking:
-            # Calculate and update completion percentage
-            completion_percentage = await self._calculate_completion_percentage(state)
+    async def create_manual_checkpoint(
+        self, state: TripPlanningWorkflowState, description: str
+    ) -> str:
+        """Create a manual checkpoint with description."""
+        snapshot_id = await self._create_enhanced_checkpoint(
+            state, CheckpointType.MANUAL, description
+        )
+        return snapshot_id
 
-            # Extract and update performance metrics
-            await self._update_performance_metrics(state)
+    async def _create_enhanced_checkpoint(
+        self, state: TripPlanningWorkflowState, checkpoint_type: CheckpointType, description: str
+    ) -> str:
+        """Create an enhanced checkpoint with metadata and description."""
+        snapshot_id = f"{checkpoint_type.value}_{int(time.time())}"
 
-            # Log progress milestone if significant
-            if completion_percentage > 0 and completion_percentage % 25 == 0:
-                workflow_logger.log_workflow_progress_milestone(
-                    workflow_id=self.workflow_id,
-                    request_id=self.request_id,
-                    completion_percentage=completion_percentage,
-                    agents_completed=state.get("agents_completed", []),
+        # Convert TripPlanningWorkflowState to dict for snapshot
+        state_dict = dict(state) if isinstance(state, dict) else state
+
+        snapshot = StateSnapshot(
+            workflow_id=self.workflow_id,
+            timestamp=time.time(),
+            snapshot_id=snapshot_id,
+            state_data=state_dict,
+            checkpoint_type=checkpoint_type.value,
+            agents_completed=state.get("agents_completed", []),
+            agents_failed=state.get("agents_failed", []),
+            current_phase=state.get("current_node") or "unknown",
+            description=description,
+        )
+
+        await self._store_enhanced_snapshot(snapshot)
+
+        workflow_logger.log_enhanced_checkpoint_created(
+            workflow_id=self.workflow_id,
+            request_id=self.request_id,
+            snapshot_id=snapshot_id,
+            checkpoint_type=checkpoint_type.value,
+            description=description,
+        )
+
+        return snapshot_id
+
+    async def _store_enhanced_snapshot(self, snapshot: StateSnapshot) -> None:
+        """Store an enhanced snapshot (wrapper for _store_snapshot)."""
+        await self._store_snapshot(snapshot)
+
+    async def suspend_workflow(self, reason: str) -> bool:
+        """Suspend the workflow with a reason."""
+        try:
+            if self.current_state:
+                self.current_state["status"] = "suspended"
+                self.current_state["suspension_reason"] = reason
+                self.current_state["suspended_at"] = datetime.now(UTC).isoformat()
+                self.workflow_status = WorkflowStatus.SUSPENDED
+
+                # Create suspension checkpoint
+                await self._create_enhanced_checkpoint(
+                    self.current_state, CheckpointType.MANUAL, f"Suspended: {reason}"
                 )
 
-        return success
+                # Persist state with suspended status
+                result = await self.persist_state(self.current_state, CheckpointType.MANUAL)
+
+                # Stop heartbeat
+                if self.enable_heartbeat:
+                    await self._stop_heartbeat()
+
+                return result
+            return False
+
+        except Exception as e:
+            workflow_logger.error(
+                "Failed to suspend workflow",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
+            return False
+
+    async def resume_workflow(self) -> dict[str, Any] | None:
+        """Resume a suspended workflow."""
+        try:
+            # Restore state
+            state = await self.restore_state()
+            if not state:
+                return None
+
+            # Update status
+            state["status"] = "active"
+            state["resumed_at"] = datetime.now(UTC).isoformat()
+            self.workflow_status = WorkflowStatus.ACTIVE
+
+            # Restart heartbeat
+            if self.enable_heartbeat:
+                await self._start_heartbeat()
+
+            # Persist resumed state
+            await self.persist_state(state, CheckpointType.MANUAL)
+
+            return {"state": state}
+
+        except Exception as e:
+            workflow_logger.error(
+                "Failed to resume workflow",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
+            return None
+
+    async def complete_workflow(
+        self, state: TripPlanningWorkflowState, completion_message: str
+    ) -> bool:
+        """Mark workflow as completed."""
+        try:
+            state["status"] = "completed"
+            state["completed_at"] = datetime.now(UTC).isoformat()
+            state["completion_message"] = completion_message
+            self.workflow_status = WorkflowStatus.COMPLETED
+
+            # Create completion checkpoint
+            await self._create_enhanced_checkpoint(
+                state, CheckpointType.COMPLETION, completion_message
+            )
+
+            # Persist final state
+            result = await self.persist_state(state, CheckpointType.COMPLETION)
+
+            # Stop heartbeat
+            if self.enable_heartbeat:
+                await self._stop_heartbeat()
+
+            # Schedule cleanup
+            self._cleanup_tasks.add(f"cleanup_{self.workflow_id}")
+
+            return result
+
+        except Exception as e:
+            workflow_logger.error(
+                "Failed to complete workflow",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
+            return False
+
+    async def _cleanup_single_workflow(self, workflow_id: str) -> dict[str, Any]:
+        """Clean up a single workflow."""
+        try:
+            await self._cleanup_workflow(workflow_id)
+            return {"cleaned": True, "reason": "completed"}
+        except Exception as e:
+            return {"cleaned": False, "reason": str(e)}
+
+    async def _force_cleanup_workflow_keys(self, workflow_id: str) -> None:
+        """Force cleanup all Redis keys for a workflow using pipeline."""
+        try:
+            pipeline = self.redis_client.pipeline()
+
+            keys_to_delete = [
+                f"workflow:state:{workflow_id}",
+                f"workflow:metadata:{workflow_id}",
+                f"workflow:snapshots:{workflow_id}",
+                f"workflow:progress:{workflow_id}",
+                f"workflow:heartbeat:{workflow_id}",
+                f"workflow:metrics:{workflow_id}",
+                f"workflow:lock:{workflow_id}",
+            ]
+
+            for key in keys_to_delete:
+                pipeline.delete(key)
+
+            await pipeline.execute()
+
+        except Exception as e:
+            workflow_logger.error(
+                "Failed to force cleanup workflow keys",
+                extra={
+                    "workflow_id": workflow_id,
+                    "error": str(e),
+                },
+            )
+
+    async def cleanup_old_snapshots(self, max_age_hours: int = 48) -> int:
+        """Clean up old snapshots based on age."""
+        try:
+            snapshots_data = await self.redis_client.get(self.snapshots_key)
+            if not snapshots_data:
+                return 0
+
+            snapshots = json.loads(snapshots_data)
+            current_time = time.time()
+            max_age_seconds = max_age_hours * 3600
+
+            # Filter out old snapshots
+            cleaned_count = 0
+            filtered_snapshots = []
+
+            for snapshot in snapshots:
+                age = current_time - snapshot["timestamp"]
+                # Keep manual and important checkpoints regardless of age
+                if snapshot["checkpoint_type"] in ["manual", "error", "completion"]:
+                    filtered_snapshots.append(snapshot)
+                elif age < max_age_seconds:
+                    filtered_snapshots.append(snapshot)
+                else:
+                    cleaned_count += 1
+
+            # Update snapshots if any were cleaned
+            if cleaned_count > 0:
+                ttl = self._calculate_ttl(self.workflow_status)
+                await self.redis_client.setex(
+                    self.snapshots_key,
+                    ttl,
+                    json.dumps(filtered_snapshots, default=self._json_serializer),
+                )
+
+            return cleaned_count
+
+        except Exception as e:
+            workflow_logger.error(
+                "Failed to clean up old snapshots",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
+            return 0
+
+    def _estimate_enhanced_completion_time(
+        self, elapsed_time: float, completed_agents: int, total_agents: int
+    ) -> float | None:
+        """Estimate completion time based on progress."""
+        if completed_agents == 0 or total_agents == 0:
+            return None
+
+        # Calculate average time per agent
+        avg_time_per_agent = elapsed_time / completed_agents
+
+        # Estimate remaining time
+        remaining_agents = total_agents - completed_agents
+        estimated_remaining_time = avg_time_per_agent * remaining_agents
+
+        # Return estimated completion timestamp
+        return time.time() + estimated_remaining_time
 
     async def restore_workflow_state(
         self, snapshot_id: str | None = None, include_progress: bool = True
     ) -> dict[str, Any] | None:
-        """Restore workflow state with optional progress information."""
-        state = await self.restore_state(snapshot_id)
+        """Restore workflow state with optional progress data."""
+        try:
+            state_data: dict[str, Any] | None = None
+            if snapshot_id:
+                # Restore from specific snapshot
+                snapshots_data = await self.redis_client.get(self.snapshots_key)
+                if snapshots_data:
+                    snapshots = json.loads(snapshots_data)
+                    if snapshot_id in snapshots:
+                        state_data = snapshots[snapshot_id].get("state", {})
+                    else:
+                        logger.warning(f"Snapshot {snapshot_id} not found")
+                        return None
+                else:
+                    return None
+            else:
+                # Restore current state
+                state_data_raw = await self.redis_client.get(self.state_key)
+                if not state_data_raw:
+                    return None
+                state_data = json.loads(state_data_raw)
 
-        if not state:
+            if not state_data:
+                return None
+
+            # Extract progress data if present
+            progress = state_data.pop("_progress", None) if include_progress else None
+
+            # Initialize progress tracking if needed
+            if include_progress and not progress:
+                # Cast state_data for initialization
+                if isinstance(state_data, dict):
+                    await self._initialize_progress_tracking(state_data)
+                    progress = self.progress_data
+
+            return {"state": state_data, "progress": progress}
+
+        except Exception as e:
+            logger.error(f"Failed to restore workflow state: {e}")
             return None
-
-        result = {"state": state}
-
-        if include_progress:
-            progress = await self.get_comprehensive_progress()
-            result["progress"] = progress
-
-        return result
 
     # Checkpoint management
 
@@ -358,24 +694,28 @@ class EnhancedWorkflowStateManager:
         """Create a state checkpoint."""
         snapshot_id = f"{checkpoint_type.value}_{int(time.time())}"
 
+        # Convert TripPlanningWorkflowState to dict for snapshot
+        state_dict = dict(state) if isinstance(state, dict) else state
+
         snapshot = StateSnapshot(
             workflow_id=self.workflow_id,
             timestamp=time.time(),
             snapshot_id=snapshot_id,
-            state_data=state,
+            state_data=state_dict,
             checkpoint_type=checkpoint_type.value,
             agents_completed=state.get("agents_completed", []),
             agents_failed=state.get("agents_failed", []),
-            current_phase=state.get("current_node", "unknown"),
+            current_phase=state.get("current_node") or "unknown",
         )
 
         await self._store_snapshot(snapshot)
 
-        workflow_logger.log_checkpoint_created(
+        workflow_logger.log_enhanced_checkpoint_created(
             workflow_id=self.workflow_id,
             request_id=self.request_id,
             snapshot_id=snapshot_id,
             checkpoint_type=checkpoint_type.value,
+            description="",
         )
 
         return snapshot_id
@@ -399,7 +739,10 @@ class EnhancedWorkflowStateManager:
             }
 
             # Compress if needed
-            if self.config.enable_compression and self.state_size_bytes > self.config.snapshot_compression_threshold:
+            if (
+                self.config.enable_compression
+                and self.state_size_bytes > self.config.snapshot_compression_threshold
+            ):
                 snapshot_dict["compressed"] = True
                 snapshot_dict["state_data"] = self._compress_state(snapshot.state_data)
             else:
@@ -410,27 +753,41 @@ class EnhancedWorkflowStateManager:
             # Cleanup old snapshots
             if len(snapshots) > self.config.max_snapshots_per_workflow:
                 # Keep important checkpoints and recent ones
-                important_types = [CheckpointType.MANUAL.value, CheckpointType.ERROR.value, CheckpointType.COMPLETION.value]
-                
-                important_snapshots = [s for s in snapshots if s["checkpoint_type"] in important_types]
-                regular_snapshots = [s for s in snapshots if s["checkpoint_type"] not in important_types]
-                
+                important_types = [
+                    CheckpointType.MANUAL.value,
+                    CheckpointType.ERROR.value,
+                    CheckpointType.COMPLETION.value,
+                ]
+
+                important_snapshots = [
+                    s for s in snapshots if s["checkpoint_type"] in important_types
+                ]
+                regular_snapshots = [
+                    s for s in snapshots if s["checkpoint_type"] not in important_types
+                ]
+
                 # Sort regular snapshots by timestamp
                 regular_snapshots.sort(key=lambda x: x["timestamp"], reverse=True)
-                
+
                 # Keep recent regular snapshots
                 keep_regular = self.config.max_snapshots_per_workflow - len(important_snapshots)
-                regular_snapshots = regular_snapshots[:max(keep_regular, 0)]
-                
+                regular_snapshots = regular_snapshots[: max(keep_regular, 0)]
+
                 snapshots = important_snapshots + regular_snapshots
 
             # Store snapshots
             ttl = self._calculate_ttl(self.workflow_status)
-            await self.redis_client.setex(self.snapshots_key, ttl, json.dumps(snapshots, default=self._json_serializer))
+            await self.redis_client.setex(
+                self.snapshots_key,
+                ttl,
+                json.dumps(snapshots, default=self._json_serializer),
+            )
 
         except Exception as e:
             workflow_logger.log_snapshot_storage_error(
-                workflow_id=self.workflow_id, snapshot_id=snapshot.snapshot_id, error=str(e)
+                workflow_id=self.workflow_id,
+                snapshot_id=snapshot.snapshot_id,
+                error=str(e),
             )
 
     async def _restore_from_snapshot(self, snapshot_id: str) -> TripPlanningWorkflowState | None:
@@ -452,7 +809,10 @@ class EnhancedWorkflowStateManager:
                     if snapshot.get("compressed", False):
                         state_data = self._decompress_state(state_data)
 
-                    return state_data
+                    # Return with proper type casting
+                    if isinstance(state_data, dict):
+                        return state_data  # type: ignore[return-value]
+                    return None
 
             return None
 
@@ -499,7 +859,7 @@ class EnhancedWorkflowStateManager:
             if description:
                 if "history" not in progress:
                     progress["history"] = []
-                
+
                 progress["history"].append(
                     {
                         "timestamp": time.time(),
@@ -507,7 +867,7 @@ class EnhancedWorkflowStateManager:
                         "completion_percentage": completion_percentage,
                     }
                 )
-                
+
                 # Keep only recent history
                 progress["history"] = progress["history"][-50:]
 
@@ -534,7 +894,7 @@ class EnhancedWorkflowStateManager:
 
             # Adjust for workflow phases
             phase_multiplier = 1.0
-            current_node = state.get("current_node", "")
+            current_node = state.get("current_node", "") or ""
 
             if "complete" in current_node.lower():
                 phase_multiplier = 1.0
@@ -566,8 +926,9 @@ class EnhancedWorkflowStateManager:
             }
 
             # Calculate processing time if available
-            if "created_at" in state:
-                created_at = datetime.fromisoformat(state["created_at"])
+            created_at_str = state.get("created_at")
+            if created_at_str:
+                created_at = datetime.fromisoformat(created_at_str)
                 processing_time = (datetime.now(UTC) - created_at).total_seconds()
                 metrics["processing_time_seconds"] = processing_time
 
@@ -577,7 +938,13 @@ class EnhancedWorkflowStateManager:
             await self.redis_client.setex(metrics_key, ttl, json.dumps(metrics))
 
         except Exception as e:
-            workflow_logger.log_metrics_update_error(workflow_id=self.workflow_id, error=str(e))
+            workflow_logger.warning(
+                "Failed to update performance metrics",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
 
     async def get_comprehensive_progress(self) -> dict[str, Any]:
         """Get comprehensive workflow progress information."""
@@ -608,13 +975,17 @@ class EnhancedWorkflowStateManager:
             }
 
             # Calculate estimated completion time
-            if progress.get("completion_percentage", 0) > 0 and metrics.get("processing_time_seconds"):
+            if progress.get("completion_percentage", 0) > 0 and metrics.get(
+                "processing_time_seconds"
+            ):
                 elapsed_time = metrics["processing_time_seconds"]
                 completion_percentage = progress["completion_percentage"]
                 if completion_percentage > 0:
                     estimated_total_time = elapsed_time / (completion_percentage / 100)
                     estimated_remaining_time = estimated_total_time - elapsed_time
-                    comprehensive_progress["estimated_completion_seconds"] = estimated_remaining_time
+                    comprehensive_progress["estimated_completion_seconds"] = (
+                        estimated_remaining_time
+                    )
 
             return comprehensive_progress
 
@@ -711,7 +1082,11 @@ class EnhancedWorkflowStateManager:
 
     def _update_workflow_status(self, state: TripPlanningWorkflowState) -> None:
         """Update workflow status based on state."""
-        status_str = state.get("status", "pending").lower()
+        status_str = state.get("status", "pending")
+        if status_str:
+            status_str = status_str.lower()
+        else:
+            status_str = "pending"
 
         if "complete" in status_str:
             self.workflow_status = WorkflowStatus.COMPLETED
@@ -753,7 +1128,7 @@ class EnhancedWorkflowStateManager:
         """Compress state data for storage."""
         import base64
         import gzip
-        
+
         json_str = json.dumps(state, default=self._json_serializer)
         compressed = gzip.compress(json_str.encode())
         return base64.b64encode(compressed).decode()
@@ -762,10 +1137,11 @@ class EnhancedWorkflowStateManager:
         """Decompress state data from storage."""
         import base64
         import gzip
-        
+
         compressed = base64.b64decode(compressed_state.encode())
         json_str = gzip.decompress(compressed).decode()
-        return json.loads(json_str)
+        result: dict[str, Any] = json.loads(json_str)
+        return result
 
     async def _count_snapshots(self) -> int:
         """Count available snapshots."""
@@ -782,13 +1158,13 @@ class EnhancedWorkflowStateManager:
         """Get remaining TTL for workflow state."""
         try:
             ttl = await self.redis_client.ttl(self.state_key)
-            return max(ttl, 0)
+            return max(ttl or 0, 0)
         except Exception:
             return 0
 
     # Cleanup and maintenance
 
-    async def cleanup_expired_workflows(self) -> dict[str, int]:
+    async def cleanup_expired_workflows(self, max_workflows: int = 100) -> dict[str, Any]:
         """Clean up expired workflows from Redis."""
         try:
             cleanup_stats = {"scanned": 0, "cleaned": 0, "errors": 0}
@@ -840,14 +1216,18 @@ class EnhancedWorkflowStateManager:
             # Update workflow index
             await self.redis_client.set(self.index_key, json.dumps(workflow_index))
 
-            workflow_logger.log_cleanup_completed(
-                cleanup_stats=cleanup_stats, workflow_count=len(workflow_index)
+            workflow_logger.log_workflow_cleanup_completed(
+                processed_count=cleanup_stats["scanned"],
+                expired_cleaned=cleanup_stats["cleaned"],
+                completed_cleaned=0,  # Placeholder
+                failed_cleanups=cleanup_stats["errors"],
+                cleanup_time=0,  # Placeholder
             )
 
             return cleanup_stats
 
         except Exception as e:
-            workflow_logger.log_cleanup_error(error=str(e))
+            workflow_logger.log_workflow_cleanup_error(error=str(e))
             return {"scanned": 0, "cleaned": 0, "errors": 1}
 
     async def _cleanup_workflow(self, workflow_id: str) -> None:
@@ -886,7 +1266,7 @@ class EnhancedWorkflowStateManager:
                         # Update state with recovery information
                         state["recovered_from"] = snapshot["snapshot_id"]
                         state["recovery_timestamp"] = datetime.now(UTC).isoformat()
-                        
+
                         if error_info:
                             if "errors" not in state:
                                 state["errors"] = []
@@ -898,11 +1278,14 @@ class EnhancedWorkflowStateManager:
                         # Persist recovered state
                         await self.persist_state(state, CheckpointType.AUTOMATIC)
 
-                        workflow_logger.log_workflow_recovered(
-                            workflow_id=self.workflow_id,
-                            request_id=self.request_id,
-                            recovered_from=snapshot["snapshot_id"],
-                            retry_count=state["retry_count"],
+                        workflow_logger.info(
+                            "Workflow recovered from failure",
+                            extra={
+                                "workflow_id": self.workflow_id,
+                                "request_id": self.request_id,
+                                "recovered_from": snapshot["snapshot_id"],
+                                "retry_count": state["retry_count"],
+                            },
                         )
 
                         return state
@@ -910,7 +1293,13 @@ class EnhancedWorkflowStateManager:
             return None
 
         except Exception as e:
-            workflow_logger.log_recovery_error(workflow_id=self.workflow_id, error=str(e))
+            workflow_logger.error(
+                "Failed to recover workflow from failure",
+                extra={
+                    "workflow_id": self.workflow_id,
+                    "error": str(e),
+                },
+            )
             return None
 
     async def list_snapshots(self) -> list[dict[str, Any]]:
@@ -961,7 +1350,9 @@ class EnhancedWorkflowStateManager:
         except Exception as e:
             logger.warning(f"Failed to add workflow to index: {e}")
 
-    async def _initialize_progress_tracking(self, state: TripPlanningWorkflowState) -> None:
+    async def _initialize_progress_tracking(
+        self, state: TripPlanningWorkflowState | dict[str, Any]
+    ) -> None:
         """Initialize progress tracking structure."""
         self.progress_data = {
             "workflow_id": self.workflow_id,
@@ -979,57 +1370,35 @@ class EnhancedWorkflowStateManager:
             },
         }
 
-    async def _update_progress_tracking(
+    async def _update_progress_tracking_by_phase(
         self, phase: str, percentage: float, checkpoint: str | None = None
     ) -> None:
         """Update progress tracking data."""
         if not self.progress_data:
-            return
+            await self._initialize_progress_tracking({})
 
-        self.progress_data["updated_at"] = datetime.now(UTC).isoformat()
-        self.progress_data["current_phase"] = phase
-        self.progress_data["completion_percentage"] = percentage
+        if self.progress_data:
+            self.progress_data["updated_at"] = datetime.now(UTC).isoformat()
+            self.progress_data["current_phase"] = phase
+            self.progress_data["completion_percentage"] = percentage
 
-        # Add to phase history
-        phase_entry = {
-            "phase": phase,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "percentage": percentage,
-        }
-        self.progress_data["phase_history"].append(phase_entry)
-
-        # Update checkpoint if provided
-        if checkpoint:
-            self.progress_data["checkpoints"][checkpoint] = {
-                "timestamp": datetime.now(UTC).isoformat(),
+            # Add to phase history
+            phase_entry = {
                 "phase": phase,
+                "timestamp": datetime.now(UTC).isoformat(),
                 "percentage": percentage,
             }
+            self.progress_data["phase_history"].append(phase_entry)
 
-    async def _calculate_completion_percentage(
-        self, state: TripPlanningWorkflowState
-    ) -> float:
-        """Calculate overall completion percentage based on workflow state."""
-        completed_phases = 0
-        total_phases = 5  # Total number of workflow phases
+            # Update checkpoint if provided
+            if checkpoint:
+                self.progress_data["checkpoints"][checkpoint] = {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "phase": phase,
+                    "percentage": percentage,
+                }
 
-        # Check each phase completion
-        if state.get("user_preferences"):
-            completed_phases += 1
-        if state.get("itinerary"):
-            completed_phases += 1
-        if state.get("accommodations"):
-            completed_phases += 1
-        if state.get("weather_data"):
-            completed_phases += 1
-        if state.get("restaurants"):
-            completed_phases += 1
-
-        return (completed_phases / total_phases) * 100
-
-    async def _extract_metrics_from_state(
-        self, state: TripPlanningWorkflowState
-    ) -> dict[str, Any]:
+    async def _extract_metrics_from_state(self, state: TripPlanningWorkflowState) -> dict[str, Any]:
         """Extract workflow metrics from state."""
         metrics = {
             "total_tasks": 0,
@@ -1045,107 +1414,42 @@ class EnhancedWorkflowStateManager:
 
         if state.get("accommodations"):
             metrics["total_tasks"] += 1
-            if state["accommodations"]:
+            if state.get("accommodations"):
                 metrics["completed_tasks"] += 1
 
         if state.get("restaurants"):
             metrics["total_tasks"] += 1
-            if state["restaurants"]:
+            if state.get("restaurants"):
                 metrics["completed_tasks"] += 1
 
         if state.get("activities"):
             metrics["total_tasks"] += 1
-            if state["activities"]:
+            if state.get("activities"):
                 metrics["completed_tasks"] += 1
 
         if state.get("weather_data"):
             metrics["total_tasks"] += 1
-            if state["weather_data"]:
+            if state.get("weather_data"):
                 metrics["completed_tasks"] += 1
 
         # Extract retry count from errors if available
         if "errors" in state:
-            metrics["retry_count"] = len(state["errors"])
+            metrics["retry_count"] = len(state.get("errors", []))
 
         return metrics
 
-    async def persist_state_with_progress(
-        self,
-        state: TripPlanningWorkflowState,
-        checkpoint: CheckpointEnum = CheckpointEnum.CUSTOM,
-    ) -> None:
-        """Persist state with progress tracking."""
-        try:
-            # Update progress tracking
-            phase = state.get("current_step", "UNKNOWN")
-            percentage = await self._calculate_completion_percentage(state)
-            await self._update_progress_tracking(phase, percentage, checkpoint.value)
+    async def get_workflow_progress(self) -> dict[str, Any] | None:
+        """Get current workflow progress."""
+        if self.progress_data:
+            return self.progress_data
 
-            # Update metrics
-            if self.progress_data:
-                self.progress_data["metrics"] = await self._extract_metrics_from_state(state)
+        # Try to restore from state
+        restored = await self.restore_workflow_state(include_progress=True)
+        if restored and restored.get("progress"):
+            self.progress_data = restored["progress"]
+            return self.progress_data
 
-            # Add progress data to state before persisting
-            state_with_progress = {**state}
-            state_with_progress["_progress"] = self.progress_data
-
-            # Persist the enhanced state
-            await self.redis_client.set(
-                self.state_key, json.dumps(state_with_progress, default=str), ex=self.ttl
-            )
-
-            # Add to snapshots if it's a checkpoint
-            if checkpoint != CheckpointEnum.CUSTOM:
-                await self._create_snapshot(state_with_progress, checkpoint.value)
-
-            # Update workflow index
-            await self._update_workflow_index()
-
-            logger.info(
-                f"Persisted state with progress: workflow_id={self.workflow_id}, "
-                f"phase={phase}, completion={percentage:.1f}%"
-            )
-        except Exception as e:
-            logger.error(f"Failed to persist state with progress: {e}")
-            raise
-
-    async def restore_workflow_state(
-        self, snapshot_id: str | None = None, include_progress: bool = True
-    ) -> dict[str, Any] | None:
-        """Restore workflow state with optional progress data."""
-        try:
-            if snapshot_id:
-                # Restore from specific snapshot
-                snapshots_data = await self.redis_client.get(self.snapshots_key)
-                if snapshots_data:
-                    snapshots = json.loads(snapshots_data)
-                    if snapshot_id in snapshots:
-                        state_data = snapshots[snapshot_id].get("state", {})
-                    else:
-                        logger.warning(f"Snapshot {snapshot_id} not found")
-                        return None
-                else:
-                    return None
-            else:
-                # Restore current state
-                state_data = await self.redis_client.get(self.state_key)
-                if not state_data:
-                    return None
-                state_data = json.loads(state_data)
-
-            # Extract progress data if present
-            progress = state_data.pop("_progress", None) if include_progress else None
-
-            # Initialize progress tracking if needed
-            if include_progress and not progress:
-                await self._initialize_progress_tracking(state_data)
-                progress = self.progress_data
-
-            return {"state": state_data, "progress": progress}
-
-        except Exception as e:
-            logger.error(f"Failed to restore workflow state: {e}")
-            return None
+        return None
 
     async def _create_snapshot(self, state: dict[str, Any], checkpoint: str) -> None:
         """Create a state snapshot."""
@@ -1189,61 +1493,11 @@ class EnhancedWorkflowStateManager:
                     workflow_index[self.workflow_id]["completion"] = self.progress_data[
                         "completion_percentage"
                     ]
-                    workflow_index[self.workflow_id]["phase"] = self.progress_data[
-                        "current_phase"
-                    ]
+                    workflow_index[self.workflow_id]["phase"] = self.progress_data["current_phase"]
 
                 await self.redis_client.set(self.index_key, json.dumps(workflow_index))
         except Exception as e:
             logger.warning(f"Failed to update workflow index: {e}")
-
-    async def get_workflow_progress(self) -> dict[str, Any] | None:
-        """Get current workflow progress."""
-        if self.progress_data:
-            return self.progress_data
-
-        # Try to restore from state
-        restored = await self.restore_workflow_state(include_progress=True)
-        if restored and restored.get("progress"):
-            self.progress_data = restored["progress"]
-            return self.progress_data
-
-        return None
-
-    async def list_snapshots(self) -> list[dict[str, Any]]:
-        """List all available snapshots for the workflow."""
-        try:
-            snapshots_data = await self.redis_client.get(self.snapshots_key)
-            if not snapshots_data:
-                return []
-
-            snapshots = json.loads(snapshots_data)
-            # Return snapshot metadata without full state
-            return [
-                {
-                    "id": snapshot_id,
-                    "checkpoint": data.get("checkpoint"),
-                    "created_at": data.get("created_at"),
-                }
-                for snapshot_id, data in snapshots.items()
-            ]
-        except Exception as e:
-            logger.error(f"Failed to list snapshots: {e}")
-            return []
-
-    # Backward compatibility methods
-    async def persist_state(
-        self, state: TripPlanningWorkflowState, checkpoint_enum: CheckpointEnum | None = None
-    ) -> None:
-        """Persist workflow state (backward compatibility)."""
-        return await self.persist_state_with_progress(state, checkpoint_enum)
-
-    async def restore_state(
-        self, snapshot_id: str | None = None
-    ) -> TripPlanningWorkflowState | None:
-        """Restore workflow state (backward compatibility)."""
-        restored_data = await self.restore_workflow_state(snapshot_id, include_progress=False)
-        return restored_data["state"] if restored_data else None
 
     async def _persist_with_ttl(self, key: str, data: dict[str, Any], ttl: int) -> None:
         """Persist data with TTL."""
@@ -1252,7 +1506,8 @@ class EnhancedWorkflowStateManager:
 
     async def _get_current_ttl(self) -> int:
         """Get current TTL for workflow state."""
-        return await self.redis_client.ttl(self.state_key)
+        ttl = await self.redis_client.ttl(self.state_key)
+        return ttl if ttl is not None else 0
 
 
 # Create backward compatibility alias

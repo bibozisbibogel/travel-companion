@@ -145,7 +145,7 @@ async def execute_weather_agent(state: TripPlanningWorkflowState) -> TripPlannin
         weather_request = WeatherSearchRequest(
             location=trip_request.destination.city,
             latitude=None,  # Optional field
-            longitude=None,  # Optional field  
+            longitude=None,  # Optional field
             start_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
             end_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             include_historical=True,
@@ -245,7 +245,9 @@ async def execute_flight_agent(state: TripPlanningWorkflowState) -> TripPlanning
         flight_request = FlightSearchRequest(
             origin=getattr(trip_request, "origin", "JFK"),  # Default origin if not specified
             destination=trip_request.destination.airport_code or "CDG",
-            departure_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
+            departure_date=datetime.combine(
+                trip_request.requirements.start_date, datetime.min.time()
+            ),
             return_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             passengers=trip_request.requirements.travelers,
             currency="USD",
@@ -347,8 +349,12 @@ async def execute_hotel_agent(state: TripPlanningWorkflowState) -> TripPlanningW
 
         hotel_request = HotelSearchRequest(
             location=trip_request.destination.city,
-            check_in_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
-            check_out_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
+            check_in_date=datetime.combine(
+                trip_request.requirements.start_date, datetime.min.time()
+            ),
+            check_out_date=datetime.combine(
+                trip_request.requirements.end_date, datetime.min.time()
+            ),
             guest_count=trip_request.requirements.travelers,
             room_count=1,  # Default, can be calculated based on traveler count
             budget_per_night=Decimal(
@@ -469,8 +475,12 @@ async def execute_activity_agent(state: TripPlanningWorkflowState) -> TripPlanni
 
         activity_request = ActivitySearchRequest(
             location=trip_request.destination.city,
-            check_in_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
-            check_out_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
+            check_in_date=datetime.combine(
+                trip_request.requirements.start_date, datetime.min.time()
+            ),
+            check_out_date=datetime.combine(
+                trip_request.requirements.end_date, datetime.min.time()
+            ),
             guest_count=trip_request.requirements.travelers,
             budget_per_person=Decimal(str(budget_allocation / trip_request.requirements.travelers))
             if trip_request.requirements.travelers > 0
@@ -659,7 +669,16 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
                     for restaurant in food_response.restaurants[:5]  # Top 5 restaurants
                     if restaurant.average_cost_per_person is not None
                 )
-                / max(1, len([r for r in food_response.restaurants[:5] if r.average_cost_per_person is not None]))
+                / max(
+                    1,
+                    len(
+                        [
+                            r
+                            for r in food_response.restaurants[:5]
+                            if r.average_cost_per_person is not None
+                        ]
+                    ),
+                )
             )
 
             estimated_food_cost = (

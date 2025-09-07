@@ -5,8 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from ...core.deps import get_redis_manager
-from ...core.redis import RedisManager
+from ...core.redis import RedisManager, get_redis_manager
 from ...workflows.monitoring import (
     HealthStatus,
     WorkflowHealthMonitor,

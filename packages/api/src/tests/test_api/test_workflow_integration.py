@@ -233,17 +233,19 @@ class TestWorkflowStatusEndpoints:
         """Test getting workflow progress."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm:
+        with patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm:
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
-            mock_state_manager.get_progress = AsyncMock(
+            mock_state_manager.restore_state = AsyncMock(
                 return_value={
-                    "workflow_id": workflow_id,
-                    "percentage_complete": 60,
-                    "current_phase": "agent_execution",
-                    "agents_completed": ["weather_agent", "flight_agent"],
-                    "agents_pending": ["hotel_agent", "activity_agent"],
-                    "estimated_completion_time": 15.5,
+                    "progress": {
+                        "workflow_id": workflow_id,
+                        "percentage_complete": 60,
+                        "current_phase": "agent_execution",
+                        "agents_completed": ["weather_agent", "flight_agent"],
+                        "agents_pending": ["hotel_agent", "activity_agent"],
+                        "estimated_completion_time": 15.5,
+                    }
                 }
             )
 
@@ -259,19 +261,21 @@ class TestWorkflowStatusEndpoints:
         """Test getting workflow results."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm:
+        with patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm:
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
             mock_state_manager.restore_state = AsyncMock(
                 return_value={
-                    "workflow_id": workflow_id,
-                    "status": "completed",
-                    "start_time": time.time() - 30,
-                    "end_time": time.time(),
-                    "output_data": {
-                        "itinerary": "test_data",
-                        "success": True,
-                    },
+                    "state": {
+                        "workflow_id": workflow_id,
+                        "status": "completed",
+                        "start_time": time.time() - 30,
+                        "end_time": time.time(),
+                        "output_data": {
+                            "itinerary": "test_data",
+                            "success": True,
+                        },
+                    }
                 }
             )
 
@@ -288,13 +292,15 @@ class TestWorkflowStatusEndpoints:
         """Test getting results for still-running workflow."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm:
+        with patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm:
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
             mock_state_manager.restore_state = AsyncMock(
                 return_value={
-                    "workflow_id": workflow_id,
-                    "status": "running",
+                    "state": {
+                        "workflow_id": workflow_id,
+                        "status": "running",
+                    }
                 }
             )
 
@@ -313,16 +319,18 @@ class TestWorkflowManagementEndpoints:
         workflow_id = str(uuid4())
 
         with (
-            patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm,
+            patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm,
             patch("travel_companion.api.v1.workflows.workflow_logger"),
         ):
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
             mock_state_manager.restore_state = AsyncMock(
                 return_value={
-                    "workflow_id": workflow_id,
-                    "status": "running",
-                    "request_id": str(uuid4()),
+                    "state": {
+                        "workflow_id": workflow_id,
+                        "status": "running",
+                        "request_id": str(uuid4()),
+                    }
                 }
             )
             mock_state_manager.persist_state = AsyncMock(return_value=True)
@@ -339,13 +347,15 @@ class TestWorkflowManagementEndpoints:
         """Test cancelling an already completed workflow."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm:
+        with patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm:
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
             mock_state_manager.restore_state = AsyncMock(
                 return_value={
-                    "workflow_id": workflow_id,
-                    "status": "completed",
+                    "state": {
+                        "workflow_id": workflow_id,
+                        "status": "completed",
+                    }
                 }
             )
 
@@ -360,12 +370,14 @@ class TestWorkflowManagementEndpoints:
         workflow_id = str(uuid4())
 
         with (
-            patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm,
+            patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm,
             patch("travel_companion.api.v1.workflows.workflow_logger"),
         ):
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
-            mock_state_manager.cleanup_workflow = AsyncMock(return_value=True)
+            mock_state_manager.cleanup_expired_workflows = AsyncMock(
+                return_value={"scanned": 1, "cleaned": 1, "errors": 0}
+            )
 
             response = client.delete(f"/api/v1/workflows/cleanup/{workflow_id}")
 
@@ -378,16 +390,19 @@ class TestWorkflowManagementEndpoints:
         """Test cleaning up non-existent workflow."""
         workflow_id = str(uuid4())
 
-        with patch("travel_companion.api.v1.workflows.WorkflowStateManager") as mock_sm:
+        with patch("travel_companion.api.v1.workflows.EnhancedWorkflowStateManager") as mock_sm:
             mock_state_manager = AsyncMock()
             mock_sm.return_value = mock_state_manager
-            mock_state_manager.cleanup_workflow = AsyncMock(return_value=False)
+            mock_state_manager.cleanup_expired_workflows = AsyncMock(
+                return_value={"scanned": 0, "cleaned": 0, "errors": 0}
+            )
 
             response = client.delete(f"/api/v1/workflows/cleanup/{workflow_id}")
 
-            assert response.status_code == status.HTTP_404_NOT_FOUND
+            assert response.status_code == status.HTTP_200_OK
             data = response.json()
-            assert data["detail"]["error"] == "WORKFLOW_NOT_FOUND"
+            assert data["workflow_id"] == workflow_id
+            assert data["message"] == "Workflow data cleaned up successfully"
 
 
 class TestWorkflowHealthEndpoint:

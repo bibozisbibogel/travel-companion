@@ -1,6 +1,7 @@
 """Itinerary agent for coordinating and integrating all travel components."""
 
 import asyncio
+import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -15,10 +16,24 @@ from travel_companion.agents.food_agent import FoodAgent
 from travel_companion.agents.hotel_agent import HotelAgent
 from travel_companion.agents.weather_agent import WeatherAgent
 from travel_companion.models.external import (
+    ActivityCategory,
+    ActivityLocation,
+    ActivityOption,
     ActivitySearchRequest,
+    ActivitySearchResponse,
+    CuisineType,
+    FlightOption,
     FlightSearchRequest,
+    FlightSearchResponse,
+    HotelLocation,
+    HotelOption,
     HotelSearchRequest,
+    HotelSearchResponse,
+    PriceRange,
+    RestaurantLocation,
+    RestaurantOption,
     RestaurantSearchRequest,
+    RestaurantSearchResponse,
     WeatherSearchRequest,
 )
 from travel_companion.models.trip import (
@@ -49,7 +64,7 @@ class ItineraryAgentResponse(BaseModel):
 class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
     """Itinerary agent that coordinates all travel planning agents."""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize itinerary agent with multi-agent coordination capabilities."""
         super().__init__(**kwargs)
 
@@ -183,7 +198,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             # Cache the result (convert to dict for JSON serialization)
             try:
                 cache_data = response.model_dump(mode="json")
-                await self.redis.set(cache_key, cache_data, expire=self.cache_ttl)
+                await self.redis.set(cache_key, json.dumps(cache_data), expire=self.cache_ttl)
             except Exception as cache_error:
                 self.logger.warning(f"Failed to cache itinerary result: {cache_error}")
 
@@ -205,7 +220,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         Returns:
             Dictionary containing results from all agents with graceful degradation
         """
-        agent_results = {}
+        agent_results: dict[str, Any] = {}
 
         # Prepare requests for each agent
         agent_requests = {
@@ -253,15 +268,16 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
     async def _get_cached_agent_results(self, agent_requests: dict[str, Any]) -> dict[str, Any]:
         """Get cached results for agents that don't need fresh data."""
-        cached_results = {}
+        cached_results: dict[str, Any] = {}
 
         for agent_name, request in agent_requests.items():
             # Generate cache key for each agent
             cache_key = f"agent_{agent_name}:{await self._agent_cache_key(request)}"
 
             try:
-                cached_data = await self.redis.get(cache_key, json_decode=True)
-                if cached_data:
+                cached_data_raw = await self.redis.get(cache_key)
+                if cached_data_raw:
+                    cached_data = json.loads(cached_data_raw)
                     # Check if cached data is still valid
                     cached_at = datetime.fromisoformat(cached_data.get("cached_at", "2000-01-01"))
                     cache_age_hours = (datetime.now() - cached_at).total_seconds() / 3600
@@ -289,7 +305,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, agents_to_call: dict[str, Any]
     ) -> dict[str, Any]:
         """Execute agent calls with retry logic and fallback strategies."""
-        agent_results = {}
+        agent_results: dict[str, Any] = {}
 
         # Primary attempt with all agents
         tasks = []
@@ -333,7 +349,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, request: FlightSearchRequest, retries: int = 2
     ) -> Any:
         """Call flight agent with retry logic and fallback."""
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt in range(retries + 1):
             try:
@@ -361,7 +377,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, request: HotelSearchRequest, retries: int = 2
     ) -> Any:
         """Call hotel agent with retry logic and fallback."""
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt in range(retries + 1):
             try:
@@ -387,7 +403,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, request: ActivitySearchRequest, retries: int = 2
     ) -> Any:
         """Call activity agent with retry logic and fallback."""
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt in range(retries + 1):
             try:
@@ -414,7 +430,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, request: WeatherSearchRequest, retries: int = 2
     ) -> Any:
         """Call weather agent with retry logic and fallback."""
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt in range(retries + 1):
             try:
@@ -440,7 +456,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, request: RestaurantSearchRequest, retries: int = 2
     ) -> Any:
         """Call food agent with retry logic and fallback."""
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt in range(retries + 1):
             try:
@@ -466,7 +482,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, agent_results: dict[str, Any], trip_request: TripPlanRequest
     ) -> dict[str, Any]:
         """Apply graceful degradation for failed agents using fallback strategies."""
-        degraded_results = {}
+        degraded_results: dict[str, Any] = {}
 
         for agent_name, result in agent_results.items():
             if result.get("status") == "failed":
@@ -500,10 +516,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         return None
 
-    def _create_fallback_flight_data(self, trip_request: TripPlanRequest) -> dict[str, Any]:
+    def _create_fallback_flight_data(self, trip_request: TripPlanRequest) -> FlightSearchResponse:
         """Create basic flight data when flight agent fails."""
-        from travel_companion.models.external import FlightOption, FlightSearchResponse
-
         # Create placeholder flight options
         departure_flight = FlightOption(
             external_id="fallback_departure",
@@ -522,6 +536,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             currency=trip_request.requirements.currency,
             travel_class=trip_request.requirements.travel_class,
             stops=0,
+            trip_id=None,
+            booking_url=None,
         )
 
         return_flight = FlightOption(
@@ -541,6 +557,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             currency=trip_request.requirements.currency,
             travel_class=trip_request.requirements.travel_class,
             stops=0,
+            trip_id=None,
+            booking_url=None,
         )
 
         return FlightSearchResponse(
@@ -549,12 +567,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 "fallback": True,
                 "note": "Placeholder flights - manual booking required",
             },
+            cache_expires_at=None,
         )
 
-    def _create_fallback_hotel_data(self, trip_request: TripPlanRequest) -> dict[str, Any]:
+    def _create_fallback_hotel_data(self, trip_request: TripPlanRequest) -> HotelSearchResponse:
         """Create basic hotel data when hotel agent fails."""
-        from travel_companion.models.external import HotelLocation, HotelOption, HotelSearchResponse
-
         nights = (trip_request.requirements.end_date - trip_request.requirements.start_date).days
         budget_per_night = (
             trip_request.requirements.budget / max(nights, 1) / 3
@@ -567,11 +584,16 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 latitude=trip_request.destination.latitude or 0.0,
                 longitude=trip_request.destination.longitude or 0.0,
                 address=f"City Center, {trip_request.destination.city}",
+                city=trip_request.destination.city,
+                country=trip_request.destination.country,
+                postal_code=None,
             ),
-            price_per_night=budget_per_night,
+            price_per_night=Decimal(budget_per_night),
             currency=trip_request.requirements.currency,
             rating=3.5,
             amenities=["WiFi", "Breakfast", "Reception"],
+            trip_id=None,
+            booking_url=None,
         )
 
         return HotelSearchResponse(
@@ -580,17 +602,13 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 "fallback": True,
                 "note": "Generic hotel option - manual selection required",
             },
+            cache_expires_at=None,
         )
 
-    def _create_fallback_activity_data(self, trip_request: TripPlanRequest) -> dict[str, Any]:
+    def _create_fallback_activity_data(
+        self, trip_request: TripPlanRequest
+    ) -> ActivitySearchResponse:
         """Create basic activity data when activity agent fails."""
-        from travel_companion.models.external import (
-            ActivityCategory,
-            ActivityLocation,
-            ActivityOption,
-            ActivitySearchResponse,
-        )
-
         generic_activities = [
             ActivityOption(
                 external_id="fallback_city_tour",
@@ -604,9 +622,15 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     latitude=trip_request.destination.latitude or 0.0,
                     longitude=trip_request.destination.longitude or 0.0,
                     address=f"{trip_request.destination.city} City Center",
+                    city=trip_request.destination.city,
+                    country=trip_request.destination.country,
+                    postal_code=None,
                 ),
                 rating=4.0,
                 provider="fallback",
+                trip_id=None,
+                review_count=None,
+                booking_url=None,
             ),
             ActivityOption(
                 external_id="fallback_museum",
@@ -620,9 +644,15 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     latitude=trip_request.destination.latitude or 0.0,
                     longitude=trip_request.destination.longitude or 0.0,
                     address=f"{trip_request.destination.city}",
+                    city=trip_request.destination.city,
+                    country=trip_request.destination.country,
+                    postal_code=None,
                 ),
                 rating=3.8,
                 provider="fallback",
+                trip_id=None,
+                review_count=None,
+                booking_url=None,
             ),
         ]
 
@@ -632,6 +662,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 "fallback": True,
                 "note": "Generic activities - research specific options",
             },
+            cache_expires_at=None,
         )
 
     def _create_fallback_weather_data(self, trip_request: TripPlanRequest) -> dict[str, Any]:
@@ -645,16 +676,10 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             "fallback": True,
         }
 
-    def _create_fallback_restaurant_data(self, trip_request: TripPlanRequest) -> dict[str, Any]:
+    def _create_fallback_restaurant_data(
+        self, trip_request: TripPlanRequest
+    ) -> RestaurantSearchResponse:
         """Create basic restaurant data when food agent fails."""
-        from travel_companion.models.external import (
-            CuisineType,
-            PriceRange,
-            RestaurantLocation,
-            RestaurantOption,
-            RestaurantSearchResponse,
-        )
-
         generic_restaurants = [
             RestaurantOption(
                 external_id="fallback_restaurant",
@@ -664,10 +689,22 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     latitude=trip_request.destination.latitude or 0.0,
                     longitude=trip_request.destination.longitude or 0.0,
                     address=f"City Center, {trip_request.destination.city}",
+                    city=trip_request.destination.city,
+                    state=None,
+                    country=trip_request.destination.country,
+                    postal_code=None,
+                    neighborhood=None,
                 ),
                 price_range=PriceRange.MODERATE,
                 rating=3.8,
                 provider="fallback",
+                trip_id=None,
+                review_count=None,
+                average_cost_per_person=None,
+                hours=None,
+                contact=None,
+                booking_url=None,
+                distance_km=None,
             )
         ]
 
@@ -677,6 +714,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 "fallback": True,
                 "note": "Generic restaurant - research local options",
             },
+            cache_expires_at=None,
         )
 
     async def _cache_agent_results(self, agent_results: dict[str, Any]) -> None:
@@ -698,7 +736,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         7200 if agent_name == "weather" else 86400
                     )  # 2h for weather, 24h for others
 
-                    await self.redis.set(cache_key, cache_data, expire=expire_seconds)
+                    await self.redis.set(cache_key, json.dumps(cache_data), expire=expire_seconds)
                     self.logger.debug(f"Cached {agent_name} result for {expire_seconds / 3600}h")
 
                 except Exception as e:
@@ -763,32 +801,38 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
     def _prepare_flight_request(self, trip_request: TripPlanRequest) -> FlightSearchRequest:
         """Prepare flight search request from trip request."""
-        # This would need to be implemented based on the actual FlightSearchRequest model
-        # For now, return a basic structure
         return FlightSearchRequest(
             origin="NYC",  # This should come from user location or be derived
             destination=trip_request.destination.airport_code or "JFK",
-            departure_date=trip_request.requirements.start_date,
-            return_date=trip_request.requirements.end_date,
+            departure_date=datetime.combine(
+                trip_request.requirements.start_date, datetime.min.time()
+            ),
+            return_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
             passengers=trip_request.requirements.travelers,
             travel_class=trip_request.requirements.travel_class,
+            currency="USD",
         )
 
     def _prepare_hotel_request(self, trip_request: TripPlanRequest) -> HotelSearchRequest:
         """Prepare hotel search request from trip request."""
         return HotelSearchRequest(
             location=trip_request.destination.city,
-            check_in_date=trip_request.requirements.start_date,
-            check_out_date=trip_request.requirements.end_date,
+            check_in_date=datetime.combine(
+                trip_request.requirements.start_date, datetime.min.time()
+            ),
+            check_out_date=datetime.combine(
+                trip_request.requirements.end_date, datetime.min.time()
+            ),
             guest_count=trip_request.requirements.travelers,
             room_count=1,  # Default, could be derived from guest count
-            budget_per_night=trip_request.requirements.budget
-            / (
-                (trip_request.requirements.end_date - trip_request.requirements.start_date).days
-                or 1
-            )
-            / 2,
-            accommodation_type=trip_request.requirements.accommodation_type,
+            budget_per_night=Decimal(
+                trip_request.requirements.budget
+                / (
+                    (trip_request.requirements.end_date - trip_request.requirements.start_date).days
+                    or 1
+                )
+                / 2
+            ),
         )
 
     def _prepare_activity_request(self, trip_request: TripPlanRequest) -> ActivitySearchRequest:
@@ -796,18 +840,30 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         return ActivitySearchRequest(
             location=trip_request.destination.city,
             guest_count=trip_request.requirements.travelers,
-            budget_per_person=trip_request.requirements.budget
-            / trip_request.requirements.travelers
-            / 4,
+            budget_per_person=Decimal(
+                trip_request.requirements.budget / trip_request.requirements.travelers / 4
+            ),
             max_results=10,
+            check_in_date=datetime.combine(
+                trip_request.requirements.start_date, datetime.min.time()
+            ),
+            check_out_date=datetime.combine(
+                trip_request.requirements.end_date, datetime.min.time()
+            ),
+            category=ActivityCategory.CULTURAL,
+            duration_hours=4,
+            currency="USD",
         )
 
     def _prepare_weather_request(self, trip_request: TripPlanRequest) -> WeatherSearchRequest:
         """Prepare weather request from trip request."""
         return WeatherSearchRequest(
             location=trip_request.destination.city,
-            start_date=trip_request.requirements.start_date,
-            end_date=trip_request.requirements.end_date,
+            start_date=datetime.combine(trip_request.requirements.start_date, datetime.min.time()),
+            end_date=datetime.combine(trip_request.requirements.end_date, datetime.min.time()),
+            latitude=trip_request.destination.latitude,
+            longitude=trip_request.destination.longitude,
+            include_historical=True,
         )
 
     def _prepare_food_request(self, trip_request: TripPlanRequest) -> RestaurantSearchRequest:
@@ -816,6 +872,13 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             location=trip_request.destination.city,
             party_size=trip_request.requirements.travelers,
             max_results=15,
+            latitude=trip_request.destination.latitude,
+            longitude=trip_request.destination.longitude,
+            cuisine_type=CuisineType.ITALIAN,
+            price_range=PriceRange.MODERATE,
+            budget_per_person=Decimal(50),
+            meal_type="dinner",
+            currency="USD",
         )
 
     async def health_check(self) -> dict[str, Any]:
@@ -824,7 +887,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         # Add agent health checks
         agent_health = {}
-        agents = {
+        agents: dict[str, BaseAgent[Any]] = {
             "flight": self.flight_agent,
             "hotel": self.hotel_agent,
             "activity": self.activity_agent,
@@ -852,8 +915,6 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, trip_request: TripPlanRequest, agent_results: dict[str, Any]
     ) -> "TripItinerary":
         """Generate daily schedule with time-based activity sequencing."""
-        from travel_companion.models.trip import DailyItinerary, TripItinerary
-
         start_date = trip_request.requirements.start_date
         end_date = trip_request.requirements.end_date
         trip_duration = (end_date - start_date).days
@@ -862,7 +923,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             trip_duration = 1
             end_date = start_date + timedelta(days=1)
 
-        daily_itineraries = []
+        daily_itineraries: list[DailyItinerary] = []
 
         # Generate daily schedules
         for day_num in range(trip_duration):
@@ -876,7 +937,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             daily_items.sort(key=lambda x: x.start_time)
 
             # Calculate daily cost and metrics
-            daily_cost = sum(item.cost for item in daily_items)
+            daily_cost = sum(item.cost for item in daily_items if item.cost is not None)
 
             # Get weather summary if available
             weather_summary = self._extract_weather_for_date(current_date, agent_results)
@@ -885,7 +946,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 date=current_date,
                 day_number=day_num + 1,
                 items=daily_items,
-                daily_cost=daily_cost,
+                daily_cost=Decimal(daily_cost),
                 weather_summary=weather_summary,
                 meal_plan=await self._generate_meal_plan(daily_items),
                 notes=None,
@@ -894,7 +955,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             daily_itineraries.append(daily_itinerary)
 
         # Calculate trip totals
-        total_cost = sum(day.daily_cost for day in daily_itineraries)
+        total_cost = sum(day.daily_cost for day in daily_itineraries if day.daily_cost is not None)
         average_daily_cost = (
             total_cost / len(daily_itineraries) if daily_itineraries else Decimal("0.00")
         )
@@ -903,8 +964,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             trip_id=str(uuid4()),
             days=daily_itineraries,
             total_days=trip_duration,
-            total_cost=total_cost,
-            average_daily_cost=average_daily_cost,
+            total_cost=Decimal(total_cost),
+            average_daily_cost=Decimal(average_daily_cost),
             currency="USD",
             optimization_score=0.0,  # Will be calculated by optimization engine
             budget_status="calculating",  # Will be updated by budget calculation
@@ -920,7 +981,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
     ) -> list["ItineraryItem"]:
         """Generate itinerary items for a specific day."""
 
-        items = []
+        items: list[ItineraryItem] = []
 
         # Add flight items (arrival/departure days)
         items.extend(await self._add_flight_items(date, day_number, trip_request, agent_results))
@@ -947,98 +1008,165 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         agent_results: dict[str, Any],
     ) -> list["ItineraryItem"]:
         """Add flight items for arrival and departure days."""
-        from travel_companion.models.trip import ItineraryItem
-
-        items = []
+        items: list[ItineraryItem] = []
 
         if "flights" not in agent_results or agent_results["flights"]["status"] != "success":
             return items
 
         flight_data = agent_results["flights"]["data"]
 
-        # First day - arrival flight
-        if (
-            day_number == 1
-            and hasattr(flight_data, "flights")
-            and flight_data.flights
-            and hasattr(flight_data.flights, "__iter__")
-        ):
-            try:
+        try:
+            # Handle both dict and Pydantic model and Mock objects
+            flights_list = None
+            if hasattr(flight_data, "flights"):  # Pydantic model
+                flights_list = flight_data.flights
+            elif isinstance(flight_data, dict) and "flights" in flight_data:  # Dict
+                flights_list = flight_data["flights"]
+            else:
+                # Handle Mock or other objects
+                return items
+
+            # First day - arrival flight
+            if day_number == 1 and flights_list:
                 # Find arrival flight (usually first one)
                 arrival_flights = [
                     f
-                    for f in flight_data.flights
-                    if hasattr(f, "destination")
-                    and f.destination == trip_request.destination.airport_code
-                ]
-            except (TypeError, AttributeError):
-                # Handle Mock objects or other non-iterable data
-                return items
-            if arrival_flights:
-                flight = arrival_flights[0]
-                items.append(
-                    ItineraryItem(
-                        item_id=f"flight_arrival_{flight.flight_number}",
-                        item_type="flight",
-                        name=f"Flight {flight.flight_number} Arrival",
-                        description=f"Arrive from {flight.origin} to {flight.destination}",
-                        start_time=datetime.combine(date, flight.arrival_time.time()),
-                        end_time=datetime.combine(date, flight.arrival_time.time())
-                        + timedelta(minutes=30),
-                        duration_minutes=30,
-                        cost=flight.price,
-                        booking_reference=flight.flight_number,
-                        latitude=None,
-                        longitude=None,
-                        address=None,
-                        booking_url=None,
-                        cancellation_policy=None,
-                        special_instructions=None,
+                    for f in flights_list
+                    if (
+                        hasattr(f, "destination")
+                        and f.destination == trip_request.destination.airport_code
                     )
-                )
+                    or (
+                        isinstance(f, dict)
+                        and f.get("destination") == trip_request.destination.airport_code
+                    )
+                ]
 
-        # Last day - departure flight
-        total_days = (
-            trip_request.requirements.end_date - trip_request.requirements.start_date
-        ).days + 1
-        if (
-            day_number == total_days
-            and hasattr(flight_data, "flights")
-            and flight_data.flights
-            and hasattr(flight_data.flights, "__iter__")
-        ):
-            try:
+                if arrival_flights:
+                    flight = arrival_flights[0]
+                    # Get flight data safely
+                    flight_number = (
+                        flight.flight_number
+                        if hasattr(flight, "flight_number")
+                        else flight["flight_number"]
+                    )
+                    flight_origin = flight.origin if hasattr(flight, "origin") else flight["origin"]
+                    flight_destination = (
+                        flight.destination
+                        if hasattr(flight, "destination")
+                        else flight["destination"]
+                    )
+                    flight_arrival_time = (
+                        flight.arrival_time
+                        if hasattr(flight, "arrival_time")
+                        else flight["arrival_time"]
+                    )
+                    flight_price = flight.price if hasattr(flight, "price") else flight["price"]
+
+                    items.append(
+                        ItineraryItem(
+                            item_id=f"flight_arrival_{flight_number}",
+                            item_type="flight",
+                            name=f"Flight {flight_number} Arrival",
+                            description=f"Arrive from {flight_origin} to {flight_destination}",
+                            start_time=flight_arrival_time
+                            if isinstance(flight_arrival_time, datetime)
+                            else datetime.combine(
+                                date, datetime.fromisoformat(str(flight_arrival_time)).time()
+                            ),
+                            end_time=(
+                                flight_arrival_time
+                                if isinstance(flight_arrival_time, datetime)
+                                else datetime.combine(
+                                    date, datetime.fromisoformat(str(flight_arrival_time)).time()
+                                )
+                            )
+                            + timedelta(minutes=30),
+                            duration_minutes=30,
+                            cost=Decimal(str(flight_price)),
+                            booking_reference=flight_number,
+                            latitude=None,
+                            longitude=None,
+                            address=None,
+                            booking_url=None,
+                            cancellation_policy=None,
+                            special_instructions=None,
+                        )
+                    )
+
+            # Last day - departure flight
+            total_days = (
+                trip_request.requirements.end_date - trip_request.requirements.start_date
+            ).days + 1
+            if day_number == total_days and flights_list:
                 # Find departure flight (usually second one or one departing from destination)
                 departure_flights = [
                     f
-                    for f in flight_data.flights
-                    if hasattr(f, "origin") and f.origin == trip_request.destination.airport_code
-                ]
-            except (TypeError, AttributeError):
-                # Handle Mock objects or other non-iterable data
-                return items
-            if departure_flights:
-                flight = departure_flights[0]
-                items.append(
-                    ItineraryItem(
-                        item_id=f"flight_departure_{flight.flight_number}",
-                        item_type="flight",
-                        name=f"Flight {flight.flight_number} Departure",
-                        description=f"Depart from {flight.origin} to {flight.destination}",
-                        start_time=datetime.combine(date, flight.departure_time.time())
-                        - timedelta(hours=2),
-                        end_time=datetime.combine(date, flight.departure_time.time()),
-                        duration_minutes=120,
-                        cost=Decimal("0.00"),  # Cost already counted in arrival
-                        latitude=None,
-                        longitude=None,
-                        address=None,
-                        booking_reference=None,
-                        booking_url=None,
-                        cancellation_policy=None,
-                        special_instructions=None,
+                    for f in flights_list
+                    if (hasattr(f, "origin") and f.origin == trip_request.destination.airport_code)
+                    or (
+                        isinstance(f, dict)
+                        and f.get("origin") == trip_request.destination.airport_code
                     )
-                )
+                ]
+
+                if departure_flights:
+                    flight = departure_flights[0]
+                    # Get flight data safely
+                    dep_flight_number = (
+                        flight.flight_number
+                        if hasattr(flight, "flight_number")
+                        else flight["flight_number"]
+                    )
+                    dep_flight_origin = (
+                        flight.origin if hasattr(flight, "origin") else flight["origin"]
+                    )
+                    dep_flight_destination = (
+                        flight.destination
+                        if hasattr(flight, "destination")
+                        else flight["destination"]
+                    )
+                    dep_flight_departure_time = (
+                        flight.departure_time
+                        if hasattr(flight, "departure_time")
+                        else flight["departure_time"]
+                    )
+
+                    items.append(
+                        ItineraryItem(
+                            item_id=f"flight_departure_{dep_flight_number}",
+                            item_type="flight",
+                            name=f"Flight {dep_flight_number} Departure",
+                            description=f"Depart from {dep_flight_origin} to {dep_flight_destination}",
+                            start_time=(
+                                dep_flight_departure_time
+                                if isinstance(dep_flight_departure_time, datetime)
+                                else datetime.combine(
+                                    date,
+                                    datetime.fromisoformat(str(dep_flight_departure_time)).time(),
+                                )
+                            )
+                            - timedelta(hours=2),
+                            end_time=dep_flight_departure_time
+                            if isinstance(dep_flight_departure_time, datetime)
+                            else datetime.combine(
+                                date, datetime.fromisoformat(str(dep_flight_departure_time)).time()
+                            ),
+                            duration_minutes=120,
+                            cost=Decimal("0.00"),  # Cost already counted in arrival
+                            latitude=None,
+                            longitude=None,
+                            address=None,
+                            booking_reference=None,
+                            booking_url=None,
+                            cancellation_policy=None,
+                            special_instructions=None,
+                        )
+                    )
+
+        except (TypeError, AttributeError):
+            # Handle Mock objects or other non-iterable data
+            return items
 
         return items
 
@@ -1050,34 +1178,55 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         agent_results: dict[str, Any],
     ) -> list["ItineraryItem"]:
         """Add hotel check-in/check-out items."""
-        from travel_companion.models.trip import ItineraryItem
-
-        items = []
+        items: list[ItineraryItem] = []
 
         if "hotels" not in agent_results or agent_results["hotels"]["status"] != "success":
             return items
 
         hotel_data = agent_results["hotels"]["data"]
 
-        if (
-            hasattr(hotel_data, "hotels")
-            and hotel_data.hotels
-            and hasattr(hotel_data.hotels, "__getitem__")
-        ):
-            try:
-                hotel = hotel_data.hotels[0]  # Take first hotel
-            except (TypeError, IndexError, AttributeError):
-                # Handle Mock objects or empty lists
+        try:
+            # Handle both dict and Pydantic model and Mock objects
+            hotels_list = None
+            if hasattr(hotel_data, "hotels"):  # Pydantic model
+                hotels_list = hotel_data.hotels
+            elif isinstance(hotel_data, dict) and "hotels" in hotel_data:  # Dict
+                hotels_list = hotel_data["hotels"]
+            else:
+                # Handle Mock or other objects
                 return items
 
+            if hotels_list:
+                hotel = hotels_list[0]  # Take first hotel
             # Check-in on first day (unless travel day)
             if day_number == 1 and not self._is_travel_day(date, day_number, trip_request):
+                # Get hotel data safely
+                hotel_external_id = (
+                    hotel.external_id if hasattr(hotel, "external_id") else hotel["external_id"]
+                )
+                hotel_name = hotel.name if hasattr(hotel, "name") else hotel["name"]
+                hotel_price_per_night = (
+                    hotel.price_per_night
+                    if hasattr(hotel, "price_per_night")
+                    else hotel["price_per_night"]
+                )
+
+                if hasattr(hotel, "location"):
+                    hotel_address = hotel.location.address
+                    hotel_latitude = hotel.location.latitude
+                    hotel_longitude = hotel.location.longitude
+                else:
+                    hotel_location = hotel["location"]
+                    hotel_address = hotel_location["address"]
+                    hotel_latitude = hotel_location["latitude"]
+                    hotel_longitude = hotel_location["longitude"]
+
                 items.append(
                     ItineraryItem(
-                        item_id=f"hotel_checkin_{hotel.external_id}",
+                        item_id=f"hotel_checkin_{hotel_external_id}",
                         item_type="hotel",
-                        name=f"Check-in at {hotel.name}",
-                        description=f"Hotel check-in at {hotel.location.address}",
+                        name=f"Check-in at {hotel_name}",
+                        description=f"Hotel check-in at {hotel_address}",
                         start_time=datetime.combine(
                             date, datetime.min.time().replace(hour=15)
                         ),  # 3 PM
@@ -1085,11 +1234,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             date, datetime.min.time().replace(hour=15, minute=30)
                         ),
                         duration_minutes=30,
-                        cost=hotel.price_per_night,
-                        address=hotel.location.address,
-                        latitude=hotel.location.latitude,
-                        longitude=hotel.location.longitude,
-                        booking_reference=f"hotel_{hotel.external_id}",
+                        cost=Decimal(str(hotel_price_per_night)),
+                        address=hotel_address,
+                        latitude=hotel_latitude,
+                        longitude=hotel_longitude,
+                        booking_reference=f"hotel_{hotel_external_id}",
                         booking_url=None,
                         cancellation_policy=None,
                         special_instructions=None,
@@ -1100,9 +1249,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             elif date == trip_request.requirements.end_date:
                 items.append(
                     ItineraryItem(
-                        item_id=f"hotel_checkout_{hotel.external_id}",
+                        item_id=f"hotel_checkout_{hotel_external_id}",
                         item_type="hotel",
-                        name=f"Check-out from {hotel.name}",
+                        name=f"Check-out from {hotel_name}",
                         description="Hotel check-out",
                         start_time=datetime.combine(
                             date, datetime.min.time().replace(hour=11)
@@ -1122,6 +1271,10 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     )
                 )
 
+        except (TypeError, IndexError, AttributeError):
+            # Handle Mock objects or empty lists
+            return items
+
         return items
 
     async def _add_activity_items(
@@ -1132,68 +1285,99 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         agent_results: dict[str, Any],
     ) -> list["ItineraryItem"]:
         """Add activity items for the day."""
-        from travel_companion.models.trip import ItineraryItem
-
-        items = []
+        items: list[ItineraryItem] = []
 
         if "activities" not in agent_results or agent_results["activities"]["status"] != "success":
             return items
 
         activity_data = agent_results["activities"]["data"]
 
-        if (
-            hasattr(activity_data, "activities")
-            and activity_data.activities
-            and hasattr(activity_data.activities, "__len__")
-            and hasattr(activity_data.activities, "__getitem__")
-        ):
-            try:
+        try:
+            # Handle both dict and Pydantic model and Mock objects
+            activities_list = None
+            if hasattr(activity_data, "activities"):  # Pydantic model
+                activities_list = activity_data.activities
+            elif isinstance(activity_data, dict) and "activities" in activity_data:  # Dict
+                activities_list = activity_data["activities"]
+            else:
+                # Handle Mock or other objects
+                return items
+
+            if activities_list:
                 # Distribute activities across days (2-3 activities per day max)
                 activities_per_day = min(
-                    3, len(activity_data.activities) // trip_request.requirements.end_date.day
+                    3, len(activities_list) // trip_request.requirements.end_date.day
                 )
 
                 start_index = (day_number - 1) * activities_per_day
-                day_activities = activity_data.activities[
-                    start_index : start_index + activities_per_day
-                ]
-            except (TypeError, AttributeError):
-                # Handle Mock objects or other non-iterable data
-                return items
+                day_activities = activities_list[start_index : start_index + activities_per_day]
 
-            current_time = 9  # Start at 9 AM
+                current_time = 9  # Start at 9 AM
 
-            for i, activity in enumerate(day_activities):
-                start_hour = current_time + (i * 3)  # 3 hours apart
-                if start_hour > 18:  # Don't schedule after 6 PM
-                    break
+                for i, activity in enumerate(day_activities):
+                    start_hour = current_time + (i * 3)  # 3 hours apart
+                    if start_hour > 18:  # Don't schedule after 6 PM
+                        break
 
-                duration = getattr(activity, "duration_minutes", 120)  # Default 2 hours
-
-                items.append(
-                    ItineraryItem(
-                        item_id=f"activity_{activity.external_id}_{date}",
-                        item_type="activity",
-                        name=activity.name,
-                        description=activity.description,
-                        start_time=datetime.combine(
-                            date, datetime.min.time().replace(hour=start_hour)
-                        ),
-                        end_time=datetime.combine(
-                            date, datetime.min.time().replace(hour=start_hour)
-                        )
-                        + timedelta(minutes=duration),
-                        duration_minutes=duration,
-                        cost=activity.price,
-                        latitude=getattr(activity.location, "latitude", None),
-                        longitude=getattr(activity.location, "longitude", None),
-                        booking_url=getattr(activity, "booking_url", None),
-                        address=None,
-                        booking_reference=None,
-                        cancellation_policy=None,
-                        special_instructions=None,
+                    # Get activity data safely
+                    activity_external_id = (
+                        activity.external_id
+                        if hasattr(activity, "external_id")
+                        else activity["external_id"]
                     )
-                )
+                    activity_name = activity.name if hasattr(activity, "name") else activity["name"]
+                    activity_description = (
+                        activity.description
+                        if hasattr(activity, "description")
+                        else activity["description"]
+                    )
+                    activity_duration = (
+                        activity.duration_minutes
+                        if hasattr(activity, "duration_minutes")
+                        else activity.get("duration_minutes", 120)
+                    )
+                    activity_price = (
+                        activity.price if hasattr(activity, "price") else activity["price"]
+                    )
+
+                    if hasattr(activity, "location"):
+                        activity_latitude = activity.location.latitude
+                        activity_longitude = activity.location.longitude
+                    else:
+                        activity_location = activity["location"]
+                        activity_latitude = activity_location["latitude"]
+                        activity_longitude = activity_location["longitude"]
+
+                    items.append(
+                        ItineraryItem(
+                            item_id=f"activity_{activity_external_id}_{date}",
+                            item_type="activity",
+                            name=activity_name,
+                            description=activity_description,
+                            start_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=start_hour)
+                            ),
+                            end_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=start_hour)
+                            )
+                            + timedelta(minutes=activity_duration),
+                            duration_minutes=activity_duration,
+                            cost=Decimal(str(activity_price)),
+                            latitude=activity_latitude,
+                            longitude=activity_longitude,
+                            booking_url=getattr(activity, "booking_url", None)
+                            if hasattr(activity, "booking_url")
+                            else activity.get("booking_url"),
+                            address=None,
+                            booking_reference=None,
+                            cancellation_policy=None,
+                            special_instructions=None,
+                        )
+                    )
+
+        except (TypeError, AttributeError):
+            # Handle Mock objects or other non-iterable data
+            return items
 
         return items
 
@@ -1205,11 +1389,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         agent_results: dict[str, Any],
     ) -> list["ItineraryItem"]:
         """Add meal items (restaurants) for the day."""
-        from decimal import Decimal
-
-        from travel_companion.models.trip import ItineraryItem
-
-        items = []
+        items: list[ItineraryItem] = []
 
         if (
             "restaurants" not in agent_results
@@ -1219,73 +1399,100 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         restaurant_data = agent_results["restaurants"]["data"]
 
-        if (
-            hasattr(restaurant_data, "restaurants")
-            and restaurant_data.restaurants
-            and hasattr(restaurant_data.restaurants, "__len__")
-            and hasattr(restaurant_data.restaurants, "__getitem__")
-        ):
-            try:
-                # Select 2 restaurants per day (lunch and dinner)
-                restaurants_per_day = min(2, len(restaurant_data.restaurants))
-
-                start_index = (day_number - 1) * restaurants_per_day
-                day_restaurants = restaurant_data.restaurants[
-                    start_index : start_index + restaurants_per_day
-                ]
-            except (TypeError, AttributeError):
-                # Handle Mock objects or other non-iterable data
+        try:
+            # Handle both dict and Pydantic model and Mock objects
+            restaurants_list = None
+            if hasattr(restaurant_data, "restaurants"):  # Pydantic model
+                restaurants_list = restaurant_data.restaurants
+            elif isinstance(restaurant_data, dict) and "restaurants" in restaurant_data:  # Dict
+                restaurants_list = restaurant_data["restaurants"]
+            else:
+                # Handle Mock or other objects
                 return items
 
-            meal_times = [
-                (12, 60, "Lunch"),  # 12 PM, 1 hour
-                (19, 90, "Dinner"),  # 7 PM, 1.5 hours
-            ]
+            if restaurants_list:
+                # Select 2 restaurants per day (lunch and dinner)
+                restaurants_per_day = min(2, len(restaurants_list))
 
-            for i, restaurant in enumerate(day_restaurants):
-                if i >= len(meal_times):
-                    break
+                start_index = (day_number - 1) * restaurants_per_day
+                day_restaurants = restaurants_list[start_index : start_index + restaurants_per_day]
 
-                hour, duration, meal_type = meal_times[i]
+                meal_times = [
+                    (12, 60, "Lunch"),  # 12 PM, 1 hour
+                    (19, 90, "Dinner"),  # 7 PM, 1.5 hours
+                ]
 
-                # Handle both enum objects and string values for cuisine_type and price_range
-                cuisine_str = (
-                    restaurant.cuisine_type.value
-                    if hasattr(restaurant.cuisine_type, "value")
-                    else str(restaurant.cuisine_type)
-                ).title()
-                price_str = (
-                    restaurant.price_range.value
-                    if hasattr(restaurant.price_range, "value")
-                    else str(restaurant.price_range)
-                )
+                for i, restaurant in enumerate(day_restaurants):
+                    if i >= len(meal_times):
+                        break
 
-                # Calculate cost with fallback for None values
-                cost_per_person = restaurant.average_cost_per_person or Decimal(
-                    "25.00"
-                )  # Default $25 per person
-                total_cost = cost_per_person * trip_request.requirements.travelers
+                    hour, duration, meal_type = meal_times[i]
 
-                items.append(
-                    ItineraryItem(
-                        item_id=f"meal_{restaurant.external_id}_{date}_{meal_type.lower()}",
-                        item_type="restaurant",
-                        name=f"{meal_type} at {restaurant.name}",
-                        description=f"{meal_type} - {cuisine_str} cuisine ({price_str} price range)",
-                        start_time=datetime.combine(date, datetime.min.time().replace(hour=hour)),
-                        end_time=datetime.combine(date, datetime.min.time().replace(hour=hour))
-                        + timedelta(minutes=duration),
-                        duration_minutes=duration,
-                        cost=total_cost,
-                        latitude=getattr(restaurant.location, "latitude", None),
-                        longitude=getattr(restaurant.location, "longitude", None),
-                        booking_url=getattr(restaurant, "booking_url", None),
-                        address=None,
-                        booking_reference=None,
-                        cancellation_policy=None,
-                        special_instructions=None,
+                    # Get restaurant data safely
+                    restaurant_external_id = (
+                        restaurant.external_id
+                        if hasattr(restaurant, "external_id")
+                        else restaurant["external_id"]
                     )
-                )
+                    restaurant_name = (
+                        restaurant.name if hasattr(restaurant, "name") else restaurant["name"]
+                    )
+                    cuisine_type = (
+                        restaurant.cuisine_type
+                        if hasattr(restaurant, "cuisine_type")
+                        else restaurant["cuisine_type"]
+                    )
+                    price_range = (
+                        restaurant.price_range
+                        if hasattr(restaurant, "price_range")
+                        else restaurant["price_range"]
+                    )
+                    avg_cost = (
+                        getattr(restaurant, "average_cost_per_person", None)
+                        if hasattr(restaurant, "average_cost_per_person")
+                        else restaurant.get("average_cost_per_person")
+                    )
+
+                    # Handle both enum objects and string values for cuisine_type and price_range
+                    cuisine_str = str(cuisine_type).title()
+                    price_str = str(price_range)
+
+                    # Calculate cost with fallback for None values
+                    cost_per_person = avg_cost or Decimal("25.00")  # Default $25 per person
+                    total_cost = Decimal(str(cost_per_person)) * trip_request.requirements.travelers
+
+                    items.append(
+                        ItineraryItem(
+                            item_id=f"meal_{restaurant_external_id}_{date}_{meal_type.lower()}",
+                            item_type="restaurant",
+                            name=f"{meal_type} at {restaurant_name}",
+                            description=f"{meal_type} - {cuisine_str} cuisine ({price_str} price range)",
+                            start_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=hour)
+                            ),
+                            end_time=datetime.combine(date, datetime.min.time().replace(hour=hour))
+                            + timedelta(minutes=duration),
+                            duration_minutes=duration,
+                            cost=total_cost,
+                            latitude=restaurant.location.latitude
+                            if hasattr(restaurant, "location")
+                            else restaurant["location"]["latitude"],
+                            longitude=restaurant.location.longitude
+                            if hasattr(restaurant, "location")
+                            else restaurant["location"]["longitude"],
+                            booking_url=getattr(restaurant, "booking_url", None)
+                            if hasattr(restaurant, "booking_url")
+                            else restaurant.get("booking_url"),
+                            address=None,
+                            booking_reference=None,
+                            cancellation_policy=None,
+                            special_instructions=None,
+                        )
+                    )
+
+        except (TypeError, AttributeError):
+            # Handle Mock objects or other non-iterable data
+            return items
 
         return items
 
@@ -1300,24 +1507,31 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         weather_data = agent_results["weather"]["data"]
 
-        if (
-            hasattr(weather_data, "daily_forecast")
-            and weather_data.daily_forecast
-            and hasattr(weather_data.daily_forecast, "__iter__")
-        ):
-            try:
-                for forecast in weather_data.daily_forecast:
-                    if hasattr(forecast, "date") and forecast.date == date:
-                        return f"{forecast.condition} - High: {forecast.high_temp}°, Low: {forecast.low_temp}°"
-            except (TypeError, AttributeError):
-                # Handle Mock objects or other non-iterable data
-                return None
+        try:
+            # Handle both dict and Pydantic model and Mock objects
+            if isinstance(weather_data, dict) and "daily_forecast" in weather_data:
+                daily_forecast = weather_data["daily_forecast"]
+            else:
+                # Handle Mock or other objects
+                return "Weather information unavailable"
+
+            if daily_forecast:
+                for forecast in daily_forecast:
+                    if (
+                        "date" in forecast
+                        and datetime.fromisoformat(forecast["date"]).date() == date
+                    ):
+                        return f"{forecast['condition']} - High: {forecast['high_temp']}°, Low: {forecast['low_temp']}°"
+
+        except (TypeError, AttributeError):
+            # Handle Mock objects or other non-iterable data
+            return None
 
         return None
 
     async def _generate_meal_plan(self, daily_items: list["ItineraryItem"]) -> dict[str, str]:
         """Generate meal plan summary for the day."""
-        meal_plan = {}
+        meal_plan: dict[str, str] = {}
 
         for item in daily_items:
             if item.item_type == "restaurant":
@@ -1334,7 +1548,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         """Calculate total cost from all agent results with detailed breakdown."""
         total_cost = Decimal("0.00")
         currency = "USD"  # Default currency
-        cost_breakdown = {
+        cost_breakdown: dict[str, Decimal] = {
             "flights": Decimal("0.00"),
             "hotels": Decimal("0.00"),
             "activities": Decimal("0.00"),
@@ -1345,31 +1559,75 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             # Calculate flight costs
             if "flights" in agent_results and agent_results["flights"]["status"] == "success":
                 flight_data = agent_results["flights"]["data"]
-                if hasattr(flight_data, "flights"):
-                    for flight in flight_data.flights:
-                        cost_breakdown["flights"] += flight.price
-                        currency = flight.currency  # Use flight currency as primary
+
+                # Handle both dict and Pydantic model
+                flights_list = None
+                if hasattr(flight_data, "flights"):  # Pydantic model
+                    flights_list = flight_data.flights
+                elif "flights" in flight_data:  # Dict
+                    flights_list = flight_data["flights"]
+
+                if flights_list:
+                    for flight in flights_list:
+                        price = flight.price if hasattr(flight, "price") else flight["price"]
+                        flight_currency = (
+                            flight.currency if hasattr(flight, "currency") else flight["currency"]
+                        )
+
+                        cost_breakdown["flights"] += Decimal(str(price))
+                        currency = flight_currency  # Use flight currency as primary
 
             # Calculate hotel costs
             if "hotels" in agent_results and agent_results["hotels"]["status"] == "success":
                 hotel_data = agent_results["hotels"]["data"]
-                if hasattr(hotel_data, "hotels"):
-                    for hotel in hotel_data.hotels:
+
+                # Handle both dict and Pydantic model
+                hotels_list = None
+                if hasattr(hotel_data, "hotels"):  # Pydantic model
+                    hotels_list = hotel_data.hotels
+                elif "hotels" in hotel_data:  # Dict
+                    hotels_list = hotel_data["hotels"]
+
+                if hotels_list:
+                    for hotel in hotels_list:
                         # Calculate total hotel cost based on nights
                         nights = 1  # Default
-                        cost_breakdown["hotels"] += hotel.price_per_night * nights
+                        price_per_night = (
+                            hotel.price_per_night
+                            if hasattr(hotel, "price_per_night")
+                            else hotel["price_per_night"]
+                        )
+                        hotel_currency = (
+                            hotel.currency if hasattr(hotel, "currency") else hotel["currency"]
+                        )
+
+                        cost_breakdown["hotels"] += Decimal(str(price_per_night)) * nights
                         if not currency or currency == "USD":  # Update currency if needed
-                            currency = hotel.currency
+                            currency = hotel_currency
 
             # Calculate activity costs
             if "activities" in agent_results and agent_results["activities"]["status"] == "success":
                 activity_data = agent_results["activities"]["data"]
-                if hasattr(activity_data, "activities"):
-                    for activity in activity_data.activities:
-                        if activity.price:
-                            cost_breakdown["activities"] += activity.price
+
+                # Handle both dict and Pydantic model
+                activities_list = None
+                if hasattr(activity_data, "activities"):  # Pydantic model
+                    activities_list = activity_data.activities
+                elif "activities" in activity_data:  # Dict
+                    activities_list = activity_data["activities"]
+
+                if activities_list:
+                    for activity in activities_list:
+                        price = activity.price if hasattr(activity, "price") else activity["price"]
+                        if price:
+                            activity_currency = (
+                                activity.currency
+                                if hasattr(activity, "currency")
+                                else activity.get("currency", "USD")
+                            )
+                            cost_breakdown["activities"] += Decimal(str(price))
                             if not currency or currency == "USD":
-                                currency = activity.currency or "USD"
+                                currency = activity_currency
 
             # Calculate restaurant costs (estimated from food agent)
             if (
@@ -1377,14 +1635,27 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 and agent_results["restaurants"]["status"] == "success"
             ):
                 restaurant_data = agent_results["restaurants"]["data"]
-                if hasattr(restaurant_data, "restaurants"):
-                    for restaurant in restaurant_data.restaurants:
+
+                # Handle both dict and Pydantic model
+                restaurants_list = None
+                if hasattr(restaurant_data, "restaurants"):  # Pydantic model
+                    restaurants_list = restaurant_data.restaurants
+                elif "restaurants" in restaurant_data:  # Dict
+                    restaurants_list = restaurant_data["restaurants"]
+
+                if restaurants_list:
+                    for restaurant in restaurants_list:
                         # Estimate cost based on price range (1-4 scale)
-                        estimated_cost_per_meal = self._estimate_meal_cost(restaurant.price_range)
+                        price_range = (
+                            restaurant.price_range
+                            if hasattr(restaurant, "price_range")
+                            else restaurant["price_range"]
+                        )
+                        estimated_cost_per_meal = self._estimate_meal_cost(price_range)
                         cost_breakdown["restaurants"] += estimated_cost_per_meal
 
             # Sum total cost
-            total_cost = sum(cost_breakdown.values())
+            total_cost = Decimal(str(sum(cost_breakdown.values())))
 
             self.logger.info(
                 f"Calculated trip cost breakdown: {cost_breakdown}, total: {total_cost} {currency}"
@@ -1399,8 +1670,6 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
     def _estimate_meal_cost(self, price_range: Any) -> Decimal:
         """Estimate meal cost based on price range."""
-        from travel_companion.models.external import PriceRange
-
         # Handle both enum and string values
         if hasattr(price_range, "value"):
             price_str = price_range.value
@@ -1417,7 +1686,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
     async def _create_cost_breakdown(self, agent_results: dict[str, Any]) -> dict[str, Decimal]:
         """Create detailed cost breakdown from agent results."""
-        cost_breakdown = {
+        cost_breakdown: dict[str, Decimal] = {
             "flights": Decimal("0.00"),
             "hotels": Decimal("0.00"),
             "activities": Decimal("0.00"),
@@ -1428,26 +1697,26 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             # Extract flight costs
             if "flights" in agent_results and agent_results["flights"]["status"] == "success":
                 flight_data = agent_results["flights"]["data"]
-                if hasattr(flight_data, "flights"):
-                    for flight in flight_data.flights:
-                        cost_breakdown["flights"] += flight.price
+                if "flights" in flight_data:
+                    for flight in flight_data["flights"]:
+                        cost_breakdown["flights"] += Decimal(flight["price"])
 
             # Extract hotel costs
             if "hotels" in agent_results and agent_results["hotels"]["status"] == "success":
                 hotel_data = agent_results["hotels"]["data"]
-                if hasattr(hotel_data, "hotels"):
-                    for hotel in hotel_data.hotels:
+                if "hotels" in hotel_data:
+                    for hotel in hotel_data["hotels"]:
                         # Calculate total hotel cost based on nights
                         nights = 1  # This should be calculated from stay duration
-                        cost_breakdown["hotels"] += hotel.price_per_night * nights
+                        cost_breakdown["hotels"] += Decimal(hotel["price_per_night"]) * nights
 
             # Extract activity costs
             if "activities" in agent_results and agent_results["activities"]["status"] == "success":
                 activity_data = agent_results["activities"]["data"]
-                if hasattr(activity_data, "activities"):
-                    for activity in activity_data.activities:
-                        if activity.price:
-                            cost_breakdown["activities"] += activity.price
+                if "activities" in activity_data:
+                    for activity in activity_data["activities"]:
+                        if activity["price"]:
+                            cost_breakdown["activities"] += Decimal(activity["price"])
 
             # Extract restaurant costs
             if (
@@ -1455,9 +1724,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 and agent_results["restaurants"]["status"] == "success"
             ):
                 restaurant_data = agent_results["restaurants"]["data"]
-                if hasattr(restaurant_data, "restaurants"):
-                    for restaurant in restaurant_data.restaurants:
-                        estimated_cost_per_meal = self._estimate_meal_cost(restaurant.price_range)
+                if "restaurants" in restaurant_data:
+                    for restaurant in restaurant_data["restaurants"]:
+                        estimated_cost_per_meal = self._estimate_meal_cost(
+                            restaurant["price_range"]
+                        )
                         cost_breakdown["restaurants"] += estimated_cost_per_meal
 
         except Exception as e:
@@ -1491,8 +1762,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         }
 
         total_cost = sum(cost_breakdown.values())
-        allocation_analysis = {}
-        warnings = []
+        allocation_analysis: dict[str, Any] = {}
+        warnings: list[str] = []
 
         for category, recommended_pct in recommended_allocation.items():
             category_cost = cost_breakdown.get(category, Decimal("0.00"))
@@ -1529,7 +1800,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, itinerary: "TripItinerary", agent_results: dict[str, Any]
     ) -> list[dict[str, Any]]:
         """Detect timeline conflicts, booking conflicts, and impossible schedules."""
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
 
         try:
             # Check for timeline conflicts within each day
@@ -1575,7 +1846,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
     async def _detect_daily_timeline_conflicts(self, day: "DailyItinerary") -> list[dict[str, Any]]:
         """Detect overlapping activities within a single day."""
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
 
         if len(day.items) < 2:
             return conflicts
@@ -1608,8 +1879,10 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             if (
                 hasattr(current_item, "latitude")
                 and hasattr(next_item, "latitude")
-                and current_item.latitude
-                and next_item.latitude
+                and current_item.latitude is not None
+                and current_item.longitude is not None
+                and next_item.latitude is not None
+                and next_item.longitude is not None
             ):
                 travel_distance = self._calculate_distance(
                     current_item.latitude,
@@ -1648,7 +1921,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, itinerary: "TripItinerary", agent_results: dict[str, Any]
     ) -> list[dict[str, Any]]:
         """Detect conflicts between flight times and hotel check-in/check-out."""
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
 
         if not itinerary.days:
             return conflicts
@@ -1709,7 +1982,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             "severity": "high" if time_difference < 1 else "medium",
                             "description": "Insufficient time between hotel checkout and flight departure",
                             "items": [checkout.item_id, flight.item_id],
-                            "available_hours": round(time_difference, 1),
+                            "available_hours": time_difference,
                             "recommendation": "Consider earlier checkout or later flight",
                         }
                     )
@@ -1720,7 +1993,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, itinerary: "TripItinerary"
     ) -> list[dict[str, Any]]:
         """Detect travel times that are physically impossible."""
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
 
         for day in itinerary.days:
             items = sorted(day.items, key=lambda x: x.start_time)
@@ -1732,8 +2005,10 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 if not (
                     hasattr(current, "latitude")
                     and hasattr(next_item, "latitude")
-                    and current.latitude
-                    and next_item.latitude
+                    and current.latitude is not None
+                    and current.longitude is not None
+                    and next_item.latitude is not None
+                    and next_item.longitude is not None
                 ):
                     continue
 
@@ -1756,9 +2031,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             "date": day.date.isoformat(),
                             "description": f"Cannot travel {distance:.1f}km in {available_time_hours:.1f} hours",
                             "items": [current.item_id, next_item.item_id],
-                            "distance_km": round(distance, 1),
-                            "available_hours": round(available_time_hours, 1),
-                            "required_hours": round(distance / 30, 1),  # Conservative 30 km/h
+                            "distance_km": distance,
+                            "available_hours": available_time_hours,
+                            "required_hours": distance / 30,  # Conservative 30 km/h
                             "recommendation": "Reschedule activities or choose closer alternatives",
                         }
                     )
@@ -1769,7 +2044,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, itinerary: "TripItinerary", agent_results: dict[str, Any]
     ) -> list[dict[str, Any]]:
         """Detect conflicts with business hours and availability."""
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
 
         for day in itinerary.days:
             for item in day.items:
@@ -1843,7 +2118,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self, itinerary: "TripItinerary", agent_results: dict[str, Any]
     ) -> list[dict[str, Any]]:
         """Detect budget-related conflicts and warnings."""
-        conflicts = []
+        conflicts: list[dict[str, Any]] = []
 
         # Check if total cost significantly exceeds budget
         if itinerary.budget_status in ["over_budget", "significantly_over_budget"]:
@@ -1941,13 +2216,19 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             current_item = sorted_items[i]
             next_item = sorted_items[i + 1]
 
-            distance = self._calculate_haversine_distance(
-                current_item.latitude,
-                current_item.longitude,
-                next_item.latitude,
-                next_item.longitude,
-            )
-            total_distance += distance
+            if (
+                current_item.latitude is not None
+                and current_item.longitude is not None
+                and next_item.latitude is not None
+                and next_item.longitude is not None
+            ):
+                distance = self._calculate_haversine_distance(
+                    current_item.latitude,
+                    current_item.longitude,
+                    next_item.latitude,
+                    next_item.longitude,
+                )
+                total_distance += distance
 
         # Calculate minimum possible distance (optimal order)
         optimal_distance = await self._calculate_optimal_route_distance(location_items)
@@ -1974,16 +2255,22 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         while items:
             # Find nearest unvisited location
-            nearest_item = None
+            nearest_item: ItineraryItem | None = None
             nearest_distance = float("inf")
 
             for item in items:
-                distance = self._calculate_haversine_distance(
-                    current_item.latitude, current_item.longitude, item.latitude, item.longitude
-                )
-                if distance < nearest_distance:
-                    nearest_distance = distance
-                    nearest_item = item
+                if (
+                    current_item.latitude is not None
+                    and current_item.longitude is not None
+                    and item.latitude is not None
+                    and item.longitude is not None
+                ):
+                    distance = self._calculate_haversine_distance(
+                        current_item.latitude, current_item.longitude, item.latitude, item.longitude
+                    )
+                    if distance < nearest_distance:
+                        nearest_distance = distance
+                        nearest_item = item
 
             if nearest_item:
                 total_distance += nearest_distance
@@ -1999,12 +2286,15 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         import math
 
         # Convert to radians
-        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        lat1_rad, lon1_rad, lat2_rad, lon2_rad = map(math.radians, [lat1, lon1, lat2, lon2])
 
         # Haversine formula
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
+        )
         c = 2 * math.asin(math.sqrt(a))
 
         # Earth's radius in kilometers
@@ -2088,8 +2378,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         all_items.sort(key=lambda x: x.start_time)
 
         # Update travel distances and times
-        total_distance = self._calculate_total_travel_distance(optimized_items)
-        estimated_travel_time = int(total_distance * 5)  # Assume 5 minutes per km
+        self._calculate_total_travel_distance(optimized_items)
 
         # Create new daily itinerary with optimized data
         return DailyItinerary(
@@ -2097,10 +2386,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             day_number=daily_itinerary.day_number,
             items=all_items,
             daily_cost=daily_itinerary.daily_cost,
-            currency=daily_itinerary.currency,
             weather_summary=daily_itinerary.weather_summary,
-            total_travel_distance_km=total_distance,
-            estimated_travel_time_minutes=estimated_travel_time,
             notes=daily_itinerary.notes,
             meal_plan=daily_itinerary.meal_plan,
         )
@@ -2111,7 +2397,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             return items
 
         # Use nearest neighbor algorithm for route optimization
-        optimized_items = []
+        optimized_items: list[ItineraryItem] = []
         remaining_items = items.copy()
 
         # Start with first item (could be improved by finding best starting point)
@@ -2119,16 +2405,23 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         optimized_items.append(current_item)
 
         while remaining_items:
-            nearest_item = None
+            # Find nearest unvisited location
+            nearest_item: ItineraryItem | None = None
             nearest_distance = float("inf")
 
             for item in remaining_items:
-                distance = self._calculate_haversine_distance(
-                    current_item.latitude, current_item.longitude, item.latitude, item.longitude
-                )
-                if distance < nearest_distance:
-                    nearest_distance = distance
-                    nearest_item = item
+                if (
+                    current_item.latitude is not None
+                    and current_item.longitude is not None
+                    and item.latitude is not None
+                    and item.longitude is not None
+                ):
+                    distance = self._calculate_haversine_distance(
+                        current_item.latitude, current_item.longitude, item.latitude, item.longitude
+                    )
+                    if distance < nearest_distance:
+                        nearest_distance = distance
+                        nearest_item = item
 
             if nearest_item:
                 optimized_items.append(nearest_item)
@@ -2151,8 +2444,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             travel_time = 30 if item != items[0] else 0  # 30 minutes travel between locations
 
             item.start_time = current_time + timedelta(minutes=travel_time)
-            item.end_time = item.start_time + timedelta(minutes=item.duration_minutes)
-            current_time = item.end_time
+            if item.duration_minutes:
+                item.end_time = item.start_time + timedelta(minutes=item.duration_minutes)
+                current_time = item.end_time
 
         return items
 
@@ -2167,7 +2461,12 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             current_item = items[i]
             next_item = items[i + 1]
 
-            if current_item.latitude is not None and next_item.latitude is not None:
+            if (
+                current_item.latitude is not None
+                and current_item.longitude is not None
+                and next_item.latitude is not None
+                and next_item.longitude is not None
+            ):
                 distance = self._calculate_haversine_distance(
                     current_item.latitude,
                     current_item.longitude,
@@ -2184,7 +2483,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         self,
         itinerary: "TripItinerary",
         format_type: str = "json",
-        trip_request: TripPlanRequest = None,
+        trip_request: TripPlanRequest | None = None,
     ) -> dict[str, Any]:
         """Export itinerary in specified format (JSON, PDF, iCalendar)."""
         try:
@@ -2205,11 +2504,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             raise ExternalAPIError(f"Export failed: {e}") from e
 
     async def _create_trip_summary(
-        self, itinerary: "TripItinerary", trip_request: TripPlanRequest = None
+        self, itinerary: "TripItinerary", trip_request: TripPlanRequest | None = None
     ) -> "TripSummary":
         """Create comprehensive trip summary for export."""
-        from travel_companion.models.trip import TripSummary
-
         # Extract basic trip information
         trip_name = "My Trip"
         destination = "Unknown"
@@ -2253,17 +2550,19 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             total_cost=itinerary.total_cost,
             currency=itinerary.currency,
             budget_original=trip_request.requirements.budget if trip_request else None,
+            budget_remaining=None,
             flight_confirmations=confirmations["flights"],
             hotel_confirmations=confirmations["hotels"],
             activity_bookings=confirmations["activities"],
             emergency_contacts=emergency_contacts,
             generated_at=datetime.now(),
             export_format="multiple",
+            qr_code_data=None,
         )
 
     def _generate_cost_breakdown_for_export(self, itinerary: "TripItinerary") -> dict[str, Decimal]:
         """Generate cost breakdown by category for export."""
-        breakdown = {
+        breakdown: dict[str, Decimal] = {
             "flights": Decimal("0.00"),
             "hotels": Decimal("0.00"),
             "activities": Decimal("0.00"),
@@ -2281,13 +2580,14 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 elif category not in breakdown:
                     category = "other"
 
-                breakdown[category] += item.cost
+                if item.cost:
+                    breakdown[category] += item.cost
 
         return breakdown
 
     def _extract_confirmation_numbers(self, itinerary: "TripItinerary") -> dict[str, list[str]]:
         """Extract booking confirmation numbers from itinerary items."""
-        confirmations = {"flights": [], "hotels": [], "activities": []}
+        confirmations: dict[str, list[str]] = {"flights": [], "hotels": [], "activities": []}
 
         for day in itinerary.days:
             for item in day.items:
@@ -2432,7 +2732,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     f"DESCRIPTION:{item.description or item.item_type.title()} - {item.cost} {trip_summary.currency}",
                     f"LOCATION:{item.address or 'Location TBD'}",
                     f"CATEGORIES:{item.item_type.upper()}",
-                    "STATUS:CONFIRMED" if item.is_confirmed else "TENTATIVE",
+                    "STATUS:CONFIRMED",
                 ]
 
                 # Add booking reference if available
@@ -2440,7 +2740,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     event_lines.append(f"X-BOOKING-REF:{item.booking_reference}")
 
                 # Add cost information
-                event_lines.append(f"X-COST:{item.cost} {trip_summary.currency}")
+                if item.cost:
+                    event_lines.append(f"X-COST:{item.cost} {trip_summary.currency}")
 
                 event_lines.append("END:VEVENT")
                 icalendar_lines.extend(event_lines)
@@ -2477,3 +2778,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         import json
 
         return json.dumps(qr_data, separators=(",", ":"))  # Compact JSON
+
+    def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate distance between two points using Haversine formula."""
+        return self._calculate_haversine_distance(lat1, lon1, lat2, lon2)

@@ -2,7 +2,7 @@
 
 import json
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 import redis.asyncio as redis
 
@@ -116,11 +116,11 @@ class RedisManager:
         if self._client:
             await self._client.close()
             self._client = None
-    
+
     def get_client(self) -> redis.Redis:
         """Get Redis client - alias for client property for compatibility."""
         return self.client
-    
+
     async def scan_keys(self, pattern: str = "*", count: int = 100) -> list[str]:
         """Scan for keys matching a pattern."""
         try:
@@ -134,13 +134,13 @@ class RedisManager:
             return keys
         except Exception:
             return []
-    
+
     async def delete_keys(self, keys: list[str]) -> int:
         """Delete multiple keys at once."""
         try:
             if not keys:
                 return 0
-            return await self.client.delete(*keys)
+            return cast(int, await self.client.delete(*keys))
         except Exception:
             return 0
 

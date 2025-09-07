@@ -167,9 +167,9 @@ class ParallelExecutionQueue:
     def __init__(self, config: ParallelExecutionConfig):
         """Initialize execution queue."""
         self.config = config
-        self.priority_queues: dict[ExecutionPriority, list[tuple[str, Callable[..., Any], dict[str, Any]]]] = {
-            priority: [] for priority in ExecutionPriority
-        }
+        self.priority_queues: dict[
+            ExecutionPriority, list[tuple[str, Callable[..., Any], dict[str, Any]]]
+        ] = {priority: [] for priority in ExecutionPriority}
         self.active_executions: dict[ExecutionPriority, set[str]] = {
             priority: set() for priority in ExecutionPriority
         }
@@ -259,7 +259,9 @@ class ParallelExecutionQueue:
 
         return priority
 
-    async def get_next_agent(self) -> tuple[str, Callable[..., Any], dict[str, Any], ExecutionPriority] | None:
+    async def get_next_agent(
+        self,
+    ) -> tuple[str, Callable[..., Any], dict[str, Any], ExecutionPriority] | None:
         """
         Get the next agent to execute based on priority and availability.
 
@@ -352,7 +354,7 @@ class ParallelExecutionOptimizer:
         """Get or create circuit breaker for an agent."""
         if agent_name not in self.circuit_breakers:
             self.circuit_breakers[agent_name] = CircuitBreaker(
-                failure_threshold=5, recovery_timeout=30.0, expected_exception=Exception
+                failure_threshold=5, recovery_timeout=30, expected_exception=Exception
             )
         return self.circuit_breakers[agent_name]
 
@@ -394,7 +396,7 @@ class ParallelExecutionOptimizer:
             if hasattr(cb, "average_response_time") and cb.average_response_time > 0:
                 # Add 50% buffer to average response time
                 adaptive_timeout = cb.average_response_time * 1.5
-                return min(max(adaptive_timeout, base_timeout), base_timeout * 2)
+                return float(min(max(adaptive_timeout, base_timeout), base_timeout * 2))
 
         return base_timeout
 
@@ -500,7 +502,9 @@ class ParallelExecutionOptimizer:
     ) -> TripPlanningWorkflowState:
         """Execute all queued agents with parallel coordination."""
         current_state = copy.deepcopy(initial_state)
-        dependency_retry_count = {}  # Track how many times we've retried each agent due to dependencies
+        dependency_retry_count: dict[
+            str, int
+        ] = {}  # Track how many times we've retried each agent due to dependencies
         max_dependency_retries = 100  # Prevent infinite loops
 
         while True:
@@ -738,7 +742,7 @@ class ParallelExecutionOptimizer:
                     metrics.retry_count = attempt
 
                     # Use circuit breaker for execution
-                    async def execute_agent():
+                    async def execute_agent() -> Any:
                         if asyncio.iscoroutinefunction(agent_function):
                             return await agent_function(state)
                         else:
@@ -758,7 +762,8 @@ class ParallelExecutionOptimizer:
 
                     # Update state with results
                     if isinstance(result, dict):
-                        state.update(result)
+                        # Type ignore needed for TypedDict update
+                        state.update(result)  # type: ignore[typeddict-item]
 
                     # Mark as completed
                     if "agents_completed" not in state:

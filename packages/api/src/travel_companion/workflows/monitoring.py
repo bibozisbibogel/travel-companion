@@ -324,7 +324,7 @@ class StructuredWorkflowLogger:
 
     def _summarize_state(self, state: dict[str, Any]) -> dict[str, Any]:
         """Summarize state for logging."""
-        summary = {
+        summary: dict[str, Any] = {
             "total_keys": len(state),
             "has_errors": "errors" in state,
             "has_results": any(k.endswith("_results") for k in state.keys()),

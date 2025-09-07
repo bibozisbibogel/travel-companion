@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
+from ...core.redis import get_redis_manager
 from ...models.trip import TripPlanRequest
 from ...models.workflow import (
     WorkflowExecutionRequest,
@@ -14,7 +15,10 @@ from ...models.workflow import (
 )
 from ...utils.logging import workflow_logger
 from ...workflows.orchestrator import TripPlanningWorkflow
-from ...workflows.state_manager import WorkflowStateManager
+from ...workflows.state_manager import (
+    CheckpointType,
+    EnhancedWorkflowStateManager,
+)
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -135,8 +139,13 @@ async def execute_workflow_async(
         }
 
         # Store initial state
-        state_manager = WorkflowStateManager(workflow_id=workflow_id)
-        await state_manager.persist_state(initial_state, "automatic")
+        redis_manager = get_redis_manager()
+        state_manager = EnhancedWorkflowStateManager(
+            redis_client=redis_manager.client,
+            workflow_id=workflow_id,
+            request_id=request_id,
+        )
+        await state_manager.persist_state(initial_state, CheckpointType.AUTOMATIC)  # type: ignore[arg-type]
 
         # Execute workflow in background
         async def run_workflow() -> None:
@@ -175,16 +184,21 @@ async def execute_workflow_async(
                 final_state = await state_manager.restore_state()
                 if final_state:
                     final_state["status"] = "completed"
-                    final_state["output_data"] = result
-                    await state_manager.persist_state(final_state, "completion")
+                    final_state["output_data"] = result  # type: ignore[typeddict-unknown-key]
+                    await state_manager.persist_state(final_state, CheckpointType.COMPLETION)
 
             except Exception as e:
                 # Update state with error
                 error_state = await state_manager.restore_state()
-                if error_state:
+                if error_state and isinstance(error_state, dict):
                     error_state["status"] = "failed"
-                    error_state["error"] = str(e)
-                    await state_manager.persist_state(error_state, "error")
+                    # Convert error to proper format for the state
+                    error_dict = {"message": str(e), "type": type(e).__name__}
+                    if "errors" in error_state:
+                        error_state["errors"] = [error_dict]
+                    else:
+                        error_state["errors"] = [error_dict]
+                    await state_manager.persist_state(error_state, CheckpointType.ERROR)
 
         # Add to background tasks
         background_tasks.add_task(run_workflow)
@@ -227,12 +241,18 @@ async def get_workflow_progress(workflow_id: str) -> dict[str, Any]:
     """
     try:
         # Use enhanced state manager for progress tracking
-        state_manager = WorkflowStateManager(workflow_id=workflow_id)
+        redis_manager = get_redis_manager()
+        state_manager = EnhancedWorkflowStateManager(
+            redis_client=redis_manager.client,
+            workflow_id=workflow_id,
+        )
 
         # Get progress information
-        progress = await state_manager.get_progress()
+        state_data = await state_manager.restore_state()
+        # Note: Enhanced state manager doesn't have include_progress parameter
+        progress = state_data.get("progress", {}) if state_data else {}
 
-        if progress is None:
+        if not progress:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
@@ -242,7 +262,7 @@ async def get_workflow_progress(workflow_id: str) -> dict[str, Any]:
                 },
             )
 
-        return progress
+        return progress  # type: ignore[return-value]
 
     except HTTPException:
         raise
@@ -325,12 +345,17 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
     """
     try:
         # Use enhanced state manager for result retrieval
-        state_manager = WorkflowStateManager(workflow_id=workflow_id)
+        redis_manager = get_redis_manager()
+        state_manager = EnhancedWorkflowStateManager(
+            redis_client=redis_manager.client,
+            workflow_id=workflow_id,
+        )
 
         # Get workflow state
-        state = await state_manager.restore_state()
+        state_result = await state_manager.restore_state()
+        state = state_result.get("state", {}) if state_result else None
 
-        if state is None:
+        if state is None or not isinstance(state, dict):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
@@ -357,9 +382,9 @@ async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
             "workflow_id": workflow_id,
             "status": state.get("status"),
             "output_data": state.get("output_data", {}),
-            "error": state.get("error"),
+            "error": state.get("errors", [None])[0] if state.get("errors") else None,
             "execution_time_ms": (
-                (state.get("end_time", 0) - state.get("start_time", 0)) * 1000
+                (float(state.get("end_time", 0)) - float(state.get("start_time", 0))) * 1000
                 if state.get("end_time") and state.get("start_time")
                 else None
             ),
@@ -396,12 +421,17 @@ async def cancel_workflow(workflow_id: str) -> dict[str, str]:
     """
     try:
         # Use enhanced state manager for cancellation
-        state_manager = WorkflowStateManager(workflow_id=workflow_id)
+        redis_manager = get_redis_manager()
+        state_manager = EnhancedWorkflowStateManager(
+            redis_client=redis_manager.client,
+            workflow_id=workflow_id,
+        )
 
         # Get current state
-        state = await state_manager.restore_state()
+        state_result = await state_manager.restore_state()
+        state = state_result.get("state", {}) if state_result else None
 
-        if state is None:
+        if state is None or not isinstance(state, dict):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
@@ -416,16 +446,17 @@ async def cancel_workflow(workflow_id: str) -> dict[str, str]:
             return {
                 "workflow_id": workflow_id,
                 "message": f"Workflow already {state.get('status')}",
-                "status": state.get("status"),
+                "status": state.get("status") or "unknown",
             }
 
         # Update state to cancelled
         state["status"] = "cancelled"
-        state["end_time"] = time.time()
-        state["error"] = "Workflow cancelled by user"
+        if isinstance(state, dict):
+            state["end_time"] = time.time()
+        state["errors"] = [{"message": "Workflow cancelled by user", "type": "cancellation"}]
 
         # Persist cancellation state
-        await state_manager.persist_state(state, "manual")
+        await state_manager.persist_state(state, CheckpointType.MANUAL)  # type: ignore[arg-type]
 
         # Log cancellation
         workflow_logger.log_workflow_cancelled(
@@ -470,10 +501,14 @@ async def cleanup_workflow(workflow_id: str) -> dict[str, str]:
     """
     try:
         # Use enhanced state manager for cleanup
-        state_manager = WorkflowStateManager(workflow_id=workflow_id)
+        redis_manager = get_redis_manager()
+        state_manager = EnhancedWorkflowStateManager(
+            redis_client=redis_manager.client,
+            workflow_id=workflow_id,
+        )
 
         # Perform cleanup
-        cleanup_success = await state_manager.cleanup_workflow()
+        cleanup_success = await state_manager.cleanup_expired_workflows()
 
         if not cleanup_success:
             raise HTTPException(

@@ -280,7 +280,9 @@ class ErrorRecoveryManager:
         logger.info(f"Using fallback data for {agent_name} (circuit breaker open)")
         return FallbackData.get_fallback_data(agent_name.replace("_agent", ""))
 
-    async def _handle_final_failure(self, agent_name: str, exception: Exception | None) -> dict[str, Any]:
+    async def _handle_final_failure(
+        self, agent_name: str, exception: Exception | None
+    ) -> dict[str, Any]:
         """Handle final failure after all retry attempts."""
         priority = self.agent_priorities.get(agent_name, AgentPriority.MEDIUM)
 
@@ -460,7 +462,9 @@ class WorkflowFallbackOrchestrator:
 
         return await self.create_minimal_itinerary(trip_request, successful_agents)
 
-    async def _execute_agent_with_fallback(self, agent_name: str, operation: Callable[..., Any]) -> Any:
+    async def _execute_agent_with_fallback(
+        self, agent_name: str, operation: Callable[..., Any]
+    ) -> Any:
         """Execute agent operation with fallback handling."""
         try:
             return await self.error_recovery_manager.execute_with_recovery(agent_name, operation)

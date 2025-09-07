@@ -64,7 +64,7 @@ class AggregatedTripPlan:
     # Aggregated insights
     total_estimated_cost: Decimal = Decimal("0.00")
     cost_breakdown: dict[str, Decimal] = field(default_factory=dict)
-    daily_schedule: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    daily_schedule: dict[str, dict[str, Any]] = field(default_factory=dict)
     correlations: list[ResultCorrelation] = field(default_factory=list)
 
     # Optimization metrics
@@ -128,8 +128,8 @@ class AgentResultAggregator:
         """
         start_time = time.time()
 
-        workflow_logger.log_aggregation_started(
-            workflow_id=self.workflow_id, request_id=self.request_id
+        workflow_logger.log_coordination_started(
+            workflow_id=self.workflow_id, request_id=self.request_id, total_agents=6
         )
 
         try:
@@ -156,12 +156,14 @@ class AgentResultAggregator:
 
             aggregation_time_ms = (time.time() - start_time) * 1000
 
-            workflow_logger.log_aggregation_completed(
+            workflow_logger.log_coordination_completed(
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
-                aggregation_time_ms=aggregation_time_ms,
-                total_correlations=len(aggregated_plan.correlations),
-                quality_score=aggregated_plan.overall_quality_score,
+                execution_summary={
+                    "aggregation_time_ms": aggregation_time_ms,
+                    "total_correlations": len(aggregated_plan.correlations),
+                    "quality_score": aggregated_plan.overall_quality_score,
+                },
             )
 
             return aggregated_plan
@@ -169,11 +171,11 @@ class AgentResultAggregator:
         except Exception as e:
             aggregation_time_ms = (time.time() - start_time) * 1000
 
-            workflow_logger.log_aggregation_failed(
+            workflow_logger.log_coordination_failed(
                 workflow_id=self.workflow_id,
                 request_id=self.request_id,
                 error=str(e),
-                aggregation_time_ms=aggregation_time_ms,
+                execution_summary={"aggregation_failed": True, "error": str(e)},
             )
 
             raise
@@ -183,8 +185,12 @@ class AgentResultAggregator:
         trip_destination = self.trip_request.destination
         trip_requirements = self.trip_request.requirements
 
+        trip_id = self.state.get("trip_id")
+        if not trip_id:
+            trip_id = f"trip_{self.workflow_id[:8]}"
+
         return AggregatedTripPlan(
-            trip_id=self.state.get("trip_id", f"trip_{self.workflow_id[:8]}"),
+            trip_id=trip_id,
             destination=trip_destination.city,
             start_date=datetime.combine(trip_requirements.start_date, datetime.min.time()),
             end_date=datetime.combine(trip_requirements.end_date, datetime.min.time()),
@@ -222,17 +228,74 @@ class AgentResultAggregator:
 
     def _convert_food_to_restaurant(self, food_item: dict[str, Any]) -> RestaurantOption:
         """Convert food recommendation to RestaurantOption."""
+        from travel_companion.models.external import CuisineType, PriceRange, RestaurantLocation
+
+        # Parse location data
+        location_data = food_item.get("location", {})
+        if isinstance(location_data, str):
+            # If location is a string, create basic location
+            location = RestaurantLocation(
+                latitude=0.0,
+                longitude=0.0,
+                address=location_data,
+                city=None,
+                state=None,
+                country=None,
+                postal_code=None,
+                neighborhood=None,
+            )
+        elif isinstance(location_data, dict):
+            location = RestaurantLocation(
+                latitude=location_data.get("latitude", 0.0),
+                longitude=location_data.get("longitude", 0.0),
+                address=location_data.get("address"),
+                city=location_data.get("city"),
+                state=location_data.get("state"),
+                country=location_data.get("country"),
+                postal_code=location_data.get("postal_code"),
+                neighborhood=location_data.get("neighborhood"),
+            )
+        else:
+            location = RestaurantLocation(
+                latitude=0.0,
+                longitude=0.0,
+                address=None,
+                city=None,
+                state=None,
+                country=None,
+                postal_code=None,
+                neighborhood=None,
+            )
+
+        # Parse cuisine type
+        cuisine_str = food_item.get("cuisine", "International")
+        try:
+            cuisine_type = CuisineType(cuisine_str.lower())
+        except ValueError:
+            cuisine_type = CuisineType.OTHER
+
+        # Parse price range
+        price_str = food_item.get("price_range", "$")
+        try:
+            price_range = PriceRange(price_str)
+        except ValueError:
+            price_range = PriceRange.BUDGET
+
         return RestaurantOption(
             external_id=food_item.get("id", "unknown"),
             name=food_item.get("name", "Restaurant"),
-            cuisine_type=food_item.get("cuisine", "International"),
-            location=food_item.get("location", "Unknown"),
-            rating=food_item.get("rating", 0.0),
-            price_range=food_item.get("price_range", "$"),
-            categories=food_item.get("categories", []),
-            contact_info=food_item.get("contact", {}),
-            operating_hours=food_item.get("hours", {}),
+            cuisine_type=cuisine_type,
+            location=location,
+            rating=food_item.get("rating"),
+            review_count=food_item.get("review_count"),
+            price_range=price_range,
+            average_cost_per_person=food_item.get("average_cost_per_person"),
+            hours=food_item.get("hours"),
+            contact=food_item.get("contact"),
             booking_url=food_item.get("booking_url"),
+            provider=food_item.get("provider", "unknown"),
+            distance_km=food_item.get("distance_km"),
+            trip_id=None,  # Will be set later if needed
         )
 
     def _calculate_result_correlations(self, plan: AggregatedTripPlan) -> None:
@@ -454,13 +517,14 @@ class AgentResultAggregator:
 
         # Activity preferences
         preferred_activities = preferences.get("activity_types", [])
-        if preferred_activities:
+        if preferred_activities and isinstance(preferred_activities, list | tuple):
             for activity in plan.activities:
                 activity_category = getattr(activity, "category", "").lower()
 
                 preference_match = any(
                     pref.lower() in activity_category or activity_category in pref.lower()
                     for pref in preferred_activities
+                    if isinstance(pref, str)
                 )
 
                 if preference_match:
@@ -482,12 +546,13 @@ class AgentResultAggregator:
 
         # Cuisine preferences
         preferred_cuisines = preferences.get("cuisine_types", [])
-        if preferred_cuisines:
+        if preferred_cuisines and isinstance(preferred_cuisines, list | tuple):
             for restaurant in plan.restaurants:
                 cuisine_match = any(
                     cuisine.lower() in restaurant.cuisine_type.lower()
                     or restaurant.cuisine_type.lower() in cuisine.lower()
                     for cuisine in preferred_cuisines
+                    if isinstance(cuisine, str)
                 )
 
                 if cuisine_match:
@@ -535,7 +600,7 @@ class AgentResultAggregator:
 
         if activity_costs:
             # Select top 3-4 activities within budget
-            cost_breakdown["activities"] = sum(sorted(activity_costs)[:4])
+            cost_breakdown["activities"] = Decimal(str(sum(sorted(activity_costs)[:4])))
 
         # Restaurant costs (estimated per day)
         if plan.restaurants:
@@ -546,7 +611,7 @@ class AgentResultAggregator:
 
         # Calculate totals
         plan.cost_breakdown = cost_breakdown
-        plan.total_estimated_cost = sum(cost_breakdown.values())
+        plan.total_estimated_cost = Decimal(str(sum(cost_breakdown.values())))
 
         # Calculate budget utilization
         original_budget = float(self.trip_request.requirements.budget)
@@ -647,7 +712,7 @@ class AgentResultAggregator:
                 )
 
             # Sort activities by time
-            day_activities.sort(key=lambda x: x["time"])
+            day_activities.sort(key=lambda x: str(x.get("time", "00:00")))
             daily_schedule[day_key] = {
                 "date": day_date.isoformat(),
                 "weather": daily_forecasts[day] if day < len(daily_forecasts) else {},
@@ -759,9 +824,8 @@ class AgentResultAggregator:
         if issues:
             workflow_logger.log_plan_coherence_issues(
                 workflow_id=self.workflow_id,
-                request_id=self.request_id,
                 issues=issues,
-                quality_score=plan.overall_quality_score,
+                severity="warning" if plan.overall_quality_score < 0.5 else "info",
             )
 
     def _get_weather_suitable_activities(

@@ -1053,9 +1053,9 @@ class WorkflowLogger:
         if output_data is not None:
             details["output_data_summary"] = {
                 "keys": list(output_data.keys()) if output_data else [],
-                "size": len(str(output_data)) if output_data else 0
+                "size": len(str(output_data)) if output_data else 0,
             }
-        
+
         self.logger.info(
             "Workflow completed successfully",
             extra={
@@ -1455,7 +1455,7 @@ class WorkflowLogger:
             extra={
                 "workflow_id": workflow_id,
                 "cleanup_scope": cleanup_scope,
-            }
+            },
         )
 
     def log_workflow_cancelled(
@@ -1471,14 +1471,11 @@ class WorkflowLogger:
                 "workflow_id": workflow_id,
                 "request_id": request_id,
                 "cancellation_reason": cancellation_reason,
-            }
+            },
         )
-    
+
     def log_plan_coherence_issues(
-        self, 
-        workflow_id: str,
-        issues: list[str],
-        severity: str = "warning"
+        self, workflow_id: str, issues: list[str], severity: str = "warning"
     ) -> None:
         """Log plan coherence issues."""
         self.logger.warning(
@@ -1488,14 +1485,11 @@ class WorkflowLogger:
                 "workflow_id": workflow_id,
                 "issues": issues,
                 "severity": severity,
-            }
+            },
         )
-    
+
     def log_error_handling_started(
-        self,
-        workflow_id: str,
-        error_type: str,
-        error_message: str
+        self, workflow_id: str, error_type: str, error_message: str
     ) -> None:
         """Log when error handling starts."""
         self.logger.info(
@@ -1505,7 +1499,7 @@ class WorkflowLogger:
                 "workflow_id": workflow_id,
                 "error_type": error_type,
                 "error_message": error_message,
-            }
+            },
         )
 
 

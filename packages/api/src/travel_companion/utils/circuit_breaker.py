@@ -173,7 +173,7 @@ class CircuitBreaker:
             else None,
             "recovery_timeout": self.recovery_timeout,
         }
-    
+
     async def __aenter__(self) -> "CircuitBreaker":
         """Enter async context manager."""
         async with self._lock:
@@ -184,8 +184,10 @@ class CircuitBreaker:
                     f"Circuit breaker {self.name} is open. Next attempt at {self.next_attempt_time}"
                 )
         return self
-    
-    async def __aexit__(self, exc_type: type[Exception] | None, exc_val: Exception | None, exc_tb: Any) -> bool:
+
+    async def __aexit__(
+        self, exc_type: type[Exception] | None, exc_val: Exception | None, exc_tb: Any
+    ) -> bool:
         """Exit async context manager."""
         async with self._lock:
             if exc_type is None:

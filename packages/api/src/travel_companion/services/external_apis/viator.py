@@ -172,7 +172,7 @@ class ViatorAPIClient:
             "Authorization": f"Bearer {self.settings.viator_api_key}",
         }
 
-        params = {
+        params: dict[str, Any] = {
             "destination_id": destination_id,
             "count": min(request.max_results, 100),  # Viator max is typically 100
         }
@@ -337,18 +337,19 @@ class ViatorAPIClient:
 
             # Handle common patterns
             if "hour" in duration_lower:
-                hours = 0
                 if duration_lower.startswith("full day"):
-                    hours = 8
+                    duration_hours = 8
                 elif duration_lower.startswith("half day"):
-                    hours = 4
+                    duration_hours = 4
                 else:
                     # Extract number before "hour"
                     import re
 
                     match = re.search(r"(\d+(?:\.\d+)?)\s*hour", duration_lower)
                     if match:
-                        duration_hours: int = int(float(match.group(1)))
+                        duration_hours = int(float(match.group(1)))
+                    else:
+                        duration_hours = 2  # Default fallback
 
                 return int(duration_hours * 60)
 

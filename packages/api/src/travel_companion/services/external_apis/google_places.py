@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -106,7 +106,7 @@ class GooglePlacesClient:
 
     def _build_search_params(self, request: RestaurantSearchRequest) -> dict[str, Any]:
         """Build Google Places API search parameters from request."""
-        params = {"key": self.api_key, "type": "restaurant", "rankby": "prominence"}
+        params: dict[str, Any] = {"key": self.api_key, "type": "restaurant", "rankby": "prominence"}
 
         # Location parameters
         if request.latitude and request.longitude:
@@ -139,7 +139,7 @@ class GooglePlacesClient:
 
     async def _get_detailed_places(self, places: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Get detailed information for a list of places."""
-        detailed_places = []
+        detailed_places_results = []
 
         # Batch requests with rate limiting
         semaphore = asyncio.Semaphore(10)  # Limit concurrent requests
@@ -192,13 +192,13 @@ class GooglePlacesClient:
 
         # Execute all detail requests concurrently
         tasks = [get_place_details(place) for place in places]
-        detailed_places = await asyncio.gather(*tasks, return_exceptions=True)
+        detailed_places_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out exceptions and return valid places
         valid_places: list[dict[str, Any]] = []
-        for place in detailed_places:
+        for place in detailed_places_results:
             if not isinstance(place, Exception):
-                valid_places.append(place)
+                valid_places.append(cast(dict[str, Any], place))
 
         return valid_places
 
@@ -323,7 +323,7 @@ class GooglePlacesClient:
         is_open_now = opening_hours.get("open_now", False)
 
         # Initialize hours dict
-        hours_dict = {
+        hours_dict: dict[str, Any] = {
             "monday": None,
             "tuesday": None,
             "wednesday": None,
@@ -384,7 +384,7 @@ class GooglePlacesClient:
 
             if data.get("status") == "OK":
                 results = data.get("results", [])
-                return results  # type: ignore[return-value]
+                return cast(list[dict[str, Any]], results)
             else:
                 self.logger.error(f"Google Places text search error: {data.get('status')}")
                 return []

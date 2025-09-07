@@ -271,7 +271,7 @@ class ZomatoClient:
 
             # Extract contact info
             contact = RestaurantContact(
-                phone=restaurant_data.get("phone_numbers"), 
+                phone=restaurant_data.get("phone_numbers"),
                 email=None,
                 website=restaurant_data.get("menu_url"),
                 reservation_url=None,

@@ -494,22 +494,9 @@ class TestTripPlanningWorkflow:
 
         # The new workflow uses coordinated execution approach
         # Check that initialize_trip leads to coordinated_execution
-        edge_tuples = [(e[0], e[1]) for e in edges if isinstance(e, tuple) and len(e) == 2]
-        assert ("initialize_trip", "coordinated_execution") in edge_tuples
-
-        # Check that there's a conditional edge from coordinated_execution
-        conditional_edges = [e for e in edges if isinstance(e, tuple) and len(e) == 3]
-        assert len(conditional_edges) >= 1
-
-        # Check that the conditional edge has the right structure
-        for edge in conditional_edges:
-            if edge[0] == "coordinated_execution":
-                # Should have a routing function and routing map
-                assert callable(edge[1])
-                assert isinstance(edge[2], dict)
-                # Check expected routing keys
-                assert "continue" in edge[2]
-                assert edge[2]["continue"] == "finalize_plan"
+        assert len(edges) >= 2
+        assert edges[0] == ("initialize_trip", "coordinated_execution")
+        assert edges[1] == ("coordinated_execution", "finalize_plan")
 
     def test_get_entry_point(self, workflow):
         """Test workflow entry point."""
@@ -647,8 +634,15 @@ class TestTripPlanningWorkflow:
     @patch("travel_companion.workflows.orchestrator.workflow_logger")
     @patch("travel_companion.workflows.orchestrator.get_redis_manager")
     @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.state_manager.EnhancedWorkflowStateManager")
     async def test_execute_trip_planning_failure(
-        self, mock_get_settings, mock_get_redis, mock_logger, workflow, sample_trip_request
+        self,
+        mock_enhanced_state_manager,
+        mock_get_settings,
+        mock_get_redis,
+        mock_logger,
+        workflow,
+        sample_trip_request,
     ):
         """Test trip planning workflow execution failure."""
         # Mock settings
@@ -666,6 +660,11 @@ class TestTripPlanningWorkflow:
 
         # Set the workflow's redis client to the mock
         workflow.redis_client = mock_redis
+
+        # Mock the enhanced state manager to fail so it falls back to basic persistence
+        mock_state_manager_instance = AsyncMock()
+        mock_state_manager_instance.persist_state = AsyncMock(return_value=False)
+        mock_enhanced_state_manager.return_value = mock_state_manager_instance
 
         # Mock execution failure
         with patch.object(workflow, "_execute_with_timeout", side_effect=Exception("Test error")):
