@@ -106,7 +106,7 @@ def test_detailed_health_check_redis_error(mock_redis, client: TestClient):
     assert "Redis connection failed" in dependencies["redis"]["error"]
 
 
-@patch("travel_companion.workflows.simple_workflow.TravelPlanningWorkflow")
+@patch("travel_companion.workflows.orchestrator.TripPlanningWorkflow")
 def test_detailed_health_check_workflow_error(mock_workflow_class, client: TestClient):
     """Test health check with workflow engine error."""
     # Mock workflow to raise exception
@@ -173,7 +173,7 @@ def test_detailed_health_check_metrics_calculation(client: TestClient):
 
 @patch("travel_companion.core.database.get_database_manager")
 @patch("travel_companion.core.redis.get_redis_manager")
-@patch("travel_companion.workflows.simple_workflow.TravelPlanningWorkflow")
+@patch("travel_companion.workflows.orchestrator.TripPlanningWorkflow")
 def test_detailed_health_check_degraded_status(
     mock_workflow_class, mock_redis, mock_db, client: TestClient
 ):

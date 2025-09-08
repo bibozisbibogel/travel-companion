@@ -77,16 +77,18 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     historical_end = int(search_request.start_date.timestamp())
 
                     # Get coordinates from forecast location
-                    lat = forecast.location.latitude
-                    lon = forecast.location.longitude
+                    if forecast.location:
+                        lat = forecast.location.latitude
+                        lon = forecast.location.longitude
 
-                    historical_data = await self.openweather_client.get_historical_weather(
-                        lat, lon, historical_start, historical_end
-                    )
+                        if lat is not None and lon is not None:
+                            historical_data = await self.openweather_client.get_historical_weather(
+                                lat, lon, historical_start, historical_end
+                            )
 
-                    self.logger.info(
-                        f"Retrieved {len(historical_data)} historical weather data points"
-                    )
+                            self.logger.info(
+                                f"Retrieved {len(historical_data)} historical weather data points"
+                            )
                 except Exception as e:
                     self.logger.warning(f"Failed to get historical weather data: {e}")
                     # Continue without historical data
@@ -105,6 +107,8 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
                     "include_historical": search_request.include_historical,
                 },
                 data_source="OpenWeatherMap",
+                cached=False,
+                cache_expires_at=None,
             )
 
             self.logger.info(
@@ -119,7 +123,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             # Adjust cache TTL based on data type
             if search_request.include_historical:
                 cache_ttl = 10800  # 3 hours for historical data (changes less frequently)
-            elif len(forecast.alerts) > 0:
+            elif forecast.alerts and len(forecast.alerts) > 0:
                 cache_ttl = 1800  # 30 minutes if there are weather alerts (more volatile)
 
             await self.cache_manager.set_weather_cache(cache_key, response, cache_ttl)
@@ -162,7 +166,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             for activity_type in activity_types:
                 # Calculate average suitability across weather period
                 suitability_scores = []
-                weather_factors = []
+                weather_factors: list[str] = []
 
                 for weather in weather_data:
                     score, factors = self._calculate_activity_suitability(activity_type, weather)
@@ -241,7 +245,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             Dictionary with travel impact assessment
         """
         try:
-            impact_assessment = {
+            impact_assessment: dict[str, Any] = {
                 "overall_impact": "low",
                 "risk_factors": [],
                 "recommendations": [],
@@ -321,7 +325,7 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         Returns:
             Tuple of (suitability_score, weather_factors)
         """
-        factors = []
+        factors: list[str] = []
 
         # Base suitability rules by activity type
         if activity_type in ["outdoor_sightseeing", "walking_tours", "photography"]:
@@ -345,26 +349,28 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         score = 0.7  # Base score
 
         # Temperature scoring
-        if 15 <= weather.temperature <= 25:
+        if weather.temperature and 15 <= weather.temperature <= 25:
             score += 0.2
             factors.append("ideal_temperature")
-        elif 10 <= weather.temperature < 15 or 25 < weather.temperature <= 30:
+        elif weather.temperature and (
+            10 <= weather.temperature < 15 or 25 < weather.temperature <= 30
+        ):
             score += 0.1
             factors.append("acceptable_temperature")
-        elif weather.temperature < 5 or weather.temperature > 35:
+        elif weather.temperature and (weather.temperature < 5 or weather.temperature > 35):
             score -= 0.3
             factors.append("extreme_temperature")
 
         # Precipitation scoring
-        if weather.precipitation_probability < 0.2:
+        if weather.precipitation_probability and weather.precipitation_probability < 0.2:
             score += 0.1
             factors.append("low_rain_chance")
-        elif weather.precipitation_probability > 0.7:
+        elif weather.precipitation_probability and weather.precipitation_probability > 0.7:
             score -= 0.4
             factors.append("high_rain_chance")
 
         # Wind scoring
-        if weather.wind_speed > 50:  # km/h
+        if weather.wind_speed and weather.wind_speed > 50:  # km/h
             score -= 0.2
             factors.append("strong_winds")
 
@@ -375,11 +381,11 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         score = 0.8  # Base score - always good for indoor
 
         # Indoor activities are better when outdoor conditions are poor
-        if weather.precipitation_probability > 0.5:
+        if weather.precipitation_probability and weather.precipitation_probability > 0.5:
             score += 0.1
             factors.append("rain_makes_indoor_attractive")
 
-        if weather.temperature < 5 or weather.temperature > 35:
+        if weather.temperature and (weather.temperature < 5 or weather.temperature > 35):
             score += 0.1
             factors.append("extreme_temperature_favors_indoor")
 
@@ -390,10 +396,10 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         score = 0.5  # Base score
 
         # Temperature is critical for beach activities
-        if 22 <= weather.temperature <= 32:
+        if weather.temperature and 22 <= weather.temperature <= 32:
             score += 0.3
             factors.append("ideal_beach_temperature")
-        elif weather.temperature < 18:
+        elif weather.temperature and weather.temperature < 18:
             score -= 0.4
             factors.append("too_cold_for_beach")
 
@@ -417,20 +423,20 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         score = 0.6  # Base score
 
         # Temperature range for hiking
-        if 10 <= weather.temperature <= 20:
+        if weather.temperature and 10 <= weather.temperature <= 20:
             score += 0.2
             factors.append("ideal_hiking_temperature")
-        elif weather.temperature < 0 or weather.temperature > 30:
+        elif weather.temperature and (weather.temperature < 0 or weather.temperature > 30):
             score -= 0.3
             factors.append("challenging_hiking_temperature")
 
         # Precipitation and trail conditions
-        if weather.precipitation_probability > 0.6:
+        if weather.precipitation_probability and weather.precipitation_probability > 0.6:
             score -= 0.3
             factors.append("rain_makes_trails_dangerous")
 
         # Visibility important for safety
-        if weather.visibility < 1.0:  # km
+        if weather.visibility and weather.visibility < 1.0:  # km
             score -= 0.4
             factors.append("poor_visibility_unsafe")
 
@@ -441,10 +447,10 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
         score = 0.3  # Base score - depends on conditions
 
         # Temperature needs to be cold
-        if weather.temperature < 0:
+        if weather.temperature and weather.temperature < 0:
             score += 0.4
             factors.append("cold_temperature_for_snow_sports")
-        elif weather.temperature > 5:
+        elif weather.temperature and weather.temperature > 5:
             score -= 0.2
             factors.append("too_warm_for_winter_sports")
 
@@ -457,28 +463,28 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
 
     def _is_extreme_weather(self, weather: WeatherData) -> bool:
         """Check if weather conditions are extreme."""
-        return (
+        return bool(
             weather.condition
             in [
                 WeatherCondition.THUNDERSTORM,
                 WeatherCondition.HEAVY_RAIN,
                 WeatherCondition.HEAVY_SNOW,
             ]
-            or weather.temperature < -10
-            or weather.temperature > 40
-            or weather.wind_speed > 70  # km/h
-            or weather.precipitation_probability > 0.9
+            or (weather.temperature and weather.temperature < -10)
+            or (weather.temperature and weather.temperature > 40)
+            or (weather.wind_speed and weather.wind_speed > 70)  # km/h
+            or (weather.precipitation_probability and weather.precipitation_probability > 0.9)
         )
 
     def _is_challenging_weather(self, weather: WeatherData) -> bool:
         """Check if weather conditions are challenging but not extreme."""
-        return (
+        return bool(
             weather.condition
             in [WeatherCondition.RAIN, WeatherCondition.SNOW, WeatherCondition.FOG]
-            or weather.temperature < 0
-            or weather.temperature > 35
-            or weather.wind_speed > 40  # km/h
-            or weather.precipitation_probability > 0.7
+            or (weather.temperature and weather.temperature < 0)
+            or (weather.temperature and weather.temperature > 35)
+            or (weather.wind_speed and weather.wind_speed > 40)  # km/h
+            or (weather.precipitation_probability and weather.precipitation_probability > 0.7)
         )
 
     def _generate_recommendation_text(

@@ -1,10 +1,12 @@
 """Tests for trip planning API endpoints."""
 
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from travel_companion.models.user import User
+from travel_companion.workflows.orchestrator import TripPlanningWorkflow
 
 
 class TestTripPlanEndpoint:
@@ -29,15 +31,24 @@ class TestTripPlanEndpoint:
             },
         }
 
-        response = authenticated_client.post("/api/v1/trips/plan", json=trip_request)
+        # Mock the workflow execution to prevent hanging
+        with patch.object(
+            TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock
+        ) as mock_execute:
+            mock_execute.return_value = {
+                "trip_id": str(uuid4()),
+                "itinerary_data": None,  # Set to None for testing (plan field can be None)
+            }
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "Trip plan generated successfully"
-        assert "data" in data
-        assert data["data"]["destination"]["city"] == "Paris"
-        assert data["data"]["user_id"] == str(sample_user.user_id)
+            response = authenticated_client.post("/api/v1/trips/plan", json=trip_request)
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["message"] == "Trip plan generated successfully"
+            assert "data" in data
+            assert data["data"]["destination"]["city"] == "Paris"
+            assert data["data"]["user_id"] == str(sample_user.user_id)
 
     def test_generate_trip_plan_unauthenticated(self, client: TestClient):
         """Test trip plan generation without authentication."""

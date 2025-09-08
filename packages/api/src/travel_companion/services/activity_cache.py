@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from travel_companion.core.redis import RedisManager
 from travel_companion.models.external import ActivitySearchRequest, ActivitySearchResponse
@@ -123,7 +123,7 @@ class ActivityCacheManager:
             if pricing_data:
                 await self._increment_cache_stats("pricing_hits")
                 self.logger.debug(f"Cache hit for activity pricing: {cache_key}")
-                return pricing_data
+                return cast(dict[str, Any], pricing_data)
 
             await self._increment_cache_stats("pricing_misses")
             return None

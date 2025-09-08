@@ -105,7 +105,7 @@ class BaseAgent(ABC, Generic[T]):
         """
         import hashlib
         import json
-        from datetime import datetime, date
+        from datetime import date, datetime
         from decimal import Decimal
 
         def json_serializer(obj: Any) -> str:

@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -106,7 +106,7 @@ class GooglePlacesClient:
 
     def _build_search_params(self, request: RestaurantSearchRequest) -> dict[str, Any]:
         """Build Google Places API search parameters from request."""
-        params = {"key": self.api_key, "type": "restaurant", "rankby": "prominence"}
+        params: dict[str, Any] = {"key": self.api_key, "type": "restaurant", "rankby": "prominence"}
 
         # Location parameters
         if request.latitude and request.longitude:
@@ -124,27 +124,27 @@ class GooglePlacesClient:
         # Radius in meters (max 50000 for rankby=prominence)
         if request.radius_km:
             radius_meters = min(int(request.radius_km * 1000), 50000)
-            params["radius"] = radius_meters
+            params["radius"] = str(radius_meters)
         else:
-            params["radius"] = 5000  # Default 5km
+            params["radius"] = "5000"  # Default 5km
 
         # Note: Google Places doesn't directly support price filtering in nearby search
         # Price filtering would need to be applied post-search if needed
 
         # Open now filter
         if request.open_now:
-            params["opennow"] = True
+            params["opennow"] = "true"
 
         return params
 
-    async def _get_detailed_places(self, places: list[dict]) -> list[dict]:
+    async def _get_detailed_places(self, places: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Get detailed information for a list of places."""
-        detailed_places = []
+        detailed_places_results = []
 
         # Batch requests with rate limiting
         semaphore = asyncio.Semaphore(10)  # Limit concurrent requests
 
-        async def get_place_details(place: dict) -> dict:
+        async def get_place_details(place: dict[str, Any]) -> dict[str, Any]:
             async with semaphore:
                 try:
                     place_id = place.get("place_id")
@@ -192,13 +192,13 @@ class GooglePlacesClient:
 
         # Execute all detail requests concurrently
         tasks = [get_place_details(place) for place in places]
-        detailed_places = await asyncio.gather(*tasks, return_exceptions=True)
+        detailed_places_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out exceptions and return valid places
-        valid_places = []
-        for place in detailed_places:
+        valid_places: list[dict[str, Any]] = []
+        for place in detailed_places_results:
             if not isinstance(place, Exception):
-                valid_places.append(place)
+                valid_places.append(cast(dict[str, Any], place))
 
         return valid_places
 
@@ -220,6 +220,7 @@ class GooglePlacesClient:
                 state=None,
                 country=None,
                 postal_code=None,
+                neighborhood=None,
             )
 
             # Map price level from Google (0-4) to our price range
@@ -245,7 +246,10 @@ class GooglePlacesClient:
 
             # Extract contact info
             contact = RestaurantContact(
-                phone=place.get("formatted_phone_number"), website=place.get("website")
+                phone=place.get("formatted_phone_number"),
+                email=None,
+                website=place.get("website"),
+                reservation_url=None,
             )
 
             # Extract photos
@@ -284,6 +288,8 @@ class GooglePlacesClient:
                 photos=photos,
                 booking_url=place.get("website"),
                 provider="google_places",
+                trip_id=None,  # Will be set when associated with a trip
+                distance_km=None,  # Would need to calculate from request location
             )
 
         except Exception as e:
@@ -311,13 +317,13 @@ class GooglePlacesClient:
         # Default to American for general restaurants
         return CuisineType.AMERICAN
 
-    def _parse_hours(self, opening_hours: dict) -> RestaurantHours:
+    def _parse_hours(self, opening_hours: dict[str, Any]) -> RestaurantHours:
         """Parse Google Places hours data into RestaurantHours model."""
         weekday_text = opening_hours.get("weekday_text", [])
         is_open_now = opening_hours.get("open_now", False)
 
         # Initialize hours dict
-        hours_dict = {
+        hours_dict: dict[str, Any] = {
             "monday": None,
             "tuesday": None,
             "wednesday": None,
@@ -351,7 +357,7 @@ class GooglePlacesClient:
 
         return RestaurantHours(**hours_dict)
 
-    async def search_text(self, query: str, location: str = None) -> list[dict]:
+    async def search_text(self, query: str, location: str | None = None) -> list[dict[str, Any]]:
         """Perform text-based search for restaurants.
 
         Args:
@@ -366,7 +372,7 @@ class GooglePlacesClient:
 
             if location:
                 params["location"] = location
-                params["radius"] = 50000  # 50km radius
+                params["radius"] = "50000"  # 50km radius
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(f"{self.base_url}/textsearch/json", params=params)
@@ -377,7 +383,8 @@ class GooglePlacesClient:
                 data = response.json()
 
             if data.get("status") == "OK":
-                return data.get("results", [])
+                results = data.get("results", [])
+                return cast(list[dict[str, Any]], results)
             else:
                 self.logger.error(f"Google Places text search error: {data.get('status')}")
                 return []

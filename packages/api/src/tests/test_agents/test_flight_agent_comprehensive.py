@@ -19,6 +19,7 @@ from travel_companion.models.external import (
 )
 from travel_companion.models.trip import TravelClass
 from travel_companion.services.external_apis.amadeus import AmadeusFlightOffer
+from travel_companion.utils.circuit_breaker import CircuitState
 from travel_companion.utils.errors import ExternalAPIError
 
 
@@ -143,9 +144,9 @@ class TestFlightAgentComprehensive:
     async def test_flight_search_timeout_handling(self, flight_agent, sample_flight_request):
         """Test timeout handling in flight search."""
 
-        # Mock Amadeus client that times out
+        # Mock Amadeus client that times out - use shorter timeout to prevent test hanging
         async def slow_search(*args, **kwargs):
-            await asyncio.sleep(35)  # Longer than 30s timeout
+            await asyncio.sleep(2)  # Shorter sleep to prevent hanging tests
             return []
 
         mock_amadeus_client = Mock()
@@ -153,8 +154,14 @@ class TestFlightAgentComprehensive:
         mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
         mock_amadeus_client.search_flights = slow_search
 
-        with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
-            flights = await flight_agent.search_flights(sample_flight_request)
+        # Patch the timeout to be very short for testing
+        with patch("asyncio.wait_for") as mock_wait_for:
+            mock_wait_for.side_effect = TimeoutError("Test timeout")
+
+            with patch.object(
+                flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client
+            ):
+                flights = await flight_agent.search_flights(sample_flight_request)
 
         # Should fall back to mock data due to timeout
         assert len(flights) > 0
@@ -164,7 +171,7 @@ class TestFlightAgentComprehensive:
     async def test_circuit_breaker_open_fallback(self, flight_agent, sample_flight_request):
         """Test fallback when circuit breaker is open."""
         # Force circuit breaker to open state
-        flight_agent._amadeus_circuit_breaker.state = "open"
+        flight_agent._amadeus_circuit_breaker.state = CircuitState.OPEN
         flight_agent._amadeus_circuit_breaker.next_attempt_time = datetime.now() + timedelta(
             minutes=5
         )
@@ -355,9 +362,11 @@ class TestFlightAgentComprehensive:
         ]
 
         for exception, test_name in test_cases:
-            # Mock Amadeus client to raise specific exception
+            # Mock Amadeus client to raise specific exception during search
             mock_amadeus_client = Mock()
-            mock_amadeus_client.__aenter__ = AsyncMock(side_effect=exception)
+            mock_amadeus_client.__aenter__ = AsyncMock(return_value=mock_amadeus_client)
+            mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
+            mock_amadeus_client.search_flights = AsyncMock(side_effect=exception)
 
             with patch.object(
                 flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client

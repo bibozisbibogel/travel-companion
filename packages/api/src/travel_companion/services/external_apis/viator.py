@@ -172,7 +172,7 @@ class ViatorAPIClient:
             "Authorization": f"Bearer {self.settings.viator_api_key}",
         }
 
-        params = {
+        params: dict[str, Any] = {
             "destination_id": destination_id,
             "count": min(request.max_results, 100),  # Viator max is typically 100
         }
@@ -181,7 +181,8 @@ class ViatorAPIClient:
         if request.category:
             viator_category = self._map_category_to_viator(request.category)
             if viator_category:
-                params["category_id"] = viator_category
+                # Convert category string to int if needed by API
+                params["category_id"] = viator_category  # Keep as string for Viator API
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -272,6 +273,7 @@ class ViatorAPIClient:
                 name=product.title,
                 description=product.description,
                 category=category,
+                trip_id=None,  # Will be set when associated with a trip
                 location=location_obj,
                 duration_minutes=duration_minutes,
                 price=price,
@@ -335,20 +337,21 @@ class ViatorAPIClient:
 
             # Handle common patterns
             if "hour" in duration_lower:
-                hours = 0
                 if duration_lower.startswith("full day"):
-                    hours = 8
+                    duration_hours = 8
                 elif duration_lower.startswith("half day"):
-                    hours = 4
+                    duration_hours = 4
                 else:
                     # Extract number before "hour"
                     import re
 
                     match = re.search(r"(\d+(?:\.\d+)?)\s*hour", duration_lower)
                     if match:
-                        hours = float(match.group(1))
+                        duration_hours = int(float(match.group(1)))
+                    else:
+                        duration_hours = 2  # Default fallback
 
-                return int(hours * 60)
+                return int(duration_hours * 60)
 
             elif "day" in duration_lower:
                 days = 1

@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from travel_companion.agents.base import BaseAgent
 from travel_companion.models.external import (
@@ -84,6 +84,8 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
                     "category": search_request.category,
                     "guest_count": search_request.guest_count,
                 },
+                cached=False,
+                cache_expires_at=None,
             )
 
             # Cache the result with advanced caching
@@ -135,8 +137,10 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
             if isinstance(result, Exception):
                 self.logger.warning(f"{provider_name} search failed: {result}")
             else:
-                activities.extend(result)
-                self.logger.info(f"{provider_name} returned {len(result)} activities")
+                activities.extend(cast(list[ActivityOption], result))
+                self.logger.info(
+                    f"{provider_name} returned {len(cast(list[ActivityOption], result))} activities"
+                )
 
         # Remove duplicates based on name and location similarity
         unique_activities = await self._deduplicate_activities(activities)
@@ -301,7 +305,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
             score_components["category_score"] = 0
 
         # Duration preference score (0-15 points)
-        duration_score = 0
+        duration_score = 0.0
         if request.duration_hours and activity.duration_minutes:
             requested_minutes = request.duration_hours * 60
             duration_diff = abs(activity.duration_minutes - requested_minutes)

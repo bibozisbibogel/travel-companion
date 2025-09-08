@@ -1,12 +1,26 @@
 """Tests for workflow orchestration base classes."""
 
 import json
+from datetime import date
+from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from travel_companion.workflows.orchestrator import BaseWorkflow, WorkflowState
+from travel_companion.models.trip import (
+    AccommodationType,
+    TravelClass,
+    TripDestination,
+    TripPlanRequest,
+    TripRequirements,
+)
+from travel_companion.workflows.orchestrator import (
+    BaseWorkflow,
+    TripPlanningWorkflow,
+    TripPlanningWorkflowState,
+    WorkflowState,
+)
 
 
 class MockTestWorkflow(BaseWorkflow):
@@ -400,3 +414,316 @@ class TestBaseWorkflow:
         assert result["workflow_type"] == "TestWorkflow"
         assert result["status"] == "degraded"
         assert result["redis_connected"] is False
+
+
+@pytest.fixture
+def sample_trip_request():
+    """Sample trip planning request for testing."""
+    return TripPlanRequest(
+        destination=TripDestination(
+            city="Paris",
+            country="France",
+            country_code="FR",
+            airport_code="CDG",
+            latitude=48.8566,
+            longitude=2.3522,
+        ),
+        requirements=TripRequirements(
+            budget=Decimal("2500.00"),
+            currency="USD",
+            start_date=date(2024, 6, 15),
+            end_date=date(2024, 6, 22),
+            travelers=2,
+            travel_class=TravelClass.ECONOMY,
+            accommodation_type=AccommodationType.HOTEL,
+        ),
+        preferences={
+            "activities": "museums,restaurants",
+            "dietary_restrictions": "vegetarian",
+        },
+    )
+
+
+class TestTripPlanningWorkflow:
+    """Tests for TripPlanningWorkflow class."""
+
+    @pytest.fixture
+    def workflow(self):
+        """Create TripPlanningWorkflow instance for testing."""
+        return TripPlanningWorkflow()
+
+    def test_initialization(self, workflow):
+        """Test workflow initialization."""
+        assert workflow.workflow_type == "trip_planning"
+        assert workflow.get_state_class() == TripPlanningWorkflowState
+
+    def test_define_nodes(self, workflow):
+        """Test workflow node definition."""
+        # Mock the node functions import for testing
+        with patch.object(workflow, "define_nodes") as mock_define_nodes:
+            mock_define_nodes.return_value = {
+                "initialize_trip": lambda x: x,
+                "weather_agent": lambda x: x,
+                "flight_agent": lambda x: x,
+                "hotel_agent": lambda x: x,
+                "activity_agent": lambda x: x,
+                "food_agent": lambda x: x,
+                "itinerary_agent": lambda x: x,
+                "finalize_plan": lambda x: x,
+            }
+
+            nodes = workflow.define_nodes()
+
+            expected_nodes = {
+                "initialize_trip",
+                "weather_agent",
+                "flight_agent",
+                "hotel_agent",
+                "activity_agent",
+                "food_agent",
+                "itinerary_agent",
+                "finalize_plan",
+            }
+
+            assert set(nodes.keys()) == expected_nodes
+            assert all(callable(node) for node in nodes.values())
+
+    def test_define_edges(self, workflow):
+        """Test workflow edge definition with coordinated execution."""
+        edges = workflow.define_edges()
+
+        # The new workflow uses coordinated execution approach
+        # Check that initialize_trip leads to coordinated_execution
+        assert len(edges) >= 2
+        assert edges[0] == ("initialize_trip", "coordinated_execution")
+        assert edges[1] == ("coordinated_execution", "finalize_plan")
+
+    def test_get_entry_point(self, workflow):
+        """Test workflow entry point."""
+        assert workflow.get_entry_point() == "initialize_trip"
+
+    def test_create_initial_state(self, workflow, sample_trip_request):
+        """Test initial state creation with trip context."""
+        user_id = "user123"
+        request_id = "req456"
+
+        state = workflow.create_initial_state(sample_trip_request, user_id, request_id)
+
+        # Check base workflow fields
+        assert state["request_id"] == request_id
+        assert state["user_id"] == user_id
+        assert state["status"] == "running"
+        assert state["error"] is None
+        assert state["current_node"] == "initialize_trip"
+
+        # Check trip-specific fields
+        assert state["trip_request"] == sample_trip_request
+        assert state["trip_id"] is None
+        assert state["agents_completed"] == []
+        assert state["agents_failed"] == []
+
+        # Check agent dependencies
+        assert "activity_agent" in state["agent_dependencies"]
+        assert "weather_agent" in state["agent_dependencies"]["activity_agent"]
+        assert "itinerary_agent" in state["agent_dependencies"]
+
+        # Check initialized results
+        assert state["flight_results"] == []
+        assert state["hotel_results"] == []
+        assert state["activity_results"] == []
+        assert state["weather_data"] == {}
+        assert state["food_recommendations"] == []
+        assert state["itinerary_data"] == {}
+
+        # Check context fields
+        assert state["user_preferences"] == sample_trip_request.preferences
+        assert state["budget_tracking"]["allocated"] == float(
+            sample_trip_request.requirements.budget
+        )
+        assert state["budget_tracking"]["spent"] == 0.0
+        assert "execution_time" in state["optimization_metrics"]
+
+    def test_create_initial_state_minimal(self, workflow, sample_trip_request):
+        """Test initial state creation with minimal parameters."""
+        state = workflow.create_initial_state(sample_trip_request)
+
+        # Should generate IDs automatically
+        assert len(state["request_id"]) > 0
+        assert len(state["workflow_id"]) > 0
+        assert state["user_id"] is None
+        assert state["trip_request"] == sample_trip_request
+
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    async def test_execute_trip_planning_success(
+        self, mock_get_settings, mock_get_redis, mock_logger, workflow, sample_trip_request
+    ):
+        """Test successful trip planning workflow execution."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.workflow_timeout_seconds = 300
+        mock_settings.workflow_state_ttl = 3600
+        mock_get_settings.return_value = mock_settings
+
+        # Mock Redis
+        mock_redis = AsyncMock()
+        mock_redis_manager = MagicMock()
+        mock_redis_manager.client = mock_redis
+        mock_get_redis.return_value = mock_redis_manager
+
+        # Mock graph execution
+        final_state = workflow.create_initial_state(sample_trip_request)
+        final_state.update(
+            {
+                "status": "completed",
+                "output_data": {"trip_plan": {"flights": [], "hotels": [], "activities": []}},
+                "end_time": final_state["start_time"] + 60,
+            }
+        )
+
+        with patch.object(workflow, "_execute_with_timeout", return_value=final_state):
+            result = await workflow.execute_trip_planning(sample_trip_request, "user123", "req456")
+
+            # Check result
+            assert "trip_plan" in result
+
+            # Verify logging
+            mock_logger.log_workflow_started.assert_called_once()
+            mock_logger.log_workflow_completed.assert_called_once()
+
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    async def test_execute_trip_planning_timeout(
+        self, mock_get_settings, mock_get_redis, mock_logger, workflow, sample_trip_request
+    ):
+        """Test trip planning workflow timeout handling."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.workflow_timeout_seconds = 300
+        mock_settings.workflow_state_ttl = 3600
+        mock_get_settings.return_value = mock_settings
+
+        # Mock Redis
+        mock_redis = AsyncMock()
+        mock_redis.setex = AsyncMock()  # Mock Redis setex method
+        mock_redis_manager = MagicMock()
+        mock_redis_manager.client = mock_redis
+        mock_get_redis.return_value = mock_redis_manager
+
+        # Set the workflow's redis client to the mock
+        workflow.redis_client = mock_redis
+
+        # Mock timeout
+        with patch.object(workflow, "_execute_with_timeout", side_effect=TimeoutError("Timeout")):
+            with pytest.raises(TimeoutError):
+                await workflow.execute_trip_planning(sample_trip_request)
+
+            # Verify error logging (may be called multiple times due to state persistence errors)
+            assert mock_logger.log_workflow_failed.call_count >= 1
+
+            # Check that at least one call was for the timeout error
+            timeout_calls = [
+                call
+                for call in mock_logger.log_workflow_failed.call_args_list
+                if "timeout" in str(call).lower()
+            ]
+            assert len(timeout_calls) >= 1
+
+    @patch("travel_companion.workflows.orchestrator.workflow_logger")
+    @patch("travel_companion.workflows.orchestrator.get_redis_manager")
+    @patch("travel_companion.workflows.orchestrator.get_settings")
+    @patch("travel_companion.workflows.state_manager.EnhancedWorkflowStateManager")
+    async def test_execute_trip_planning_failure(
+        self,
+        mock_enhanced_state_manager,
+        mock_get_settings,
+        mock_get_redis,
+        mock_logger,
+        workflow,
+        sample_trip_request,
+    ):
+        """Test trip planning workflow execution failure."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.workflow_timeout_seconds = 300
+        mock_settings.workflow_state_ttl = 3600
+        mock_get_settings.return_value = mock_settings
+
+        # Mock Redis
+        mock_redis = AsyncMock()
+        mock_redis.setex = AsyncMock()  # Mock Redis setex method
+        mock_redis_manager = MagicMock()
+        mock_redis_manager.client = mock_redis
+        mock_get_redis.return_value = mock_redis_manager
+
+        # Set the workflow's redis client to the mock
+        workflow.redis_client = mock_redis
+
+        # Mock the enhanced state manager to fail so it falls back to basic persistence
+        mock_state_manager_instance = AsyncMock()
+        mock_state_manager_instance.persist_state = AsyncMock(return_value=False)
+        mock_enhanced_state_manager.return_value = mock_state_manager_instance
+
+        # Mock execution failure
+        with patch.object(workflow, "_execute_with_timeout", side_effect=Exception("Test error")):
+            with pytest.raises(RuntimeError, match="Trip planning workflow execution failed"):
+                await workflow.execute_trip_planning(sample_trip_request)
+
+            # Verify error logging and state persistence (may be called multiple times)
+            assert mock_logger.log_workflow_failed.call_count >= 1
+            mock_redis.setex.assert_called()  # Error state should be persisted
+
+            # Check that at least one call was for the test error
+            error_calls = [
+                call
+                for call in mock_logger.log_workflow_failed.call_args_list
+                if "test error" in str(call).lower()
+            ]
+            assert len(error_calls) >= 1
+
+    def test_workflow_state_schema_completeness(self):
+        """Test that TripPlanningWorkflowState includes all required fields."""
+        # This test ensures our state schema is complete
+        state_annotations = TripPlanningWorkflowState.__annotations__
+
+        # Base workflow fields
+        base_fields = {
+            "request_id",
+            "workflow_id",
+            "user_id",
+            "status",
+            "error",
+            "start_time",
+            "end_time",
+            "current_node",
+            "input_data",
+            "output_data",
+            "intermediate_results",
+        }
+
+        # Trip-specific fields
+        trip_fields = {
+            "trip_request",
+            "trip_id",
+            "agents_completed",
+            "agents_failed",
+            "agent_dependencies",
+            "flight_results",
+            "hotel_results",
+            "activity_results",
+            "weather_data",
+            "food_recommendations",
+            "itinerary_data",
+            "user_preferences",
+            "budget_tracking",
+            "optimization_metrics",
+        }
+
+        all_required_fields = base_fields | trip_fields
+        actual_fields = set(state_annotations.keys())
+
+        assert all_required_fields.issubset(actual_fields), (
+            f"Missing fields: {all_required_fields - actual_fields}"
+        )

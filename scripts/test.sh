@@ -131,7 +131,7 @@ run_api_tests() {
     fi
     
     if [ "$COVERAGE" = true ]; then
-        PYTEST_CMD="$PYTEST_CMD --cov=src/travel_companion --cov-report=html --cov-report=term"
+        PYTEST_CMD="$PYTEST_CMD --cov=travel_companion src/tests/ --cov-report=html --cov-report=term"
     fi
     
     # Run tests

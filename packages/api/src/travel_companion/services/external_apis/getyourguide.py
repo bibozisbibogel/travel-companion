@@ -124,7 +124,7 @@ class GetYourGuideAPIClient:
             "Authorization": f"Bearer {self.settings.getyourguide_api_key}",
         }
 
-        params = {
+        params: dict[str, str | int] = {
             "q": location,
             "limit": 1,  # We only need the first match
         }
@@ -176,7 +176,7 @@ class GetYourGuideAPIClient:
             "Authorization": f"Bearer {self.settings.getyourguide_api_key}",
         }
 
-        params = {
+        params: dict[str, str | int] = {
             "location_id": location.location_id,
             "limit": min(request.max_results, 50),  # GetYourGuide max is typically 50
         }
@@ -295,6 +295,7 @@ class GetYourGuideAPIClient:
             activity = ActivityOption(
                 external_id=activity_data.activity_id,
                 name=activity_data.title,
+                trip_id=None,  # Will be set when associated with a trip
                 description=activity_data.summary,
                 category=category,
                 location=location,

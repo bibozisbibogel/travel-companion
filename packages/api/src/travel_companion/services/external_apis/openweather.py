@@ -111,7 +111,7 @@ class OpenWeatherMapResponse(BaseModel):
 class OpenWeatherMapAPIClient:
     """OpenWeatherMap API client for weather forecasts."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize OpenWeatherMap API client."""
         self.settings = get_settings()
         self.logger = logging.getLogger("travel_companion.services.external_apis.openweather")
@@ -218,7 +218,13 @@ class OpenWeatherMapAPIClient:
             OpenWeatherMap historical response
         """
         url = f"{self.base_url}/onecall/timemachine"
-        params = {"lat": lat, "lon": lon, "dt": timestamp, "appid": self.api_key, "units": "metric"}
+        params: dict[str, str | int | float] = {
+            "lat": lat,
+            "lon": lon,
+            "dt": timestamp,
+            "appid": self.api_key,
+            "units": "metric",
+        }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for attempt in range(self.max_retries):
@@ -237,6 +243,9 @@ class OpenWeatherMapAPIClient:
                     )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 
+        # This should not be reached, but mypy requires it
+        raise RuntimeError("Failed to get historical data after all retries")
+
     async def _geocode_location(self, location: str) -> dict[str, float]:
         """Geocode location name to coordinates.
 
@@ -247,7 +256,7 @@ class OpenWeatherMapAPIClient:
             Dictionary with lat and lon coordinates
         """
         url = "http://api.openweathermap.org/geo/1.0/direct"
-        params = {"q": location, "limit": 1, "appid": self.api_key}
+        params: dict[str, str | int] = {"q": location, "limit": 1, "appid": self.api_key}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(url, params=params)
@@ -279,7 +288,7 @@ class OpenWeatherMapAPIClient:
             OpenWeatherMap One Call API response
         """
         url = f"{self.base_url}/onecall"
-        params = {
+        params: dict[str, str | int | float] = {
             "lat": lat,
             "lon": lon,
             "appid": self.api_key,
@@ -288,7 +297,7 @@ class OpenWeatherMapAPIClient:
         }
 
         if not include_alerts:
-            params["exclude"] += ",alerts"
+            params["exclude"] = str(params["exclude"]) + ",alerts"
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for attempt in range(self.max_retries):
@@ -305,6 +314,9 @@ class OpenWeatherMapAPIClient:
                     self.logger.warning(f"API request failed, retrying in {self.retry_delay}s: {e}")
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 
+        # This should not be reached, but mypy requires it
+        raise RuntimeError("Failed to get onecall data after all retries")
+
     def _convert_to_forecast(
         self, data: OpenWeatherMapResponse, location_name: str
     ) -> WeatherForecast:
@@ -319,7 +331,11 @@ class OpenWeatherMapAPIClient:
         """
         # Create location info
         location = WeatherLocation(
-            name=location_name, latitude=data.lat, longitude=data.lon, timezone=data.timezone
+            name=location_name,
+            latitude=data.lat,
+            longitude=data.lon,
+            timezone=data.timezone,
+            country=None,
         )
 
         # Convert current weather

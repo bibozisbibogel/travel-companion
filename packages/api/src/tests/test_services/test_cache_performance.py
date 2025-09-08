@@ -89,8 +89,9 @@ class TestCachePerformance:
         cache_manager = CacheManager(mock_redis_manager)
 
         # Mock cache hit - return data instantly
-        mock_redis_manager.get.return_value = sample_search_response.model_dump()
-        mock_redis_manager.get.return_value["cache_timestamp"] = datetime.now(UTC).isoformat()
+        cache_data = sample_search_response.model_dump()
+        cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
+        mock_redis_manager.get.return_value = cache_data
 
         # Measure cache hit time
         start_time = time.time()
@@ -283,6 +284,9 @@ class TestCachePerformance:
 
         mock_redis_manager.client.scan_iter = mock_scan_iter
 
+        # Mock get to return None for cache entries (simulating empty cache)
+        mock_redis_manager.get.return_value = None
+
         stats = await cache_manager.get_cache_statistics()
 
         # Should provide useful statistics
@@ -305,8 +309,9 @@ class TestCachePerformance:
         cache_manager = CacheManager(mock_redis_manager)
 
         # Mock cache hits for all requests
-        mock_redis_manager.get.return_value = sample_search_response.model_dump()
-        mock_redis_manager.get.return_value["cache_timestamp"] = datetime.now(UTC).isoformat()
+        cache_data = sample_search_response.model_dump()
+        cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
+        mock_redis_manager.get.return_value = cache_data
 
         # Perform multiple cache retrievals
         start_time = time.time()

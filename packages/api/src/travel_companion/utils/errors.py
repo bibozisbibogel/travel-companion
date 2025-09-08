@@ -32,6 +32,20 @@ class DatabaseErrorCode(str, Enum):
     USER_LOOKUP_FAILED = "DB005"
 
 
+class WorkflowErrorCode(str, Enum):
+    """Workflow and agent orchestration error codes."""
+
+    AGENT_EXECUTION_FAILED = "WF001"
+    CIRCUIT_BREAKER_OPEN = "WF002"
+    RETRY_EXHAUSTED = "WF003"
+    CRITICAL_SERVICE_UNAVAILABLE = "WF004"
+    CRITICAL_SERVICE_FAILED = "WF005"
+    WORKFLOW_TIMEOUT = "WF006"
+    AGENT_COORDINATION_FAILED = "WF007"
+    FALLBACK_ACTIVATION = "WF008"
+    PARTIAL_WORKFLOW_SUCCESS = "WF009"
+
+
 class ValidationErrorCode(str, Enum):
     """Validation error codes for standardized responses."""
 
@@ -229,6 +243,78 @@ class DatabaseError(TravelCompanionError):
         if operation:
             enhanced_details["operation"] = operation
         super().__init__(message, error_code, enhanced_details)
+
+
+class WorkflowError(TravelCompanionError):
+    """Raised when workflow orchestration fails."""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: str = WorkflowErrorCode.AGENT_EXECUTION_FAILED,
+        agent_name: str | None = None,
+        workflow_id: str | None = None,
+        details: dict[str, Any] | None = None,
+    ):
+        enhanced_details = details or {}
+        if agent_name:
+            enhanced_details["agent_name"] = agent_name
+        if workflow_id:
+            enhanced_details["workflow_id"] = workflow_id
+        super().__init__(message, error_code, enhanced_details)
+
+
+class AgentExecutionError(WorkflowError):
+    """Raised when agent execution fails."""
+
+    def __init__(
+        self,
+        message: str,
+        agent_name: str,
+        error_code: str = WorkflowErrorCode.AGENT_EXECUTION_FAILED,
+        attempt: int | None = None,
+        details: dict[str, Any] | None = None,
+    ):
+        enhanced_details = details or {}
+        if attempt:
+            enhanced_details["attempt"] = attempt
+        super().__init__(message, error_code, agent_name, None, enhanced_details)
+
+
+class CircuitBreakerOpenError(WorkflowError):
+    """Raised when circuit breaker prevents agent execution."""
+
+    def __init__(
+        self,
+        message: str,
+        agent_name: str,
+        next_attempt_time: str | None = None,
+        details: dict[str, Any] | None = None,
+    ):
+        enhanced_details = details or {}
+        if next_attempt_time:
+            enhanced_details["next_attempt_time"] = next_attempt_time
+        super().__init__(
+            message, WorkflowErrorCode.CIRCUIT_BREAKER_OPEN, agent_name, None, enhanced_details
+        )
+
+
+class CriticalAgentFailureError(WorkflowError):
+    """Raised when critical agents fail and workflow cannot continue."""
+
+    def __init__(
+        self,
+        message: str,
+        agent_name: str,
+        recovery_strategy: str | None = None,
+        details: dict[str, Any] | None = None,
+    ):
+        enhanced_details = details or {}
+        if recovery_strategy:
+            enhanced_details["recovery_strategy"] = recovery_strategy
+        super().__init__(
+            message, WorkflowErrorCode.CRITICAL_SERVICE_FAILED, agent_name, None, enhanced_details
+        )
 
 
 # Standardized error response helper functions

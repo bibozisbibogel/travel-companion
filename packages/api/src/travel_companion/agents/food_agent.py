@@ -9,6 +9,7 @@ from travel_companion.models.external import (
     DietaryRestriction,
     PopularDish,
     PriceRange,
+    RestaurantOption,
     RestaurantSearchRequest,
     RestaurantSearchResponse,
 )
@@ -22,7 +23,7 @@ from travel_companion.utils.errors import ExternalAPIError
 class FoodAgent(BaseAgent[RestaurantSearchResponse]):
     """Food and restaurant recommendation agent with multiple API integrations."""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize food agent with API clients and circuit breakers."""
         super().__init__(**kwargs)
 
@@ -33,13 +34,13 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         # Circuit breakers for each API
         self.yelp_circuit_breaker = CircuitBreaker(
-            name="yelp_api", failure_threshold=5, timeout=30, reset_timeout=60
+            name="yelp_api", failure_threshold=5, recovery_timeout=60
         )
         self.google_circuit_breaker = CircuitBreaker(
-            name="google_places_api", failure_threshold=5, timeout=30, reset_timeout=60
+            name="google_places_api", failure_threshold=5, recovery_timeout=60
         )
         self.zomato_circuit_breaker = CircuitBreaker(
-            name="zomato_api", failure_threshold=5, timeout=30, reset_timeout=60
+            name="zomato_api", failure_threshold=5, recovery_timeout=60
         )
 
         self.logger.info("FoodAgent initialized with API clients and circuit breakers")
@@ -87,8 +88,8 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             api_results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Process and aggregate results
-            all_restaurants = []
-            api_metadata = {}
+            all_restaurants: list[RestaurantOption] = []
+            api_metadata: dict[str, Any] = {}
 
             for i, result in enumerate(api_results):
                 api_name = ["yelp", "google_places", "zomato"][i]
@@ -96,9 +97,12 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 if isinstance(result, Exception):
                     self.logger.warning(f"{api_name} API failed: {result}")
                     api_metadata[api_name] = {"status": "failed", "error": str(result)}
-                elif result:
+                elif result and not isinstance(result, BaseException):
                     all_restaurants.extend(result)
-                    api_metadata[api_name] = {"status": "success", "results_count": len(result)}
+                    api_metadata[api_name] = {
+                        "status": "success",
+                        "results_count": str(len(result)),
+                    }
                 else:
                     api_metadata[api_name] = {"status": "no_results"}
 
@@ -119,6 +123,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 total_results=len(final_restaurants),
                 search_time_ms=search_time_ms,
                 cached=False,
+                cache_expires_at=None,
             )
 
             # Cache the result for future requests
@@ -134,40 +139,44 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.error(f"Restaurant search failed: {e}")
             raise ExternalAPIError(f"Restaurant search failed: {e}") from e
 
-    async def _search_yelp(self, request: RestaurantSearchRequest) -> list:
+    async def _search_yelp(self, request: RestaurantSearchRequest) -> list[RestaurantOption]:
         """Search restaurants using Yelp Fusion API with circuit breaker."""
         try:
             async with self.yelp_circuit_breaker:
                 return await self.yelp_client.search_restaurants(request)
         except Exception as e:
             self.logger.warning(f"Yelp search failed: {e}")
-            return []
+        return []
 
-    async def _search_google_places(self, request: RestaurantSearchRequest) -> list:
+    async def _search_google_places(
+        self, request: RestaurantSearchRequest
+    ) -> list[RestaurantOption]:
         """Search restaurants using Google Places API with circuit breaker."""
         try:
             async with self.google_circuit_breaker:
                 return await self.google_places_client.search_restaurants(request)
         except Exception as e:
             self.logger.warning(f"Google Places search failed: {e}")
-            return []
+        return []
 
-    async def _search_zomato(self, request: RestaurantSearchRequest) -> list:
+    async def _search_zomato(self, request: RestaurantSearchRequest) -> list[RestaurantOption]:
         """Search restaurants using Zomato API with circuit breaker."""
         try:
             async with self.zomato_circuit_breaker:
                 return await self.zomato_client.search_restaurants(request)
         except Exception as e:
             self.logger.warning(f"Zomato search failed: {e}")
-            return []
+        return []
 
-    def _deduplicate_restaurants(self, restaurants: list) -> list:
+    def _deduplicate_restaurants(
+        self, restaurants: list[RestaurantOption]
+    ) -> list[RestaurantOption]:
         """Remove duplicate restaurants based on name and location proximity."""
         if not restaurants:
             return restaurants
 
-        unique_restaurants = []
-        seen_combinations = set()
+        unique_restaurants: list[RestaurantOption] = []
+        seen_combinations: set[tuple[str, str]] = set()
 
         for restaurant in restaurants:
             # Create identifier based on name similarity and location proximity
@@ -180,15 +189,19 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 if self._names_similar(name_key, seen_name):
                     # Check if locations are within 100 meters
                     seen_lat, seen_lng = map(float, seen_location.split(","))
-                    distance = self._calculate_distance(
-                        restaurant.location.latitude,
-                        restaurant.location.longitude,
-                        seen_lat,
-                        seen_lng,
-                    )
-                    if distance < 0.1:  # Less than 100 meters
-                        is_duplicate = True
-                        break
+                    if (
+                        restaurant.location.latitude is not None
+                        and restaurant.location.longitude is not None
+                    ):
+                        distance = self._calculate_distance(
+                            restaurant.location.latitude,
+                            restaurant.location.longitude,
+                            seen_lat,
+                            seen_lng,
+                        )
+                        if distance < 0.1:  # Less than 100 meters
+                            is_duplicate = True
+                            break
 
             if not is_duplicate:
                 unique_restaurants.append(restaurant)
@@ -199,12 +212,14 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         )
         return unique_restaurants
 
-    def _rank_restaurants(self, restaurants: list, request: RestaurantSearchRequest) -> list:
+    def _rank_restaurants(
+        self, restaurants: list[RestaurantOption], request: RestaurantSearchRequest
+    ) -> list[RestaurantOption]:
         """Rank restaurants based on ratings, price, and user preferences."""
         if not restaurants:
             return restaurants
 
-        scored_restaurants = []
+        scored_restaurants: list[tuple[RestaurantOption, float]] = []
 
         for restaurant in restaurants:
             score = self._calculate_restaurant_score(restaurant, request)
@@ -240,12 +255,15 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         import math
 
         # Convert to radians
-        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        lat1_rad, lon1_rad, lat2_rad, lon2_rad = map(math.radians, [lat1, lon1, lat2, lon2])
 
         # Haversine formula
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
+        )
         c = 2 * math.asin(math.sqrt(a))
 
         # Earth's radius in kilometers
@@ -253,7 +271,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         return c * r
 
-    def _calculate_restaurant_score(self, restaurant, request: RestaurantSearchRequest) -> float:
+    def _calculate_restaurant_score(
+        self, restaurant: RestaurantOption, request: RestaurantSearchRequest
+    ) -> float:
         """Calculate ranking score for a restaurant based on multiple factors."""
         score = 0.0
 
@@ -295,11 +315,12 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         # Dietary restrictions matching (10% weight)
         if request.dietary_restrictions:
-            matched_restrictions = len(
-                set(request.dietary_restrictions) & set(restaurant.dietary_accommodations)
-            )
-            if matched_restrictions > 0:
-                score += (matched_restrictions / len(request.dietary_restrictions)) * 10
+            if restaurant.dietary_accommodations:
+                matched_restrictions = len(
+                    set(request.dietary_restrictions) & set(restaurant.dietary_accommodations)
+                )
+                if matched_restrictions > 0:
+                    score += (matched_restrictions / len(request.dietary_restrictions)) * 10
 
         # Distance penalty (5% weight) - closer is better
         if restaurant.distance_km is not None:
@@ -309,7 +330,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         return min(score, 100.0)  # Cap at 100
 
-    async def search_local_specialties(self, location: str, cuisine_type: str = None) -> list:
+    async def search_local_specialties(
+        self, location: str, cuisine_type: str | None = None
+    ) -> list[RestaurantOption]:
         """Search for local specialty restaurants and dishes.
 
         Args:
@@ -325,8 +348,15 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             # Build search request for local specialties
             specialty_search = RestaurantSearchRequest(
                 location=location,
+                latitude=None,
+                longitude=None,
                 cuisine_type=CuisineType.LOCAL_SPECIALTY if not cuisine_type else None,
+                price_range=None,
+                budget_per_person=None,
+                meal_type=None,
                 max_results=20,
+                currency="USD",
+                party_size=2,
             )
 
             # Search using Yelp and Google Places (better for local insights)
@@ -337,13 +367,13 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            all_restaurants = []
+            all_restaurants: list[RestaurantOption] = []
             for result in results:
                 if isinstance(result, list):
                     all_restaurants.extend(result)
 
             # Filter for truly local specialties and high-rated places
-            specialty_restaurants = []
+            specialty_restaurants: list[RestaurantOption] = []
             for restaurant in all_restaurants:
                 if self._is_local_specialty(restaurant, location):
                     # Enhance with local dish recommendations
@@ -364,8 +394,8 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             return []
 
     async def filter_by_dietary_restrictions(
-        self, restaurants: list, restrictions: list[str]
-    ) -> list:
+        self, restaurants: list[RestaurantOption], restrictions: list[str]
+    ) -> list[RestaurantOption]:
         """Filter restaurants by dietary restrictions.
 
         Args:
@@ -380,7 +410,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         if not restrictions:
             return restaurants
 
-        filtered_restaurants = []
+        filtered_restaurants: list[tuple[RestaurantOption, float]] = []
 
         for restaurant in restaurants:
             # Check if restaurant accommodates all requested restrictions
@@ -396,7 +426,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         accommodates_all = False
                         break
                     # For other restrictions, check cuisine type compatibility
-                    elif not self._cuisine_compatible_with_restriction(
+                    elif restaurant.cuisine_type and not self._cuisine_compatible_with_restriction(
                         restaurant.cuisine_type, restriction
                     ):
                         accommodates_all = False
@@ -412,7 +442,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         self.logger.info(f"Filtered to {len(result)} restaurants matching dietary restrictions")
         return result
 
-    def _is_local_specialty(self, restaurant, location: str) -> bool:
+    def _is_local_specialty(self, restaurant: RestaurantOption, location: str) -> bool:
         """Determine if a restaurant represents a local specialty."""
         # Check cuisine type
         if restaurant.cuisine_type == CuisineType.LOCAL_SPECIALTY:
@@ -445,7 +475,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         return False
 
-    async def _enhance_with_local_dishes(self, restaurant, location: str):
+    async def _enhance_with_local_dishes(
+        self, restaurant: RestaurantOption, location: str
+    ) -> RestaurantOption:
         """Enhance restaurant with local dish recommendations."""
         # This would typically involve additional API calls or local knowledge base
         # For now, we'll add some basic local dish suggestions based on location
@@ -459,11 +491,11 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         return restaurant
 
     def _get_local_dish_suggestions(
-        self, location: str, cuisine_type: CuisineType
+        self, location: str, cuisine_type: CuisineType | None
     ) -> list[PopularDish]:
         """Get local dish suggestions based on location and cuisine."""
         location_lower = location.lower()
-        dishes = []
+        dishes: list[PopularDish] = []
 
         # Location-based specialty dishes
         if "new york" in location_lower:
@@ -473,6 +505,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="New York Style Pizza",
                         description="Thin crust pizza with classic toppings",
                         is_specialty=True,
+                        price=None,
                     )
                 )
                 dishes.append(
@@ -480,6 +513,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="Pastrami on Rye",
                         description="Classic NY deli sandwich",
                         is_specialty=True,
+                        price=None,
                     )
                 )
         elif "chicago" in location_lower:
@@ -489,6 +523,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="Chicago Deep Dish Pizza",
                         description="Thick crust pizza with layers of cheese and toppings",
                         is_specialty=True,
+                        price=None,
                     )
                 )
         elif "philadelphia" in location_lower:
@@ -498,12 +533,13 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                         name="Philly Cheesesteak",
                         description="Grilled sandwich with steak and cheese",
                         is_specialty=True,
+                        price=None,
                     )
                 )
 
         return dishes
 
-    def _calculate_specialty_score(self, restaurant) -> float:
+    def _calculate_specialty_score(self, restaurant: RestaurantOption) -> float:
         """Calculate specialty score for local restaurants."""
         score = 0.0
 
@@ -516,8 +552,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             score += 25
 
         # Popular dishes with specialty flag
-        specialty_dish_count = sum(1 for dish in restaurant.popular_dishes if dish.is_specialty)
-        score += specialty_dish_count * 5
+        if restaurant.popular_dishes:
+            specialty_dish_count = sum(1 for dish in restaurant.popular_dishes if dish.is_specialty)
+            score += specialty_dish_count * 5
 
         # Review count indicates popularity
         if restaurant.review_count:
@@ -527,7 +564,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
 
         return score
 
-    def _restaurant_accommodates_restriction(self, restaurant, restriction: str) -> bool:
+    def _restaurant_accommodates_restriction(
+        self, restaurant: RestaurantOption, restriction: str
+    ) -> bool:
         """Check if restaurant explicitly accommodates dietary restriction."""
         # Check explicitly listed accommodations
         accommodation_map = {
@@ -543,7 +582,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         }
 
         required_accommodations = accommodation_map.get(restriction, [])
-        return any(acc in restaurant.dietary_accommodations for acc in required_accommodations)
+        if restaurant.dietary_accommodations:
+            return any(acc in restaurant.dietary_accommodations for acc in required_accommodations)
+        return False
 
     def _cuisine_compatible_with_restriction(
         self, cuisine_type: CuisineType, restriction: str
@@ -584,14 +625,12 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         status = await super().health_check()
 
         # Add API service health checks
-        api_health = {}
+        api_health: dict[str, str] = {}
 
         try:
             # Test Yelp API health
             api_health["yelp"] = (
-                "healthy"
-                if getattr(self.yelp_circuit_breaker, "is_closed", True)
-                else "circuit_open"
+                "healthy" if self.yelp_circuit_breaker.is_closed else "circuit_open"
             )
         except Exception:
             api_health["yelp"] = "unhealthy"
@@ -599,9 +638,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         try:
             # Test Google Places API health
             api_health["google_places"] = (
-                "healthy"
-                if getattr(self.google_circuit_breaker, "is_closed", True)
-                else "circuit_open"
+                "healthy" if self.google_circuit_breaker.is_closed else "circuit_open"
             )
         except Exception:
             api_health["google_places"] = "unhealthy"
@@ -609,9 +646,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         try:
             # Test Zomato API health
             api_health["zomato"] = (
-                "healthy"
-                if getattr(self.zomato_circuit_breaker, "is_closed", True)
-                else "circuit_open"
+                "healthy" if self.zomato_circuit_breaker.is_closed else "circuit_open"
             )
         except Exception:
             api_health["zomato"] = "unhealthy"

@@ -1,7 +1,7 @@
 """Activity repository for database operations."""
 
 import logging
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from travel_companion.core.database import DatabaseManager
@@ -99,7 +99,7 @@ class ActivityRepository:
             )
 
             self.logger.debug(f"Retrieved {len(result.data)} activities for trip {trip_id}")
-            return result.data
+            return cast(list[dict[str, Any]], result.data)
 
         except Exception as e:
             self.logger.error(f"Failed to get activities for trip {trip_id}: {e}")
@@ -222,7 +222,7 @@ class ActivityRepository:
             result = query.order("rating", desc=True).limit(limit).execute()
 
             self.logger.debug(f"Filtered activities returned {len(result.data)} results")
-            return result.data
+            return cast(list[dict[str, Any]], result.data)
 
         except Exception as e:
             self.logger.error(f"Failed to filter activities: {e}")
