@@ -30,12 +30,14 @@ export default function LoginPage() {
 
       const response = await apiClient.login(data)
 
-      if (response.success && response.token) {
+      if (response.access_token) {
         // Store the authentication token
-        apiClient.setToken(response.token)
+        apiClient.setToken(response.access_token)
         
         // Redirect to home page or dashboard
         router.push('/')
+      } else if (response.detail?.message) {
+        setApiError(response.detail.message)
       } else {
         setApiError(response.message || 'Login failed. Please try again.')
       }

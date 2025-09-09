@@ -138,7 +138,8 @@ class Settings(BaseSettings):
     # Database
     database_url: str = ""
     supabase_url: str = ""
-    supabase_key: str = ""
+    supabase_key: str = ""  # Anon key for public operations
+    supabase_service_key: str = ""  # Service role key for admin operations
 
     # Redis
     redis_url: str = "redis://localhost:6379"
