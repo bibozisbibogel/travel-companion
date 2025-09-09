@@ -13,3 +13,5 @@ __pycache__
 .cursorignore
 .cursorindexingignore
 node_modules
+
+mihai/
