@@ -75,13 +75,17 @@ async def detailed_health_check(
         db_healthy = await db_manager.health_check()
         health_status["dependencies"]["database"] = {
             "status": "healthy" if db_healthy else "unhealthy",
-            "configured": bool(settings.supabase_url and (settings.supabase_service_key or settings.supabase_key)),
+            "configured": bool(
+                settings.supabase_url and (settings.supabase_service_key or settings.supabase_key)
+            ),
         }
     except Exception as e:
         health_status["dependencies"]["database"] = {
             "status": "error",
             "error": str(e),
-            "configured": bool(settings.supabase_url and (settings.supabase_service_key or settings.supabase_key)),
+            "configured": bool(
+                settings.supabase_url and (settings.supabase_service_key or settings.supabase_key)
+            ),
         }
 
     # Check Redis connection

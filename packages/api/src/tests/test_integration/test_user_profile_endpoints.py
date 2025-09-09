@@ -140,7 +140,7 @@ class TestUserProfileEndpoints:
 
         assert response.status_code == 422
         data = response.json()
-        assert "String should have at least 1 character" in str(data)
+        assert "Name cannot be empty" in str(data)
 
     async def test_update_user_profile_unauthorized(self, client):
         """Test user profile update without authentication."""

@@ -36,7 +36,8 @@ export interface ILoginRequest {
 }
 
 export interface IRegisterRequest {
-  name: string;
+  firstName: string;
+  lastName?: string;
   email: string;
   password: string;
   confirmPassword: string;

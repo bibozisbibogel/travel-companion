@@ -75,7 +75,8 @@ describe('Login Schema Validation', () => {
 describe('Register Schema Validation', () => {
   it('should validate a correct registration form', () => {
     const validData = {
-      name: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'Password123!',
       confirmPassword: 'Password123!'
@@ -87,7 +88,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject names that are too short', () => {
     const invalidData = {
-      name: 'J',
+      firstName: 'J',
+      lastName: '',
       email: 'john@example.com',
       password: 'Password123!',
       confirmPassword: 'Password123!'
@@ -102,7 +104,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject names that are too long', () => {
     const invalidData = {
-      name: 'a'.repeat(51),
+      firstName: 'a'.repeat(51),
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'Password123!',
       confirmPassword: 'Password123!'
@@ -117,7 +120,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject password without uppercase letter', () => {
     const invalidData = {
-      name: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'password123!',
       confirmPassword: 'password123!'
@@ -132,7 +136,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject password without lowercase letter', () => {
     const invalidData = {
-      name: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'PASSWORD123!',
       confirmPassword: 'PASSWORD123!'
@@ -147,7 +152,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject password without number', () => {
     const invalidData = {
-      name: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'Password!',
       confirmPassword: 'Password!'
@@ -162,7 +168,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject password without special character', () => {
     const invalidData = {
-      name: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'Password123',
       confirmPassword: 'Password123'
@@ -177,7 +184,8 @@ describe('Register Schema Validation', () => {
 
   it('should reject mismatched passwords', () => {
     const invalidData = {
-      name: 'John Doe',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'Password123!',
       confirmPassword: 'DifferentPassword123!'

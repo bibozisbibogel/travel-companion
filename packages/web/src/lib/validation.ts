@@ -19,11 +19,16 @@ export const loginSchema = z.object({
 
 // Registration validation schema
 export const registerSchema = z.object({
-  name: z
+  firstName: z
     .string()
-    .min(1, 'Name is required')
-    .min(2, 'Name must be at least 2 characters long')
-    .max(50, 'Name cannot exceed 50 characters'),
+    .min(1, 'First name is required')
+    .min(2, 'First name must be at least 2 characters long')
+    .max(50, 'First name cannot exceed 50 characters'),
+  lastName: z
+    .string()
+    .optional()
+    .transform(val => val === '' ? undefined : val)
+    .pipe(z.string().max(50, 'Last name cannot exceed 50 characters').optional()),
   email: z
     .string()
     .min(1, 'Email is required')

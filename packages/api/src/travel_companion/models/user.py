@@ -54,9 +54,17 @@ class UserBase(BaseModel):
     """Base user model with common fields."""
 
     email: EmailStr = Field(..., description="User email address")
-    first_name: str | None = Field(None, max_length=100)
-    last_name: str | None = Field(None, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=100)
+    last_name: str | None = Field(None, min_length=1, max_length=100)
     travel_preferences: TravelPreferences = Field(default_factory=_create_default_preferences)
+
+    @field_validator("first_name", "last_name", mode="before")
+    @classmethod
+    def validate_name_not_empty(cls, v: str | None) -> str | None:
+        """Ensure names are not empty strings."""
+        if v == "":
+            raise ValueError("Name cannot be empty")
+        return v
 
 
 class UserCreate(BaseModel):
@@ -100,9 +108,17 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     """Model for user profile updates."""
 
-    first_name: str | None = Field(None, max_length=100)
-    last_name: str | None = Field(None, max_length=100)
+    first_name: str | None = Field(None, min_length=1, max_length=100)
+    last_name: str | None = Field(None, min_length=1, max_length=100)
     travel_preferences: TravelPreferences | None = None
+
+    @field_validator("first_name", "last_name", mode="before")
+    @classmethod
+    def validate_name_not_empty(cls, v: str | None) -> str | None:
+        """Ensure names are not empty strings."""
+        if v == "":
+            raise ValueError("Name cannot be empty")
+        return v
 
 
 class UserResponse(UserBase):

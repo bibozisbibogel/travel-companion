@@ -133,10 +133,10 @@ async def register_user(
             reason=f"Database error: {str(e)}",
             user_agent=user_agent,
         )
-        
+
         # Print error for debugging
         print(f"Database error during registration: {str(e)}")
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": "Database error occurred", "error_code": "DATABASE_ERROR"},
@@ -144,6 +144,7 @@ async def register_user(
     except Exception as e:
         # Log failed registration with detailed error
         import traceback
+
         error_details = f"Internal server error: {str(e)}"
         auth_logger.log_registration_failed(
             email=user_data.email,
@@ -152,7 +153,7 @@ async def register_user(
             reason=error_details,
             user_agent=user_agent,
         )
-        
+
         # Print full traceback for debugging
         print(f"Registration error: {str(e)}")
         print(traceback.format_exc())

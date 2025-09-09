@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.cors import CORSMiddleware
 from pydantic import ValidationError as PydanticValidationError
 
 from ..utils.errors import (
@@ -33,20 +32,22 @@ logger = logging.getLogger(__name__)
 def _add_cors_headers_to_response(response: JSONResponse, request: Request) -> JSONResponse:
     """Add CORS headers to error responses."""
     from ..core.config import get_settings
-    
+
     settings = get_settings()
-    
+
     # Get the origin from the request
     origin = request.headers.get("origin")
-    
+
     # Check if origin is allowed
     allowed_origins = settings.get_cors_origins_for_environment()
-    
+
     if origin in allowed_origins:
         response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = str(settings.allow_credentials).lower()
+        response.headers["Access-Control-Allow-Credentials"] = str(
+            settings.allow_credentials
+        ).lower()
         response.headers["Vary"] = "Origin"
-    
+
     return response
 
 
