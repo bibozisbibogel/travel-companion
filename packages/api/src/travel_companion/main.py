@@ -53,9 +53,13 @@ async def validation_exception_handler(
         data={"errors": error_details},
     )
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=error_response.model_dump()
     )
+    
+    # Add CORS headers
+    from travel_companion.middleware.error_handler import _add_cors_headers_to_response
+    return _add_cors_headers_to_response(response, request)
 
 
 async def pydantic_validation_exception_handler(
@@ -80,9 +84,13 @@ async def pydantic_validation_exception_handler(
         data={"errors": error_details},
     )
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=error_response.model_dump()
     )
+    
+    # Add CORS headers
+    from travel_companion.middleware.error_handler import _add_cors_headers_to_response
+    return _add_cors_headers_to_response(response, request)
 
 
 def create_app() -> FastAPI:

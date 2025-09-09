@@ -43,11 +43,15 @@ export interface IRegisterRequest {
 }
 
 export interface IAuthResponse {
-  success: boolean;
+  // Backend actual response fields
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
   user?: IUser;
-  token?: string;
+  // Error handling fields
   message?: string;
   errors?: Record<string, string[]>;
+  detail?: { message?: string; error_code?: string };
 }
 
 // Form validation types

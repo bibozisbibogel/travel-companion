@@ -34,28 +34,61 @@ export default function RegisterPage() {
       setApiError(null)
 
       const response = await apiClient.register(data)
+      
+      // Debug: Log the response to see what we're actually getting
+      console.log('Registration response:', response)
 
-      if (response.success && response.token) {
+      if (response.access_token) {
         // Store the authentication token
-        apiClient.setToken(response.token)
+        apiClient.setToken(response.access_token)
         
         // Redirect to home page or dashboard
         router.push('/')
+      } else if (response.detail?.message) {
+        setApiError(response.detail.message)
       } else {
         setApiError(response.message || 'Registration failed. Please try again.')
       }
     } catch (error) {
+      console.error('Registration error:', error)
       if (error instanceof ApiError) {
-        if (error.status === 422 && error.data?.errors) {
-          // Handle validation errors from API
-          Object.entries(error.data.errors).forEach(([field, messages]) => {
-            if (Array.isArray(messages) && messages.length > 0) {
-              setError(field as keyof RegisterFormData, {
-                type: 'server',
-                message: messages[0],
-              })
-            }
-          })
+        if (error.status === 422) {
+          // Handle validation errors from API - check both formats
+          const validationErrors = error.data?.data?.errors || error.data?.errors;
+          
+          if (Array.isArray(validationErrors)) {
+            // New format: array of error objects
+            validationErrors.forEach((err: any) => {
+              if (err.field && err.message) {
+                // Map backend field names to frontend field names
+                let fieldName = err.field.replace('body -> ', '').replace('_', '');
+                if (fieldName === 'firstname' || fieldName === 'lastname') {
+                  // These errors should be shown as general errors since we have a single "name" field
+                  setApiError(err.message);
+                } else if (fieldName === 'email' || fieldName === 'password') {
+                  setError(fieldName as keyof RegisterFormData, {
+                    type: 'server',
+                    message: err.message,
+                  });
+                }
+              }
+            });
+          } else if (validationErrors && typeof validationErrors === 'object') {
+            // Old format: object with field names as keys
+            Object.entries(validationErrors).forEach(([field, messages]) => {
+              if (Array.isArray(messages) && messages.length > 0) {
+                setError(field as keyof RegisterFormData, {
+                  type: 'server',
+                  message: messages[0],
+                })
+              }
+            })
+          }
+          
+          // If no specific field errors were set, show the general message
+          if (!validationErrors || (Array.isArray(validationErrors) && validationErrors.length === 0)) {
+            setApiError(error.data?.message || 'Validation error occurred');
+          }
         } else if (error.status === 409) {
           setApiError('An account with this email address already exists. Please try logging in instead.')
         } else {

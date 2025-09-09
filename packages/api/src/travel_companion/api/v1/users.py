@@ -17,7 +17,7 @@ from travel_companion.models.user import (
     UserUpdate,
 )
 from travel_companion.services.user_service import UserService
-from travel_companion.utils.errors import UserAlreadyExistsError, ValidationError
+from travel_companion.utils.errors import DatabaseError, UserAlreadyExistsError, ValidationError
 from travel_companion.utils.logging import auth_logger, get_client_ip, get_user_agent
 
 router = APIRouter()
@@ -124,15 +124,38 @@ async def register_user(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"message": str(e), "error_code": "VALIDATION_ERROR"},
         ) from e
+    except DatabaseError as e:
+        # Log database error
+        auth_logger.log_registration_failed(
+            email=user_data.email,
+            ip_address=client_ip,
+            error_code="AUTH007",
+            reason=f"Database error: {str(e)}",
+            user_agent=user_agent,
+        )
+        
+        # Print error for debugging
+        print(f"Database error during registration: {str(e)}")
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": "Database error occurred", "error_code": "DATABASE_ERROR"},
+        ) from e
     except Exception as e:
-        # Log failed registration
+        # Log failed registration with detailed error
+        import traceback
+        error_details = f"Internal server error: {str(e)}"
         auth_logger.log_registration_failed(
             email=user_data.email,
             ip_address=client_ip,
             error_code="AUTH009",
-            reason="Internal server error",
+            reason=error_details,
             user_agent=user_agent,
         )
+        
+        # Print full traceback for debugging
+        print(f"Registration error: {str(e)}")
+        print(traceback.format_exc())
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

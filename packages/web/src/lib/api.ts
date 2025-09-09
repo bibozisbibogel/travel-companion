@@ -188,7 +188,20 @@ export class ApiClient {
   }
 
   async register(userData: IRegisterRequest): Promise<IAuthResponse> {
-    const { confirmPassword, ...registrationData } = userData;
+    const { confirmPassword, name, ...restData } = userData;
+    
+    // Split name into first and last name
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ');
+    
+    const registrationData = {
+      ...restData,
+      first_name: firstName,
+      // Send null instead of empty string if no last name provided
+      last_name: lastName || null
+    };
+    
     return this.post<IAuthResponse>('/api/v1/users/register', registrationData);
   }
 

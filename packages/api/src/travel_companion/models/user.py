@@ -54,8 +54,8 @@ class UserBase(BaseModel):
     """Base user model with common fields."""
 
     email: EmailStr = Field(..., description="User email address")
-    first_name: str | None = Field(None, min_length=1, max_length=100)
-    last_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
     travel_preferences: TravelPreferences = Field(default_factory=_create_default_preferences)
 
 
@@ -64,8 +64,16 @@ class UserCreate(BaseModel):
 
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=128, description="User password")
-    first_name: str | None = Field(None, min_length=1, max_length=100)
-    last_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
+
+    @field_validator("first_name", "last_name", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v: str | None) -> str | None:
+        """Convert empty strings to None."""
+        if v == "":
+            return None
+        return v
 
     @field_validator("password")
     @classmethod
@@ -92,8 +100,8 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     """Model for user profile updates."""
 
-    first_name: str | None = Field(None, min_length=1, max_length=100)
-    last_name: str | None = Field(None, min_length=1, max_length=100)
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
     travel_preferences: TravelPreferences | None = None
 
 
