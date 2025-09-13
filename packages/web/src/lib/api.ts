@@ -188,12 +188,7 @@ export class ApiClient {
   }
 
   async register(userData: IRegisterRequest): Promise<IAuthResponse> {
-    const { confirmPassword, name, ...restData } = userData;
-    
-    // Split name into first and last name
-    const nameParts = name.trim().split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ');
+    const { confirmPassword, firstName, lastName, ...restData } = userData;
     
     const registrationData = {
       ...restData,

@@ -262,15 +262,17 @@ describe('ApiClient', () => {
 
     it('should register successfully', async () => {
       const registerData = { 
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: 'test@example.com', 
         password: 'Password123!',
         confirmPassword: 'Password123!'
       }
       const mockResponse = { 
-        success: true, 
-        token: 'auth-token',
-        user: { id: '1', email: 'test@example.com', name: 'Test User' }
+        access_token: 'auth-token',
+        token_type: 'bearer',
+        expires_in: 3600,
+        user: { id: '1', email: 'test@example.com', firstName: 'Test', lastName: 'User' }
       }
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -279,9 +281,10 @@ describe('ApiClient', () => {
 
       const result = await apiClient.register(registerData)
       
-      // Should exclude confirmPassword from the request
+      // Should exclude confirmPassword from the request and transform to API format
       const expectedData = { 
-        name: 'Test User',
+        first_name: 'Test',
+        last_name: 'User',
         email: 'test@example.com', 
         password: 'Password123!'
       }
@@ -289,9 +292,12 @@ describe('ApiClient', () => {
       expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/api/v1/users/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(expectedData),
+        body: expect.stringContaining('"first_name":"Test"'),
         signal: expect.any(AbortSignal),
       })
+      // Also verify the body contains all expected fields
+      const callBody = JSON.parse((mockFetch as any).mock.calls[0][1].body)
+      expect(callBody).toEqual(expectedData)
       expect(result).toEqual(mockResponse)
     })
 
@@ -315,7 +321,8 @@ describe('ApiClient', () => {
 
     it('should handle registration errors', async () => {
       const registerData = { 
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: 'existing@example.com', 
         password: 'Password123!',
         confirmPassword: 'Password123!'

@@ -202,7 +202,7 @@ class TestUserUpdate:
         # Empty string not allowed
         with pytest.raises(ValidationError) as exc_info:
             UserUpdate(first_name="")
-        assert "String should have at least 1 character" in str(exc_info.value)
+        assert "Name cannot be empty" in str(exc_info.value)
 
         # Too long name not allowed
         with pytest.raises(ValidationError) as exc_info:

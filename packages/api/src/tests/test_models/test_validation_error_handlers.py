@@ -13,7 +13,8 @@ from travel_companion.main import (
 class MockRequest:
     """Mock FastAPI Request for testing."""
 
-    pass
+    def __init__(self):
+        self.headers = {"user-agent": "test-client"}
 
 
 class TestValidationExceptionHandler:

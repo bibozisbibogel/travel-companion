@@ -143,9 +143,10 @@ describe('LoginPage', () => {
 
   it('should handle successful login', async () => {
     const mockResponse = {
-      success: true,
-      token: 'test-token',
-      user: { id: '1', email: 'test@example.com', name: 'Test User' }
+      access_token: 'test-token',
+      token_type: 'bearer',
+      expires_in: 3600,
+      user: { id: '1', email: 'test@example.com', firstName: 'Test', lastName: 'User' }
     }
     ;(apiClient.login as any).mockResolvedValue(mockResponse)
     
