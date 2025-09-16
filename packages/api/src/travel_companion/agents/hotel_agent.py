@@ -30,6 +30,10 @@ from travel_companion.services.external_apis.expedia import (
     ExpediaClient,
     ExpediaSearchParams,
 )
+from travel_companion.services.external_apis.rapidapibooking import (
+    RapidAPIBookingClient,
+    RapidAPIHotelSearchParams,
+)
 
 
 class HotelAgent(BaseAgent[HotelSearchResponse]):
@@ -58,9 +62,10 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         self.timeout_seconds = getattr(self.settings, "hotel_api_timeout_seconds", 30)
 
         # Initialize API clients with fallback chain
-        self._booking_client = BookingClient(timeout=self.timeout_seconds)
-        self._expedia_client = ExpediaClient()
-        self._airbnb_client = AirbnbClient()
+        self._rapidapi_booking_client = RapidAPIBookingClient(timeout=self.timeout_seconds)
+        # self._booking_client = BookingClient(timeout=self.timeout_seconds)
+        # self._expedia_client = ExpediaClient()
+        # self._airbnb_client = AirbnbClient()
 
         # Initialize enhanced cache manager
         self._cache_manager = CacheManager(self.redis)
@@ -210,40 +215,50 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             "api_errors": {},
         }
 
-        # Try Booking.com first
+        # Try RapidAPI Booking.com first (most reliable)
         try:
-            self.logger.info("Attempting Booking.com API search")
-            search_metadata["apis_attempted"].append("booking.com")
+            self.logger.info("Attempting RapidAPI Booking.com search")
+            search_metadata["apis_attempted"].append("rapidapi_booking.com")
 
-            booking_params = HotelSearchParams(
-                location=search_request.location,
-                check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
-                check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
-                guest_count=search_request.guest_count,
-                room_count=search_request.room_count,
-                max_results=search_request.max_results,
-                currency=search_request.currency,
-                language="en",
+            # First get destination ID for the location
+            dest_id = await self._rapidapi_booking_client.get_destination_id(search_request.location)
+            if not dest_id:
+                raise Exception("Could not find destination ID for location")
+
+            rapidapi_params = RapidAPIHotelSearchParams(
+                dest_id=dest_id,
+                search_type="CITY",
+                arrival_date=search_request.check_in_date.strftime("%Y-%m-%d"),
+                departure_date=search_request.check_out_date.strftime("%Y-%m-%d"),
+                adults=search_request.guest_count,
+                children_age="",  # No children specified
+                room_qty=search_request.room_count,
+                page_number=1,
+                units="metric",
+                temperature_unit="c",
+                languagecode="en-us",
+                currency_code=search_request.currency,
+                location="US"
             )
 
-            booking_response = await self._booking_client.search_hotels(booking_params)
+            rapidapi_response = await self._rapidapi_booking_client.search_hotels(rapidapi_params)
 
-            # Convert Booking.com results to internal HotelOption models
-            for booking_hotel in booking_response.hotels:
+            # Convert RapidAPI results to internal HotelOption models
+            for rapidapi_hotel in rapidapi_response.hotels:
                 try:
                     # Apply budget filter if specified
                     if (
                         search_request.budget_per_night
-                        and booking_hotel.price_per_night
-                        and Decimal(str(booking_hotel.price_per_night))
+                        and rapidapi_hotel.price_per_night
+                        and Decimal(str(rapidapi_hotel.price_per_night))
                         > search_request.budget_per_night
                     ):
                         continue
 
                     hotel_location = HotelLocation(
-                        latitude=booking_hotel.latitude or 0.0,
-                        longitude=booking_hotel.longitude or 0.0,
-                        address=booking_hotel.address,
+                        latitude=rapidapi_hotel.latitude or 0.0,
+                        longitude=rapidapi_hotel.longitude or 0.0,
+                        address=rapidapi_hotel.address,
                         city=None,  # Extract from address if needed
                         country=None,  # Extract from address if needed
                         postal_code=None,
@@ -251,33 +266,102 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
 
                     hotel_option = HotelOption(
                         trip_id=None,
-                        external_id=f"booking_{booking_hotel.hotel_id}",
-                        name=booking_hotel.name,
+                        external_id=f"rapidapi_booking_{rapidapi_hotel.hotel_id}",
+                        name=rapidapi_hotel.name,
                         location=hotel_location,
-                        price_per_night=Decimal(str(booking_hotel.price_per_night))
-                        if booking_hotel.price_per_night
+                        price_per_night=Decimal(str(rapidapi_hotel.price_per_night))
+                        if rapidapi_hotel.price_per_night
                         else Decimal("0"),
-                        currency=booking_hotel.currency,
-                        rating=booking_hotel.rating,
-                        amenities=booking_hotel.amenities,
-                        photos=booking_hotel.photos,
-                        booking_url=booking_hotel.booking_url,
+                        currency=rapidapi_hotel.currency,
+                        rating=rapidapi_hotel.rating,
+                        amenities=rapidapi_hotel.amenities,
+                        photos=rapidapi_hotel.photos,
+                        booking_url=rapidapi_hotel.booking_url,
                         created_at=datetime.now(UTC),
                     )
                     hotels.append(hotel_option)
 
                 except (ValueError, TypeError) as e:
-                    self.logger.warning(f"Failed to convert Booking.com hotel result: {e}")
+                    self.logger.warning(f"Failed to convert RapidAPI Booking hotel result: {e}")
                     continue
 
-            search_metadata["successful_api"] = "booking.com"
-            search_metadata["booking_api_response_time"] = booking_response.api_response_time_ms
-            search_metadata["booking_total_results"] = booking_response.total_results
-            self.logger.info(f"Booking.com API returned {len(hotels)} hotels")
+            search_metadata["successful_api"] = "rapidapi_booking.com"
+            search_metadata["rapidapi_booking_api_response_time"] = rapidapi_response.api_response_time_ms
+            search_metadata["rapidapi_booking_total_results"] = rapidapi_response.total_results
+            self.logger.info(f"RapidAPI Booking.com API returned {len(hotels)} hotels")
 
         except Exception as e:
-            self.logger.warning(f"Booking.com API failed: {e}")
-            search_metadata["api_errors"]["booking.com"] = str(e)
+            self.logger.warning(f"RapidAPI Booking.com API failed: {e}")
+            search_metadata["api_errors"]["rapidapi_booking.com"] = str(e)
+
+            # Try original Booking.com as fallback
+            try:
+                self.logger.info("Attempting original Booking.com API search (fallback)")
+                search_metadata["apis_attempted"].append("booking.com")
+
+                booking_params = HotelSearchParams(
+                    location=search_request.location,
+                    check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
+                    check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
+                    guest_count=search_request.guest_count,
+                    room_count=search_request.room_count,
+                    max_results=search_request.max_results,
+                    currency=search_request.currency,
+                    language="en",
+                )
+
+                booking_response = await self._booking_client.search_hotels(booking_params)
+
+                # Convert Booking.com results to internal HotelOption models
+                for booking_hotel in booking_response.hotels:
+                    try:
+                        # Apply budget filter if specified
+                        if (
+                            search_request.budget_per_night
+                            and booking_hotel.price_per_night
+                            and Decimal(str(booking_hotel.price_per_night))
+                            > search_request.budget_per_night
+                        ):
+                            continue
+
+                        hotel_location = HotelLocation(
+                            latitude=booking_hotel.latitude or 0.0,
+                            longitude=booking_hotel.longitude or 0.0,
+                            address=booking_hotel.address,
+                            city=None,  # Extract from address if needed
+                            country=None,  # Extract from address if needed
+                            postal_code=None,
+                        )
+
+                        hotel_option = HotelOption(
+                            trip_id=None,
+                            external_id=f"booking_{booking_hotel.hotel_id}",
+                            name=booking_hotel.name,
+                            location=hotel_location,
+                            price_per_night=Decimal(str(booking_hotel.price_per_night))
+                            if booking_hotel.price_per_night
+                            else Decimal("0"),
+                            currency=booking_hotel.currency,
+                            rating=booking_hotel.rating,
+                            amenities=booking_hotel.amenities,
+                            photos=booking_hotel.photos,
+                            booking_url=booking_hotel.booking_url,
+                            created_at=datetime.now(UTC),
+                        )
+                        hotels.append(hotel_option)
+
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"Failed to convert Booking.com hotel result: {e}")
+                        continue
+
+                search_metadata["successful_api"] = "booking.com"
+                search_metadata["booking_api_response_time"] = booking_response.api_response_time_ms
+                search_metadata["booking_total_results"] = booking_response.total_results
+                self.logger.info(f"Booking.com API returned {len(hotels)} hotels")
+
+            except Exception as e:
+                self.logger.warning(f"Booking.com API failed: {e}")
+                search_metadata["api_errors"]["booking.com"] = str(e)
 
             # Try Expedia as fallback
             try:
@@ -888,3 +972,12 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             Dictionary with cache statistics
         """
         return await self._cache_manager.get_cache_statistics()
+
+    async def cleanup(self) -> None:
+        """Clean up resources and close API clients."""
+        try:
+            if hasattr(self, '_rapidapi_booking_client'):
+                await self._rapidapi_booking_client.close()
+                self.logger.debug("RapidAPI Booking client closed")
+        except Exception as e:
+            self.logger.warning(f"Error closing RapidAPI Booking client: {e}")
