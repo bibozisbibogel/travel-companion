@@ -148,6 +148,7 @@ class Settings(BaseSettings):
     amadeus_client_id: str = ""
     amadeus_client_secret: str = ""
     booking_api_key: str = ""
+    rapidapi_booking_api_key: str = ""  # RapidAPI Booking.com API key
     expedia_api_key: str = ""
     expedia_secret_key: str = ""
     airbnb_api_key: str = ""
