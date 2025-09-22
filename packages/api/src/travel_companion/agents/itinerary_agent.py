@@ -681,9 +681,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         """Create basic restaurant data when food agent fails."""
         generic_restaurants = [
             RestaurantOption(
+                trip_id=None,  # Will be set later
                 external_id="fallback_restaurant",
                 name=f"Local Restaurant in {trip_request.destination.city}",
                 categories=[GeoapifyCateringCategory.RESTAURANT_REGIONAL.value],
+                formatted_address=f"{trip_request.destination.city}, {trip_request.destination.country}",
                 location=RestaurantLocation(
                     latitude=trip_request.destination.latitude or 0.0,
                     longitude=trip_request.destination.longitude or 0.0,
@@ -861,15 +863,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         """Prepare restaurant search request from trip request."""
         return RestaurantSearchRequest(
             location=trip_request.destination.city,
-            party_size=trip_request.requirements.travelers,
             max_results=15,
             latitude=trip_request.destination.latitude,
             longitude=trip_request.destination.longitude,
             categories=[GeoapifyCateringCategory.RESTAURANT_ITALIAN.value],
             radius_meters=5000,
-            budget_per_person=Decimal(50),
-            meal_type="dinner",
-            currency="USD",
         )
 
     async def health_check(self) -> dict[str, Any]:

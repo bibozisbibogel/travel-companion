@@ -608,20 +608,16 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
 
         # Create food search request
         trip_request = state["trip_request"]
-        budget_allocation = state["budget_tracking"]["allocations"]["food"]
+        # Note: budget_allocation could be used for future budget-aware restaurant filtering
+        # budget_allocation = state["budget_tracking"]["allocations"]["food"]
 
         food_request = RestaurantSearchRequest(
             location=trip_request.destination.city,
             latitude=None,  # Will be geocoded by the agent
             longitude=None,  # Will be geocoded by the agent
-            party_size=trip_request.requirements.travelers,
-            budget_per_person=Decimal(str(budget_allocation / trip_request.requirements.travelers))
-            if trip_request.requirements.travelers > 0
-            else Decimal(str(budget_allocation)),
-            currency="USD",
-            price_range=None,  # Will be determined from budget
-            meal_type="dinner",  # Default to dinner
-            cuisine_type=None,  # Will be set from preferences
+            categories=["catering.restaurant"],  # Default restaurant category
+            radius_meters=5000,  # Default 5km radius
+            max_results=20,  # Reasonable default
         )
 
         # Add preferences if available

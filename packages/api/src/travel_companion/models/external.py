@@ -738,7 +738,7 @@ class RestaurantSearchRequest(BaseModel):
     longitude: float | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
     categories: list[str] = Field(
         default_factory=lambda: ["catering.restaurant"],
-        description="Geoapify categories (e.g., catering.restaurant, catering.fast_food)"
+        description="Geoapify categories (e.g., catering.restaurant, catering.fast_food)",
     )
     radius_meters: int = Field(default=5000, gt=0, le=50000, description="Search radius in meters")
     max_results: int = Field(default=50, ge=1, le=250, description="Maximum results to return")
@@ -782,10 +782,14 @@ class RestaurantOption(BaseModel):
     trip_id: UUID | None = Field(None, description="Associated trip ID")
     external_id: str = Field(..., description="Geoapify place_id")
     name: str = Field(..., min_length=1, description="Restaurant name")
-    categories: list[str] = Field(default_factory=list, description="Geoapify categories (e.g., catering.restaurant)")
+    categories: list[str] = Field(
+        default_factory=list, description="Geoapify categories (e.g., catering.restaurant)"
+    )
     location: RestaurantLocation = Field(..., description="Restaurant location")
     formatted_address: str | None = Field(None, description="Full formatted address from Geoapify")
-    distance_meters: int | None = Field(None, ge=0, description="Distance from search location in meters")
+    distance_meters: int | None = Field(
+        None, ge=0, description="Distance from search location in meters"
+    )
     provider: str = Field(default="geoapify", description="API provider")
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
 

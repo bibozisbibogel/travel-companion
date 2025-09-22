@@ -55,7 +55,9 @@ def mock_geoapify_client():
 def food_agent(mock_settings, mock_database, mock_redis, mock_geoapify_client):
     """Create FoodAgent instance with mocked dependencies."""
     with (
-        patch("travel_companion.agents.food_agent.GeoapifyClient", return_value=mock_geoapify_client),
+        patch(
+            "travel_companion.agents.food_agent.GeoapifyClient", return_value=mock_geoapify_client
+        ),
         patch("travel_companion.agents.food_agent.CircuitBreaker"),
     ):
         agent = FoodAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
@@ -273,7 +275,7 @@ class TestCuisineSearch:
 
         food_agent.geoapify_client.search_restaurants = AsyncMock(return_value=expected_response)
 
-        result = await food_agent.search_by_cuisine(
+        await food_agent.search_by_cuisine(
             location="Tokyo",
             cuisine_category="catering.restaurant.sushi",  # String instead of enum
         )
@@ -331,7 +333,7 @@ class TestLocalSpecialties:
             )
         )
 
-        result = await food_agent.search_local_specialties(location="Tokyo, Japan")
+        await food_agent.search_local_specialties(location="Tokyo, Japan")
 
         # Verify Japanese categories were searched
         call_args = food_agent.geoapify_client.search_restaurants.call_args[0][0]

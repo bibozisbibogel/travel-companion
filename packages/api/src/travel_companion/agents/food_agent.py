@@ -56,8 +56,12 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             search_request = RestaurantSearchRequest(**request_data)
 
             # If location string is provided and no coordinates, log for clarity
-            if search_request.location and not (search_request.latitude and search_request.longitude):
-                self.logger.info(f"Processing restaurant search for location: {search_request.location}")
+            if search_request.location and not (
+                search_request.latitude and search_request.longitude
+            ):
+                self.logger.info(
+                    f"Processing restaurant search for location: {search_request.location}"
+                )
             elif search_request.latitude and search_request.longitude:
                 self.logger.info(
                     f"Processing restaurant search at coordinates: "
@@ -69,10 +73,11 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 response = await self.geoapify_client.search_restaurants(search_request)
 
             # If we have results, sort by distance
-            if response.restaurants and any(r.distance_meters is not None for r in response.restaurants):
+            if response.restaurants and any(
+                r.distance_meters is not None for r in response.restaurants
+            ):
                 response.restaurants = sorted(
-                    response.restaurants,
-                    key=lambda r: r.distance_meters or float('inf')
+                    response.restaurants, key=lambda r: r.distance_meters or float("inf")
                 )
 
             self.logger.info(
@@ -165,9 +170,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                     GeoapifyCateringCategory.RESTAURANT_INTERNATIONAL.value,
                 ]
 
-            self.logger.info(
-                f"Searching local specialties with categories: {specialty_categories}"
-            )
+            self.logger.info(f"Searching local specialties with categories: {specialty_categories}")
 
             # Build search request with local specialty categories
             search_request = RestaurantSearchRequest(
@@ -194,6 +197,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.error(f"Local specialty search failed: {e}")
             return RestaurantSearchResponse(
                 restaurants=[],
+                cache_expires_at=None,
                 search_metadata={"error": str(e)},
                 total_results=0,
                 search_time_ms=0,
@@ -306,7 +310,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         # Sort by distance for ranking
         sorted_by_distance = sorted(
             restaurants,
-            key=lambda r: r.distance_meters if r.distance_meters is not None else float('inf')
+            key=lambda r: r.distance_meters if r.distance_meters is not None else float("inf"),
         )
 
         for restaurant in restaurants:
@@ -316,9 +320,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             # Calculate category match score
             category_match_score = 0.0
             if preferred_categories and restaurant.categories:
-                matches = sum(
-                    1 for cat in restaurant.categories if cat in preferred_categories
-                )
+                matches = sum(1 for cat in restaurant.categories if cat in preferred_categories)
                 if matches > 0:
                     category_match_score = matches / len(preferred_categories)
 
@@ -330,9 +332,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             if restaurant.distance_meters is not None:
                 # Closer is better - normalize to 0-40 scale
                 max_distance = 5000  # 5km max
-                distance_score = max(
-                    0, (max_distance - restaurant.distance_meters) / max_distance
-                ) * 40
+                distance_score = (
+                    max(0, (max_distance - restaurant.distance_meters) / max_distance) * 40
+                )
                 score += distance_score
                 reasons.append(f"Distance: {restaurant.distance_meters}m")
 
@@ -419,6 +421,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         ]
 
         search_request = RestaurantSearchRequest(
+            location=None,  # Using coordinates instead
             latitude=latitude,
             longitude=longitude,
             categories=cafe_categories,
@@ -475,8 +478,19 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         Returns:
             RestaurantSearchResponse with results
         """
-        async with self.geoapify_circuit_breaker:
-            return await self.geoapify_client.search_restaurants(search_request)
+        try:
+            async with self.geoapify_circuit_breaker:
+                return await self.geoapify_client.search_restaurants(search_request)
+        except Exception as e:
+            self.logger.error(f"Restaurant search failed: {e}")
+            return RestaurantSearchResponse(
+                restaurants=[],
+                cache_expires_at=None,
+                search_metadata={"error": str(e)},
+                total_results=0,
+                search_time_ms=0,
+                cached=False,
+            )
 
     async def health_check(self) -> dict[str, Any]:
         """Enhanced health check including Geoapify API service status."""

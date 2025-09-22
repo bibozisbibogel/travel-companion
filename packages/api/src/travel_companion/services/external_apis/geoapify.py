@@ -25,7 +25,7 @@ class GeoapifyClient:
     PLACES_ENDPOINT = f"{BASE_URL}/places"
     PLACE_DETAILS_ENDPOINT = f"{BASE_URL}/place-details"
 
-    def __init__(self, redis_manager=None) -> None:
+    def __init__(self, redis_manager: Any = None) -> None:
         """Initialize Geoapify client with API credentials."""
         settings = get_settings()
         self.api_key = settings.geoapify_api_key
@@ -81,7 +81,7 @@ class GeoapifyClient:
             # Note: Caching would be implemented here with proper Redis integration
 
             # Build API parameters
-            params = {
+            params: dict[str, str | int] = {
                 "apiKey": self.api_key,
                 "categories": ",".join(request.categories),
                 "limit": request.max_results,
@@ -91,7 +91,9 @@ class GeoapifyClient:
             # Add location filter
             if request.latitude is not None and request.longitude is not None:
                 # Use circle filter with radius
-                params["filter"] = f"circle:{request.longitude},{request.latitude},{request.radius_meters}"
+                params["filter"] = (
+                    f"circle:{request.longitude},{request.latitude},{request.radius_meters}"
+                )
             elif request.location:
                 # Use bias for location name search
                 params["bias"] = f"proximity:{request.location}"
@@ -122,6 +124,7 @@ class GeoapifyClient:
 
                 # Create restaurant option
                 restaurant = RestaurantOption(
+                    trip_id=None,  # No trip_id at search time
                     external_id=properties.get("place_id", ""),
                     name=properties.get("name", "Unknown"),
                     categories=properties.get("categories", []),
@@ -130,8 +133,10 @@ class GeoapifyClient:
                         longitude=coords[0],
                         address=properties.get("address_line1"),
                         city=properties.get("city"),
+                        state=properties.get("state"),
                         country=properties.get("country"),
                         postal_code=properties.get("postcode"),
+                        neighborhood=properties.get("neighbourhood"),
                     ),
                     formatted_address=properties.get("formatted"),
                     distance_meters=properties.get("distance"),
@@ -198,7 +203,7 @@ class GeoapifyClient:
             response.raise_for_status()
             self._request_count += 1
 
-            data = response.json()
+            data: dict[str, Any] = response.json()
 
             # Note: Result caching would be implemented here
 
