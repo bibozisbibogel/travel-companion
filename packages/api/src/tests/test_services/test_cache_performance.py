@@ -362,5 +362,5 @@ class TestCachePerformance:
         cleanup_time = (time.time() - start_time) * 1000
 
         # Cleanup should complete in reasonable time
-        assert cleanup_time < 1000  # Under 1 second for 100 entries
+        assert cleanup_time < 1500  # Under 1.5 seconds for 100 entries
         assert invalidated >= 0

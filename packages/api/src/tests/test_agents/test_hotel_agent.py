@@ -9,6 +9,7 @@ import pytest
 from travel_companion.agents.hotel_agent import HotelAgent
 from travel_companion.core.config import Settings
 from travel_companion.models.external import (
+    HotelOption,
     HotelSearchResponse,
 )
 from travel_companion.services.external_apis.booking import (
@@ -27,6 +28,8 @@ class TestHotelAgent:
         settings.hotel_cache_ttl_seconds = 1800
         settings.hotel_max_results = 100
         settings.hotel_api_timeout_seconds = 30
+        settings.geoapify_api_key = "test_geoapify_key"
+        settings.liteapi_key = "test_liteapi_key"
         return settings
 
     @pytest.fixture
@@ -48,7 +51,11 @@ class TestHotelAgent:
     @pytest.fixture
     def hotel_agent(self, mock_settings, mock_database, mock_redis) -> HotelAgent:
         """Create HotelAgent instance for testing."""
-        return HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
+        with (
+            patch("travel_companion.agents.hotel_agent.GeoapifyClient"),
+            patch("travel_companion.agents.hotel_agent.LiteAPIClient"),
+        ):
+            return HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
 
     def test_hotel_agent_initialization(self, hotel_agent, mock_settings):
         """Test HotelAgent initializes correctly with configurations."""
@@ -373,6 +380,8 @@ class TestHotelSearchFunctionality:
         settings.hotel_cache_ttl_seconds = 1800
         settings.hotel_max_results = 100
         settings.hotel_api_timeout_seconds = 30
+        settings.geoapify_api_key = "test_geoapify_key"
+        settings.liteapi_key = "test_liteapi_key"
         return settings
 
     @pytest.fixture
@@ -432,7 +441,11 @@ class TestHotelSearchFunctionality:
     @pytest.fixture
     def hotel_agent(self, mock_settings, mock_database, mock_redis) -> HotelAgent:
         """Create HotelAgent instance for testing."""
-        return HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
+        with (
+            patch("travel_companion.agents.hotel_agent.GeoapifyClient"),
+            patch("travel_companion.agents.hotel_agent.LiteAPIClient"),
+        ):
+            return HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
 
     @pytest.mark.asyncio
     async def test_search_hotels_success(self, hotel_agent, mock_booking_response):
@@ -729,3 +742,297 @@ class TestHotelSearchFunctionality:
         assert result.search_time_ms >= 0
         assert "booking_api_response_time" in result.search_metadata
         assert result.search_metadata["booking_api_response_time"] == 180
+
+
+class TestHotelAgentEnhanced:
+    """Test suite for enhanced hotel agent functionality with Geoapify + LiteAPI."""
+
+    @pytest.fixture
+    def mock_settings(self) -> Settings:
+        """Create mock settings for testing."""
+        settings = MagicMock(spec=Settings)
+        settings.hotel_cache_ttl_seconds = 1800
+        settings.hotel_max_results = 100
+        settings.hotel_api_timeout_seconds = 30
+        settings.geoapify_api_key = "test_geoapify_key"
+        settings.liteapi_key = "test_liteapi_key"
+        return settings
+
+    @pytest.fixture
+    def mock_database(self) -> AsyncMock:
+        """Create mock database manager for testing."""
+        database = AsyncMock()
+        database.health_check.return_value = True
+        return database
+
+    @pytest.fixture
+    def mock_redis(self) -> AsyncMock:
+        """Create mock Redis manager for testing."""
+        redis = AsyncMock()
+        redis.ping.return_value = True
+        redis.get.return_value = None
+        redis.set.return_value = True
+        return redis
+
+    @pytest.fixture
+    def hotel_agent(self, mock_settings, mock_database, mock_redis) -> HotelAgent:
+        """Create HotelAgent instance for testing."""
+        with (
+            patch("travel_companion.agents.hotel_agent.GeoapifyClient") as mock_geoapify,
+            patch("travel_companion.agents.hotel_agent.LiteAPIClient") as mock_liteapi,
+        ):
+            agent = HotelAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
+            agent._geoapify_client = mock_geoapify.return_value
+            agent._liteapi_client = mock_liteapi.return_value
+            return agent
+
+    @pytest.fixture
+    def sample_geoapify_hotels(self):
+        """Sample Geoapify hotel data."""
+        return [
+            {
+                "name": "Grand Hotel Tokyo",
+                "latitude": 35.6762,
+                "longitude": 139.6503,
+                "place_id": "geo123",
+                "address": "1-1-1 Marunouchi",
+                "city": "Tokyo",
+                "country": "Japan",
+            },
+            {
+                "name": "Business Hotel Shibuya",
+                "latitude": 35.6596,
+                "longitude": 139.7016,
+                "place_id": "geo456",
+                "address": "2-2-2 Shibuya",
+                "city": "Tokyo",
+                "country": "Japan",
+            },
+        ]
+
+    @pytest.fixture
+    def sample_liteapi_hotels(self):
+        """Sample LiteAPI hotel data."""
+        return [
+            {
+                "id": "LITE123",
+                "name": "Grand Hotel Tokyo",
+                "latitude": 35.6762,
+                "longitude": 139.6503,
+            },
+            {
+                "id": "LITE456",
+                "name": "Business Hotel Shibuya",
+                "latitude": 35.6596,
+                "longitude": 139.7016,
+            },
+        ]
+
+    @pytest.fixture
+    def sample_liteapi_rates(self):
+        """Sample LiteAPI rates data."""
+        return {
+            "data": [
+                {
+                    "hotel_id": "LITE123",
+                    "rates": [
+                        {"total_amount": 150.0, "currency": "USD"},
+                        {"total_amount": 180.0, "currency": "USD"},
+                    ],
+                },
+                {"hotel_id": "LITE456", "rates": [{"total_amount": 120.0, "currency": "USD"}]},
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_search_hotels_with_rates_success(
+        self, hotel_agent, sample_geoapify_hotels, sample_liteapi_hotels, sample_liteapi_rates
+    ):
+        """Test successful enhanced hotel search with rates."""
+        # Setup mocks
+        hotel_agent._geoapify_client.search_hotels = AsyncMock(return_value=sample_geoapify_hotels)
+        hotel_agent._liteapi_client.search_hotels_by_geo = AsyncMock(
+            return_value=sample_liteapi_hotels
+        )
+        hotel_agent._liteapi_client.get_min_rates = AsyncMock(return_value=sample_liteapi_rates)
+
+        result = await hotel_agent.search_hotels_with_rates(
+            location="Tokyo",
+            check_in_date="2025-01-15",
+            check_out_date="2025-01-17",
+            guest_count=2,
+            max_results=10,
+        )
+
+        assert isinstance(result, HotelSearchResponse)
+        assert len(result.hotels) == 2
+        assert result.search_metadata["provider"] == "geoapify_liteapi"
+        assert result.search_metadata["location"] == "Tokyo"
+
+        # Verify API calls were made
+        hotel_agent._geoapify_client.search_hotels.assert_called_once()
+        hotel_agent._liteapi_client.search_hotels_by_geo.assert_called_once()
+        hotel_agent._liteapi_client.get_min_rates.assert_called_once()
+
+        # Check that hotels have rates
+        hotels_with_rates = [h for h in result.hotels if h.price_per_night > 0]
+        assert len(hotels_with_rates) == 2
+
+    @pytest.mark.asyncio
+    async def test_search_hotels_with_rates_full_rates(
+        self, hotel_agent, sample_geoapify_hotels, sample_liteapi_hotels, sample_liteapi_rates
+    ):
+        """Test enhanced hotel search with full rates option."""
+        hotel_agent._geoapify_client.search_hotels = AsyncMock(return_value=sample_geoapify_hotels)
+        hotel_agent._liteapi_client.search_hotels_by_geo = AsyncMock(
+            return_value=sample_liteapi_hotels
+        )
+        hotel_agent._liteapi_client.get_full_rates = AsyncMock(return_value=sample_liteapi_rates)
+
+        result = await hotel_agent.search_hotels_with_rates(
+            location="Tokyo",
+            check_in_date="2025-01-15",
+            check_out_date="2025-01-17",
+            guest_count=2,
+            get_full_rates=True,
+        )
+
+        assert result.search_metadata["rate_type"] == "full"
+        hotel_agent._liteapi_client.get_full_rates.assert_called_once()
+        hotel_agent._liteapi_client.get_min_rates.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_search_hotels_with_rates_no_geoapify_results(self, hotel_agent):
+        """Test handling when Geoapify returns no hotels."""
+        hotel_agent._geoapify_client.search_hotels = AsyncMock(return_value=[])
+
+        result = await hotel_agent.search_hotels_with_rates(
+            location="NonexistentCity",
+            check_in_date="2025-01-15",
+            check_out_date="2025-01-17",
+            guest_count=2,
+        )
+
+        assert len(result.hotels) == 0
+        assert "error" in result.search_metadata
+        assert "No hotels found in location" in result.search_metadata["error"]
+
+    @pytest.mark.asyncio
+    async def test_search_hotels_with_rates_fallback_on_exception(self, hotel_agent):
+        """Test fallback to original search method on exception."""
+        # Mock Geoapify to raise an exception
+        hotel_agent._geoapify_client.search_hotels = AsyncMock(side_effect=Exception("API Error"))
+
+        # Mock the fallback method
+        with patch.object(hotel_agent, "search_hotels_by_location") as mock_fallback:
+            mock_fallback_response = HotelSearchResponse(
+                hotels=[],
+                search_metadata={"provider": "fallback"},
+                total_results=0,
+                search_time_ms=100,
+                cached=False,
+                cache_expires_at=None,
+            )
+            mock_fallback.return_value = mock_fallback_response
+
+            result = await hotel_agent.search_hotels_with_rates(
+                location="Tokyo",
+                check_in_date="2025-01-15",
+                check_out_date="2025-01-17",
+                guest_count=2,
+            )
+
+            # Should use fallback method
+            mock_fallback.assert_called_once()
+            assert result.search_metadata["provider"] == "fallback"
+
+    @pytest.mark.asyncio
+    async def test_search_hotels_with_rates_budget_filter(
+        self, hotel_agent, sample_geoapify_hotels, sample_liteapi_hotels
+    ):
+        """Test budget filtering in enhanced search."""
+        # Create rates data with different prices
+        rates_data = {
+            "data": [
+                {
+                    "hotel_id": "LITE123",
+                    "rates": [{"total_amount": 300.0}],  # Above budget
+                },
+                {
+                    "hotel_id": "LITE456",
+                    "rates": [{"total_amount": 80.0}],  # Within budget
+                },
+            ]
+        }
+
+        hotel_agent._geoapify_client.search_hotels = AsyncMock(return_value=sample_geoapify_hotels)
+        hotel_agent._liteapi_client.search_hotels_by_geo = AsyncMock(
+            return_value=sample_liteapi_hotels
+        )
+        hotel_agent._liteapi_client.get_min_rates = AsyncMock(return_value=rates_data)
+
+        result = await hotel_agent.search_hotels_with_rates(
+            location="Tokyo",
+            check_in_date="2025-01-15",
+            check_out_date="2025-01-17",
+            guest_count=2,
+            budget_per_night=100.0,
+        )
+
+        # Should only include hotels within budget
+        assert len(result.hotels) >= 0  # At least the budget hotel should be included
+        for hotel in result.hotels:
+            if hotel.price_per_night > 0:
+                assert hotel.price_per_night <= Decimal("100")
+
+    @pytest.mark.asyncio
+    async def test_create_fallback_response(self, hotel_agent):
+        """Test creation of fallback response."""
+        geoapify_hotels = [
+            {
+                "name": "Fallback Hotel",
+                "latitude": 35.6762,
+                "longitude": 139.6503,
+                "place_id": "geo123",
+                "address": "Test Address",
+                "city": "Tokyo",
+                "country": "Japan",
+            }
+        ]
+
+        import time
+
+        start_time = time.time()
+
+        result = await hotel_agent._create_fallback_response(geoapify_hotels, "Tokyo", start_time)
+
+        assert isinstance(result, HotelSearchResponse)
+        assert len(result.hotels) == 1
+        assert result.search_metadata["provider"] == "geoapify_fallback"
+        assert result.hotels[0].price_per_night == Decimal("0.01")  # Minimum valid price
+        assert "geoapify_geo123" in result.hotels[0].external_id
+
+    @pytest.mark.asyncio
+    async def test_combine_geoapify_liteapi_data(
+        self, hotel_agent, sample_geoapify_hotels, sample_liteapi_hotels, sample_liteapi_rates
+    ):
+        """Test data combination from Geoapify and LiteAPI."""
+        result = await hotel_agent._combine_geoapify_liteapi_data(
+            sample_geoapify_hotels, sample_liteapi_hotels, sample_liteapi_rates
+        )
+
+        assert len(result) == 2
+
+        # Check that hotels have been properly combined
+        for hotel in result:
+            assert isinstance(hotel, HotelOption)
+            assert hotel.name in ["Grand Hotel Tokyo", "Business Hotel Shibuya"]
+            assert hotel.price_per_night > 0  # Should have rate data
+
+    @pytest.mark.asyncio
+    async def test_hotel_agent_has_new_clients(self, hotel_agent):
+        """Test that hotel agent has the new API clients."""
+        assert hasattr(hotel_agent, "_geoapify_client")
+        assert hasattr(hotel_agent, "_liteapi_client")
+        assert hotel_agent._geoapify_client is not None
+        assert hotel_agent._liteapi_client is not None

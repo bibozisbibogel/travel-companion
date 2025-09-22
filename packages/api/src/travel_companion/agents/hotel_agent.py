@@ -30,6 +30,15 @@ from travel_companion.services.external_apis.expedia import (
     ExpediaClient,
     ExpediaSearchParams,
 )
+from travel_companion.services.external_apis.geoapify import GeoapifyClient
+from travel_companion.services.external_apis.liteapi import (
+    LiteAPIClient,
+    LiteAPIHotelSearchRequest,
+    LiteAPIMinRatesRequest,
+    LiteAPIOccupancy,
+    LiteAPIRatesRequest,
+    LiteAPIStay,
+)
 
 
 class HotelAgent(BaseAgent[HotelSearchResponse]):
@@ -61,6 +70,10 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         self._booking_client = BookingClient(timeout=self.timeout_seconds)
         self._expedia_client = ExpediaClient()
         self._airbnb_client = AirbnbClient()
+
+        # Initialize new API clients
+        self._geoapify_client = GeoapifyClient()
+        self._liteapi_client = LiteAPIClient(timeout=self.timeout_seconds)
 
         # Initialize enhanced cache manager
         self._cache_manager = CacheManager(self.redis)
@@ -469,6 +482,300 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             request_data["max_results"] = self.max_results_per_request
 
         return await self.process(request_data)
+
+    async def search_hotels_with_rates(
+        self,
+        location: str,
+        check_in_date: str,
+        check_out_date: str,
+        guest_count: int,
+        room_count: int = 1,
+        budget_per_night: float | None = None,
+        max_results: int = 20,
+        get_full_rates: bool = False,
+    ) -> HotelSearchResponse:
+        """
+        Enhanced hotel search using Geoapify + LiteAPI integration.
+
+        First gets hotel list from Geoapify, then fetches rates from LiteAPI.
+
+        Args:
+            location: Search location (city, address, etc.)
+            check_in_date: Check-in date in ISO format (YYYY-MM-DD)
+            check_out_date: Check-out date in ISO format (YYYY-MM-DD)
+            guest_count: Number of guests
+            room_count: Number of rooms needed
+            budget_per_night: Optional budget filter per night
+            max_results: Maximum number of results
+            get_full_rates: Whether to get detailed rates or just minimum rates
+
+        Returns:
+            HotelSearchResponse with hotels and pricing from LiteAPI
+        """
+        start_time = time.time()
+
+        try:
+            # Step 1: Get hotels from Geoapify
+            self.logger.info(f"Searching hotels in {location} via Geoapify")
+            geoapify_hotels = await self._geoapify_client.search_hotels(
+                location=location,
+                max_results=max_results * 2,  # Get more to account for LiteAPI filtering
+            )
+
+            if not geoapify_hotels:
+                self.logger.warning("No hotels found via Geoapify")
+                return HotelSearchResponse(
+                    hotels=[],
+                    search_metadata={
+                        "provider": "geoapify_liteapi",
+                        "location": location,
+                        "error": "No hotels found in location",
+                    },
+                    total_results=0,
+                    search_time_ms=int((time.time() - start_time) * 1000),
+                    cached=False,
+                )
+
+            self.logger.info(f"Found {len(geoapify_hotels)} hotels from Geoapify")
+
+            # Step 2: Get LiteAPI hotel IDs for the same location
+            # Use first hotel coordinates as search center
+            center_hotel = geoapify_hotels[0]
+            liteapi_search = LiteAPIHotelSearchRequest(
+                latitude=center_hotel["latitude"],
+                longitude=center_hotel["longitude"],
+                radius=5000,  # 5km radius
+                limit=100,
+            )
+
+            liteapi_hotels_data = await self._liteapi_client.search_hotels_by_geo(liteapi_search)
+
+            if not liteapi_hotels_data:
+                self.logger.warning("No hotels found in LiteAPI for the location")
+                # Return Geoapify results without rates as fallback
+                return await self._create_fallback_response(geoapify_hotels, location, start_time)
+
+            # Extract LiteAPI hotel IDs
+            liteapi_hotel_ids = [
+                hotel.get("id") for hotel in liteapi_hotels_data if hotel.get("id")
+            ][:max_results]  # Limit to requested count
+
+            if not liteapi_hotel_ids:
+                self.logger.warning("No valid LiteAPI hotel IDs found")
+                return await self._create_fallback_response(geoapify_hotels, location, start_time)
+
+            self.logger.info(f"Found {len(liteapi_hotel_ids)} LiteAPI hotel IDs")
+
+            # Step 3: Get rates from LiteAPI
+            stay = LiteAPIStay(check_in=check_in_date, check_out=check_out_date)
+            occupancies = [LiteAPIOccupancy(rooms=room_count, adults=guest_count, children=0)]
+
+            if get_full_rates:
+                rates_request = LiteAPIRatesRequest(
+                    stay=stay,
+                    occupancies=occupancies,
+                    hotel_ids=liteapi_hotel_ids,
+                    currency="USD",
+                )
+                rates_data = await self._liteapi_client.get_full_rates(rates_request)
+            else:
+                min_rates_request = LiteAPIMinRatesRequest(
+                    stay=stay,
+                    occupancies=occupancies,
+                    hotel_ids=liteapi_hotel_ids,
+                )
+                rates_data = await self._liteapi_client.get_min_rates(min_rates_request)
+
+            # Step 4: Combine data and create HotelOption objects
+            hotels = await self._combine_geoapify_liteapi_data(
+                geoapify_hotels, liteapi_hotels_data, rates_data, budget_per_night
+            )
+
+            # Filter by budget if specified
+            if budget_per_night:
+                hotels = [
+                    hotel
+                    for hotel in hotels
+                    if hotel.price_per_night <= Decimal(str(budget_per_night))
+                ]
+
+            # Limit results
+            hotels = hotels[:max_results]
+
+            search_time_ms = int((time.time() - start_time) * 1000)
+
+            return HotelSearchResponse(
+                hotels=hotels,
+                search_metadata={
+                    "provider": "geoapify_liteapi",
+                    "location": location,
+                    "check_in_date": check_in_date,
+                    "check_out_date": check_out_date,
+                    "guest_count": guest_count,
+                    "room_count": room_count,
+                    "geoapify_results": len(geoapify_hotels),
+                    "liteapi_hotel_count": len(liteapi_hotel_ids),
+                    "final_results": len(hotels),
+                    "rate_type": "full" if get_full_rates else "minimum",
+                },
+                total_results=len(hotels),
+                search_time_ms=search_time_ms,
+                cached=False,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Enhanced hotel search failed: {e}")
+            # Fallback to original search method
+            self.logger.info("Falling back to original hotel search method")
+            return await self.search_hotels_by_location(
+                location=location,
+                check_in_date=check_in_date,
+                check_out_date=check_out_date,
+                guest_count=guest_count,
+                budget=budget_per_night,
+                max_results=max_results,
+            )
+
+    async def _create_fallback_response(
+        self, geoapify_hotels: list[dict[str, Any]], location: str, start_time: float
+    ) -> HotelSearchResponse:
+        """Create fallback response with Geoapify data only."""
+        hotels = []
+        for hotel_data in geoapify_hotels:
+            hotel_location = HotelLocation(
+                latitude=hotel_data["latitude"],
+                longitude=hotel_data["longitude"],
+                address=hotel_data.get("address"),
+                city=hotel_data.get("city"),
+                country=hotel_data.get("country"),
+                postal_code=None,
+            )
+
+            hotel = HotelOption(
+                external_id=f"geoapify_{hotel_data.get('place_id', '')}",
+                name=hotel_data["name"],
+                location=hotel_location,
+                price_per_night=Decimal("0.01"),  # Minimum valid price for fallback
+                currency="USD",
+                rating=None,
+                amenities=[],
+                photos=[],
+                booking_url=None,
+                created_at=datetime.now(UTC),
+            )
+            hotels.append(hotel)
+
+        return HotelSearchResponse(
+            hotels=hotels,
+            search_metadata={
+                "provider": "geoapify_fallback",
+                "location": location,
+                "note": "Pricing unavailable - using location data only",
+            },
+            total_results=len(hotels),
+            search_time_ms=int((time.time() - start_time) * 1000),
+            cached=False,
+        )
+
+    async def _combine_geoapify_liteapi_data(
+        self,
+        geoapify_hotels: list[dict[str, Any]],
+        liteapi_hotels: list[dict[str, Any]],
+        rates_data: dict[str, Any],
+        budget_filter: float | None = None,
+    ) -> list[HotelOption]:
+        """Combine Geoapify location data with LiteAPI rates."""
+        hotels = []
+
+        # Get rates from response
+        hotel_rates = {}
+        if rates_data and "data" in rates_data:
+            for hotel_data in rates_data["data"]:
+                hotel_id = hotel_data.get("hotel_id")
+                if hotel_id:
+                    # Extract minimum rate
+                    min_rate = None
+                    if "rates" in hotel_data and hotel_data["rates"]:
+                        # Find cheapest rate
+                        rates = hotel_data["rates"]
+                        if rates:
+                            min_rate = min(
+                                float(rate.get("total_amount", 0))
+                                for rate in rates
+                                if rate.get("total_amount")
+                            )
+
+                    hotel_rates[hotel_id] = {
+                        "min_rate": min_rate,
+                        "hotel_data": hotel_data,
+                    }
+
+        # Create LiteAPI hotel lookup by approximate location
+        liteapi_by_location = {}
+        for liteapi_hotel in liteapi_hotels:
+            if "latitude" in liteapi_hotel and "longitude" in liteapi_hotel:
+                # Round coordinates for matching
+                lat_key = round(liteapi_hotel["latitude"], 3)
+                lon_key = round(liteapi_hotel["longitude"], 3)
+                location_key = (lat_key, lon_key)
+                liteapi_by_location[location_key] = liteapi_hotel
+
+        # Match Geoapify hotels with LiteAPI data
+        for geo_hotel in geoapify_hotels:
+            # Find matching LiteAPI hotel by proximity
+            geo_lat = round(geo_hotel["latitude"], 3)
+            geo_lon = round(geo_hotel["longitude"], 3)
+            location_key = (geo_lat, geo_lon)
+
+            liteapi_hotel = liteapi_by_location.get(location_key)
+            if not liteapi_hotel:
+                # Try finding closest match within small radius
+                for (lat, lon), lite_hotel in liteapi_by_location.items():
+                    distance = abs(lat - geo_lat) + abs(lon - geo_lon)  # Manhattan distance
+                    if distance < 0.01:  # ~1km tolerance
+                        liteapi_hotel = lite_hotel
+                        break
+
+            # Get rate data
+            rate_info = None
+            if liteapi_hotel and liteapi_hotel.get("id"):
+                rate_info = hotel_rates.get(liteapi_hotel["id"])
+
+            # Apply budget filter early if we have rate data
+            min_rate = rate_info.get("min_rate") if rate_info else None
+            if budget_filter and min_rate and min_rate > budget_filter:
+                continue
+
+            # Create hotel location
+            hotel_location = HotelLocation(
+                latitude=geo_hotel["latitude"],
+                longitude=geo_hotel["longitude"],
+                address=geo_hotel.get("address"),
+                city=geo_hotel.get("city"),
+                country=geo_hotel.get("country"),
+                postal_code=None,
+            )
+
+            # Create hotel option
+            hotel = HotelOption(
+                external_id=(
+                    f"liteapi_{liteapi_hotel['id']}"
+                    if liteapi_hotel and liteapi_hotel.get("id")
+                    else f"geoapify_{geo_hotel.get('place_id', '')}"
+                ),
+                name=geo_hotel["name"],
+                location=hotel_location,
+                price_per_night=Decimal(str(min_rate)) if min_rate else Decimal("0.01"),
+                currency="USD",
+                rating=None,  # LiteAPI might provide this
+                amenities=[],  # Could be enriched from LiteAPI
+                photos=[],
+                booking_url=None,
+                created_at=datetime.now(UTC),
+            )
+            hotels.append(hotel)
+
+        return hotels
 
     def _calculate_distance_km(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Calculate distance between two coordinates using Haversine formula.

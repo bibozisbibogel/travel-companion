@@ -160,6 +160,9 @@ class Settings(BaseSettings):
     # Food & Restaurant APIs
     geoapify_api_key: str = ""  # Geoapify Places API key
 
+    # Hotel APIs
+    liteapi_key: str = ""  # LiteAPI (Nuitée) key for hotel bookings
+
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"
