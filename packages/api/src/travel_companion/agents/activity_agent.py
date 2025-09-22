@@ -404,7 +404,11 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
             # Create search request
             search_request = ActivitySearchRequest(
                 location=location,
+                check_in_date=None,
+                check_out_date=None,
                 category=category,
+                budget_per_person=None,
+                duration_hours=None,
                 guest_count=guest_count,
                 max_results=max_results,
             )

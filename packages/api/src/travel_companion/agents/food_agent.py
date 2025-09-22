@@ -11,7 +11,7 @@ from travel_companion.models.external import (
     RestaurantSearchResponse,
 )
 from travel_companion.services.external_apis.geoapify import GeoapifyClient
-from travel_companion.utils.circuit_breaker import CircuitBreaker
+from travel_companion.utils.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 from travel_companion.utils.errors import ExternalAPIError
 
 
@@ -481,6 +481,19 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         try:
             async with self.geoapify_circuit_breaker:
                 return await self.geoapify_client.search_restaurants(search_request)
+        except CircuitBreakerOpenError as e:
+            self.logger.warning(f"Geoapify circuit breaker is open: {e}")
+            return RestaurantSearchResponse(
+                restaurants=[],
+                cache_expires_at=None,
+                search_metadata={
+                    "error": "Service temporarily unavailable",
+                    "circuit_breaker": "open",
+                },
+                total_results=0,
+                search_time_ms=0,
+                cached=False,
+            )
         except Exception as e:
             self.logger.error(f"Restaurant search failed: {e}")
             return RestaurantSearchResponse(

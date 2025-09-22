@@ -49,76 +49,47 @@ class FlightSearchRequest(BaseModel):
     )
 
 
-class AmadeusFlightSegment(BaseModel):
-    """Amadeus API flight segment model."""
+class AviationStackFlightInfo(BaseModel):
+    """AviationStack API flight information model."""
 
-    carrier_code: str = Field(..., description="Airline carrier code")
     number: str = Field(..., description="Flight number")
-    aircraft_code: str | None = Field(None, description="Aircraft type code")
+    iata: str | None = Field(None, description="Flight IATA code")
+    icao: str | None = Field(None, description="Flight ICAO code")
+    codeshared: dict[str, Any] | None = Field(None, description="Codeshared flight info")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AviationStackAirline(BaseModel):
+    """AviationStack API airline information model."""
+
+    name: str = Field(..., description="Airline name")
+    iata: str | None = Field(None, description="Airline IATA code")
+    icao: str | None = Field(None, description="Airline ICAO code")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AviationStackFlightData(BaseModel):
+    """AviationStack API flight data model."""
+
+    flight_date: str = Field(..., description="Flight date")
+    flight_status: str = Field(..., description="Flight status")
     departure: dict[str, Any] = Field(..., description="Departure information")
     arrival: dict[str, Any] = Field(..., description="Arrival information")
-    operating: dict[str, Any] | None = Field(None, description="Operating carrier info")
-    duration: str = Field(..., description="Flight duration in ISO format")
-    stops: int = Field(default=0, description="Number of stops")
+    airline: AviationStackAirline = Field(..., description="Airline information")
+    flight: AviationStackFlightInfo = Field(..., description="Flight information")
+    aircraft: dict[str, Any] | None = Field(None, description="Aircraft information")
+    live: dict[str, Any] | None = Field(None, description="Live tracking data")
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-class AmadeusPrice(BaseModel):
-    """Amadeus API price information model."""
+class AviationStackFlightResponse(BaseModel):
+    """AviationStack API flight search response model."""
 
-    currency: str = Field(..., description="Price currency")
-    total: str = Field(..., description="Total price as string")
-    base: str = Field(..., description="Base price as string")
-    fees: list[dict[str, Any]] = Field(default_factory=list, description="Fee breakdown")
-    taxes: list[dict[str, Any]] = Field(default_factory=list, description="Tax breakdown")
-
-    @property
-    def total_decimal(self) -> Decimal:
-        """Get total price as Decimal."""
-        return Decimal(self.total)
-
-    @property
-    def base_decimal(self) -> Decimal:
-        """Get base price as Decimal."""
-        return Decimal(self.base)
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class AmadeusFlightOffer(BaseModel):
-    """Amadeus API flight offer model."""
-
-    id: str = Field(..., description="Offer ID from Amadeus")
-    type: str = Field(..., description="Offer type")
-    source: str = Field(..., description="Offer source")
-    instant_ticketing_required: bool = Field(
-        default=False, description="Instant ticketing requirement"
-    )
-    non_homogeneous: bool = Field(default=False, description="Non-homogeneous booking")
-    paymentCardRequired: bool = Field(default=False, description="Payment card requirement")
-    last_ticketing_date: str | None = Field(None, description="Last ticketing date")
-    itineraries: list[dict[str, Any]] = Field(..., description="Flight itineraries")
-    price: AmadeusPrice = Field(..., description="Price information")
-    pricing_options: dict[str, Any] = Field(default_factory=dict, description="Pricing options")
-    validating_airline_codes: list[str] = Field(
-        default_factory=list, description="Validating airlines"
-    )
-    traveler_pricings: list[dict[str, Any]] = Field(
-        default_factory=list, description="Traveler pricing"
-    )
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class AmadeusFlightResponse(BaseModel):
-    """Amadeus API flight search response model."""
-
-    meta: dict[str, Any] = Field(default_factory=dict, description="Response metadata")
-    data: list[AmadeusFlightOffer] = Field(default_factory=list, description="Flight offers")
-    dictionaries: dict[str, Any] = Field(default_factory=dict, description="Reference dictionaries")
-    warnings: list[dict[str, Any]] = Field(default_factory=list, description="API warnings")
-    errors: list[dict[str, Any]] = Field(default_factory=list, description="API errors")
+    pagination: dict[str, Any] = Field(default_factory=dict, description="Pagination info")
+    data: list[AviationStackFlightData] = Field(default_factory=list, description="Flight data")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -140,6 +111,7 @@ class FlightOption(BaseModel):
     price: Decimal = Field(..., gt=0, description="Flight price")
     currency: str = Field(default="USD", description="Price currency")
     travel_class: TravelClass = Field(default=TravelClass.ECONOMY, description="Travel class")
+    flight_status: str | None = Field(None, description="Flight status")
     booking_url: str | None = Field(None, description="Booking URL")
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
 
