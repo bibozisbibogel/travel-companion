@@ -19,13 +19,12 @@ from travel_companion.models.external import (
     ActivityLocation,
     ActivityOption,
     ActivitySearchResponse,
-    CuisineType,
     FlightOption,
     FlightSearchResponse,
+    GeoapifyCateringCategory,  # New Geoapify categories
     HotelLocation,
     HotelOption,
     HotelSearchResponse,
-    PriceRange,
     RestaurantLocation,
     RestaurantOption,
     RestaurantSearchResponse,
@@ -352,9 +351,8 @@ class TestMultiAgentIntegrationScenarios:
                 restaurant_id=uuid4(),
                 external_id="BCN_TAPAS_CENTRAL",
                 name="Cal Pep",
-                cuisine_type=CuisineType.MEDITERRANEAN,
-                rating=4.6,
-                price_range=PriceRange.MODERATE,
+                categories=[GeoapifyCateringCategory.RESTAURANT_MEDITERRANEAN.value],
+                distance_meters=500,
                 location=RestaurantLocation(
                     latitude=41.3851,
                     longitude=2.1834,
@@ -362,9 +360,7 @@ class TestMultiAgentIntegrationScenarios:
                     city="Barcelona",
                     country="Spain",
                 ),
-                dietary_options=["gluten_free"],
-                specialties=["tapas", "seafood", "traditional_catalan"],
-                provider="yelp",
+                provider="geoapify",
             ),
         ]
 

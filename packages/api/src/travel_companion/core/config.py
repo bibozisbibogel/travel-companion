@@ -158,9 +158,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
 
     # Food & Restaurant APIs
-    yelp_api_key: str = ""
-    google_places_api_key: str = ""
-    zomato_api_key: str = ""
+    geoapify_api_key: str = ""  # Geoapify Places API key
 
     # Security
     secret_key: str = "your-secret-key-change-in-production"

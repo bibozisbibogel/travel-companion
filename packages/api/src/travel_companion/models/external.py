@@ -599,85 +599,156 @@ class ActivityRecommendation(BaseModel):
 # Restaurant and Food-related models
 
 
-class CuisineType(str, Enum):
-    """Restaurant cuisine type enumeration."""
+class GeoapifyCateringCategory(str, Enum):
+    """Geoapify catering category enumeration - comprehensive list."""
 
-    AMERICAN = "american"
-    ITALIAN = "italian"
-    CHINESE = "chinese"
-    JAPANESE = "japanese"
-    INDIAN = "indian"
-    MEXICAN = "mexican"
-    FRENCH = "french"
-    THAI = "thai"
-    MEDITERRANEAN = "mediterranean"
-    SEAFOOD = "seafood"
-    VEGETARIAN = "vegetarian"
-    VEGAN = "vegan"
-    BBQ = "bbq"
-    PIZZA = "pizza"
-    SUSHI = "sushi"
-    STEAKHOUSE = "steakhouse"
-    FAST_FOOD = "fast_food"
-    FINE_DINING = "fine_dining"
-    CASUAL_DINING = "casual_dining"
-    LOCAL_SPECIALTY = "local_specialty"
-    FUSION = "fusion"
-    OTHER = "other"
+    # Main categories
+    CATERING = "catering"
+    BAR = "catering.bar"
+    BIERGARTEN = "catering.biergarten"
+    CAFE = "catering.cafe"
+    FAST_FOOD = "catering.fast_food"
+    FOOD_COURT = "catering.food_court"
+    ICE_CREAM = "catering.ice_cream"
+    PUB = "catering.pub"
+    RESTAURANT = "catering.restaurant"
+    TAPROOM = "catering.taproom"
 
+    # Cafe subcategories
+    CAFE_BUBBLE_TEA = "catering.cafe.bubble_tea"
+    CAFE_CAKE = "catering.cafe.cake"
+    CAFE_COFFEE = "catering.cafe.coffee"
+    CAFE_COFFEE_SHOP = "catering.cafe.coffee_shop"
+    CAFE_CREPE = "catering.cafe.crepe"
+    CAFE_DESSERT = "catering.cafe.dessert"
+    CAFE_DONUT = "catering.cafe.donut"
+    CAFE_FROZEN_YOGURT = "catering.cafe.frozen_yogurt"
+    CAFE_ICE_CREAM = "catering.cafe.ice_cream"
+    CAFE_TEA = "catering.cafe.tea"
+    CAFE_WAFFLE = "catering.cafe.waffle"
 
-class DietaryRestriction(str, Enum):
-    """Dietary restriction enumeration."""
+    # Fast food subcategories
+    FAST_FOOD_BURGER = "catering.fast_food.burger"
+    FAST_FOOD_FISH_CHIPS = "catering.fast_food.fish_and_chips"
+    FAST_FOOD_HOT_DOG = "catering.fast_food.hot_dog"
+    FAST_FOOD_KEBAB = "catering.fast_food.kebab"
+    FAST_FOOD_NOODLE = "catering.fast_food.noodle"
+    FAST_FOOD_PITA = "catering.fast_food.pita"
+    FAST_FOOD_PIZZA = "catering.fast_food.pizza"
+    FAST_FOOD_RAMEN = "catering.fast_food.ramen"
+    FAST_FOOD_SALAD = "catering.fast_food.salad"
+    FAST_FOOD_SANDWICH = "catering.fast_food.sandwich"
+    FAST_FOOD_SOUP = "catering.fast_food.soup"
+    FAST_FOOD_TACOS = "catering.fast_food.tacos"
+    FAST_FOOD_TAPAS = "catering.fast_food.tapas"
+    FAST_FOOD_WINGS = "catering.fast_food.wings"
 
-    VEGETARIAN = "vegetarian"
-    VEGAN = "vegan"
-    GLUTEN_FREE = "gluten_free"
-    DAIRY_FREE = "dairy_free"
-    NUT_FREE = "nut_free"
-    HALAL = "halal"
-    KOSHER = "kosher"
-    KETO = "keto"
-    PALEO = "paleo"
-    LOW_CARB = "low_carb"
-    DIABETIC_FRIENDLY = "diabetic_friendly"
-
-
-class PriceRange(str, Enum):
-    """Restaurant price range enumeration."""
-
-    BUDGET = "$"  # Under $15 per person
-    MODERATE = "$$"  # $15-30 per person
-    EXPENSIVE = "$$$"  # $30-60 per person
-    VERY_EXPENSIVE = "$$$$"  # Over $60 per person
+    # Restaurant cuisine subcategories
+    RESTAURANT_AFGHAN = "catering.restaurant.afghan"
+    RESTAURANT_AFRICAN = "catering.restaurant.african"
+    RESTAURANT_AMERICAN = "catering.restaurant.american"
+    RESTAURANT_ARAB = "catering.restaurant.arab"
+    RESTAURANT_ARGENTINIAN = "catering.restaurant.argentinian"
+    RESTAURANT_ASIAN = "catering.restaurant.asian"
+    RESTAURANT_AUSTRIAN = "catering.restaurant.austrian"
+    RESTAURANT_BALKAN = "catering.restaurant.balkan"
+    RESTAURANT_BARBECUE = "catering.restaurant.barbecue"
+    RESTAURANT_BAVARIAN = "catering.restaurant.bavarian"
+    RESTAURANT_BEEF_BOWL = "catering.restaurant.beef_bowl"
+    RESTAURANT_BELGIAN = "catering.restaurant.belgian"
+    RESTAURANT_BOLIVIAN = "catering.restaurant.bolivian"
+    RESTAURANT_BRAZILIAN = "catering.restaurant.brazilian"
+    RESTAURANT_BURGER = "catering.restaurant.burger"
+    RESTAURANT_CARIBBEAN = "catering.restaurant.caribbean"
+    RESTAURANT_CHICKEN = "catering.restaurant.chicken"
+    RESTAURANT_CHILI = "catering.restaurant.chili"
+    RESTAURANT_CHINESE = "catering.restaurant.chinese"
+    RESTAURANT_CROATIAN = "catering.restaurant.croatian"
+    RESTAURANT_CUBAN = "catering.restaurant.cuban"
+    RESTAURANT_CURRY = "catering.restaurant.curry"
+    RESTAURANT_CZECH = "catering.restaurant.czech"
+    RESTAURANT_DANISH = "catering.restaurant.danish"
+    RESTAURANT_DUMPLING = "catering.restaurant.dumpling"
+    RESTAURANT_ETHIOPIAN = "catering.restaurant.ethiopian"
+    RESTAURANT_EUROPEAN = "catering.restaurant.european"
+    RESTAURANT_FILIPINO = "catering.restaurant.filipino"
+    RESTAURANT_FISH = "catering.restaurant.fish"
+    RESTAURANT_FISH_CHIPS = "catering.restaurant.fish_and_chips"
+    RESTAURANT_FRENCH = "catering.restaurant.french"
+    RESTAURANT_FRITURE = "catering.restaurant.friture"
+    RESTAURANT_GEORGIAN = "catering.restaurant.georgian"
+    RESTAURANT_GERMAN = "catering.restaurant.german"
+    RESTAURANT_GREEK = "catering.restaurant.greek"
+    RESTAURANT_HAWAIIAN = "catering.restaurant.hawaiian"
+    RESTAURANT_HUNGARIAN = "catering.restaurant.hungarian"
+    RESTAURANT_INDIAN = "catering.restaurant.indian"
+    RESTAURANT_INDONESIAN = "catering.restaurant.indonesian"
+    RESTAURANT_INTERNATIONAL = "catering.restaurant.international"
+    RESTAURANT_IRISH = "catering.restaurant.irish"
+    RESTAURANT_ITALIAN = "catering.restaurant.italian"
+    RESTAURANT_JAMAICAN = "catering.restaurant.jamaican"
+    RESTAURANT_JAPANESE = "catering.restaurant.japanese"
+    RESTAURANT_KEBAB = "catering.restaurant.kebab"
+    RESTAURANT_KOREAN = "catering.restaurant.korean"
+    RESTAURANT_LATIN_AMERICAN = "catering.restaurant.latin_american"
+    RESTAURANT_LEBANESE = "catering.restaurant.lebanese"
+    RESTAURANT_MALAY = "catering.restaurant.malay"
+    RESTAURANT_MALAYSIAN = "catering.restaurant.malaysian"
+    RESTAURANT_MEDITERRANEAN = "catering.restaurant.mediterranean"
+    RESTAURANT_MEXICAN = "catering.restaurant.mexican"
+    RESTAURANT_MOROCCAN = "catering.restaurant.moroccan"
+    RESTAURANT_NEPALESE = "catering.restaurant.nepalese"
+    RESTAURANT_NOODLE = "catering.restaurant.noodle"
+    RESTAURANT_ORIENTAL = "catering.restaurant.oriental"
+    RESTAURANT_PAKISTANI = "catering.restaurant.pakistani"
+    RESTAURANT_PERSIAN = "catering.restaurant.persian"
+    RESTAURANT_PERUVIAN = "catering.restaurant.peruvian"
+    RESTAURANT_PITA = "catering.restaurant.pita"
+    RESTAURANT_PIZZA = "catering.restaurant.pizza"
+    RESTAURANT_PORTUGUESE = "catering.restaurant.portuguese"
+    RESTAURANT_RAMEN = "catering.restaurant.ramen"
+    RESTAURANT_REGIONAL = "catering.restaurant.regional"
+    RESTAURANT_RUSSIAN = "catering.restaurant.russian"
+    RESTAURANT_SANDWICH = "catering.restaurant.sandwich"
+    RESTAURANT_SEAFOOD = "catering.restaurant.seafood"
+    RESTAURANT_SOUP = "catering.restaurant.soup"
+    RESTAURANT_SPANISH = "catering.restaurant.spanish"
+    RESTAURANT_STEAK_HOUSE = "catering.restaurant.steak_house"
+    RESTAURANT_SUSHI = "catering.restaurant.sushi"
+    RESTAURANT_SWEDISH = "catering.restaurant.swedish"
+    RESTAURANT_SYRIAN = "catering.restaurant.syrian"
+    RESTAURANT_TACOS = "catering.restaurant.tacos"
+    RESTAURANT_TAIWANESE = "catering.restaurant.taiwanese"
+    RESTAURANT_TAPAS = "catering.restaurant.tapas"
+    RESTAURANT_TEX_MEX = "catering.restaurant.tex-mex"
+    RESTAURANT_THAI = "catering.restaurant.thai"
+    RESTAURANT_TURKISH = "catering.restaurant.turkish"
+    RESTAURANT_UKRAINIAN = "catering.restaurant.ukrainian"
+    RESTAURANT_UZBEK = "catering.restaurant.uzbek"
+    RESTAURANT_VIETNAMESE = "catering.restaurant.vietnamese"
+    RESTAURANT_WESTERN = "catering.restaurant.western"
+    RESTAURANT_WINGS = "catering.restaurant.wings"
 
 
 class RestaurantSearchRequest(BaseModel):
-    """Request model for restaurant search operations."""
+    """Request model for restaurant search operations - simplified for Geoapify."""
 
-    location: str = Field(..., min_length=1, description="Restaurant search location")
+    location: str | None = Field(None, min_length=1, description="Restaurant search location name")
     latitude: float | None = Field(None, ge=-90, le=90, description="Latitude coordinate")
     longitude: float | None = Field(None, ge=-180, le=180, description="Longitude coordinate")
-    cuisine_type: CuisineType | None = Field(None, description="Preferred cuisine type")
-    price_range: PriceRange | None = Field(None, description="Price range filter")
-    dietary_restrictions: list[DietaryRestriction] = Field(
-        default_factory=list, description="Dietary restrictions to accommodate"
+    categories: list[str] = Field(
+        default_factory=lambda: ["catering.restaurant"],
+        description="Geoapify categories (e.g., catering.restaurant, catering.fast_food)",
     )
-    budget_per_person: Decimal | None = Field(None, gt=0, description="Budget per person")
-    currency: str = Field(
-        default="USD", min_length=3, max_length=3, description="Preferred currency"
-    )
-    radius_km: float = Field(default=5.0, gt=0, le=50, description="Search radius in kilometers")
-    party_size: int = Field(default=2, ge=1, le=20, description="Number of people in party")
-    meal_type: str | None = Field(None, description="Meal type (breakfast, lunch, dinner, etc.)")
-    open_now: bool = Field(default=False, description="Only show restaurants open now")
+    radius_meters: int = Field(default=5000, gt=0, le=50000, description="Search radius in meters")
     max_results: int = Field(default=50, ge=1, le=250, description="Maximum results to return")
 
-    @field_validator("currency")
+    @field_validator("categories")
     @classmethod
-    def validate_currency_code(cls, v: str) -> str:
-        """Validate currency code format."""
-        if not v.isupper():
-            raise ValueError("Currency code must be uppercase")
+    def validate_categories(cls, v: list[str]) -> list[str]:
+        """Validate at least one category is provided."""
+        if not v:
+            return ["catering.restaurant"]
         return v
 
     model_config = ConfigDict(
@@ -701,85 +772,26 @@ class RestaurantLocation(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class RestaurantHours(BaseModel):
-    """Restaurant operating hours model."""
-
-    monday: str | None = Field(None, description="Monday hours (e.g., '9:00 AM - 10:00 PM')")
-    tuesday: str | None = Field(None, description="Tuesday hours")
-    wednesday: str | None = Field(None, description="Wednesday hours")
-    thursday: str | None = Field(None, description="Thursday hours")
-    friday: str | None = Field(None, description="Friday hours")
-    saturday: str | None = Field(None, description="Saturday hours")
-    sunday: str | None = Field(None, description="Sunday hours")
-    is_open_now: bool = Field(default=False, description="Currently open status")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class RestaurantContact(BaseModel):
-    """Restaurant contact information model."""
-
-    phone: str | None = Field(None, description="Phone number")
-    email: str | None = Field(None, description="Email address")
-    website: str | None = Field(None, description="Website URL")
-    reservation_url: str | None = Field(None, description="Online reservation URL")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class PopularDish(BaseModel):
-    """Popular dish recommendation model."""
-
-    name: str = Field(..., description="Dish name")
-    description: str | None = Field(None, description="Dish description")
-    price: Decimal | None = Field(None, gt=0, description="Dish price")
-    currency: str = Field(default="USD", description="Price currency")
-    is_specialty: bool = Field(default=False, description="Local specialty indicator")
-    dietary_info: list[str] = Field(default_factory=list, description="Dietary information")
-
-    model_config = ConfigDict(populate_by_name=True)
+# Restaurant hours, contact, and dish models removed - not available in Geoapify API
 
 
 class RestaurantOption(BaseModel):
-    """Standardized restaurant option model for internal use."""
+    """Standardized restaurant option model for internal use - simplified for Geoapify."""
 
     restaurant_id: UUID = Field(default_factory=uuid4, description="Internal restaurant ID")
     trip_id: UUID | None = Field(None, description="Associated trip ID")
-    external_id: str = Field(..., description="External provider ID")
+    external_id: str = Field(..., description="Geoapify place_id")
     name: str = Field(..., min_length=1, description="Restaurant name")
-    cuisine_type: CuisineType = Field(..., description="Primary cuisine type")
+    categories: list[str] = Field(
+        default_factory=list, description="Geoapify categories (e.g., catering.restaurant)"
+    )
     location: RestaurantLocation = Field(..., description="Restaurant location")
-    rating: float | None = Field(None, ge=1, le=5, description="Restaurant rating (1-5)")
-    review_count: int | None = Field(None, ge=0, description="Number of reviews")
-    price_range: PriceRange = Field(..., description="Price range category")
-    average_cost_per_person: Decimal | None = Field(
-        None, gt=0, description="Average cost per person"
+    formatted_address: str | None = Field(None, description="Full formatted address from Geoapify")
+    distance_meters: int | None = Field(
+        None, ge=0, description="Distance from search location in meters"
     )
-    currency: str = Field(default="USD", description="Price currency")
-    hours: RestaurantHours | None = Field(None, description="Operating hours")
-    contact: RestaurantContact | None = Field(None, description="Contact information")
-    amenities: list[str] = Field(default_factory=list, description="Available amenities")
-    dietary_accommodations: list[DietaryRestriction] = Field(
-        default_factory=list, description="Dietary restrictions accommodated"
-    )
-    popular_dishes: list[PopularDish] = Field(
-        default_factory=list, description="Popular and specialty dishes"
-    )
-    photos: list[str] = Field(default_factory=list, description="Photo URLs")
-    booking_url: str | None = Field(None, description="Booking/reservation URL")
-    provider: str = Field(..., description="API provider (yelp, google_places, zomato)")
-    distance_km: float | None = Field(None, ge=0, description="Distance from search location in km")
+    provider: str = Field(default="geoapify", description="API provider")
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
-
-    @field_validator("average_cost_per_person")
-    @classmethod
-    def validate_price(cls, v: Decimal | None) -> Decimal | None:
-        """Validate price is positive with max 2 decimal places."""
-        if v is not None:
-            if v <= 0:
-                raise ValueError("Price must be positive")
-            return v.quantize(Decimal("0.01"))
-        return v
 
     model_config = ConfigDict(
         use_enum_values=True,
@@ -807,21 +819,13 @@ class RestaurantSearchResponse(BaseModel):
 
 
 class RestaurantComparisonResult(BaseModel):
-    """Restaurant comparison and ranking result model."""
+    """Restaurant comparison and ranking result model - simplified for Geoapify."""
 
     restaurant: RestaurantOption = Field(..., description="Restaurant option")
     score: float = Field(..., ge=0, le=100, description="Ranking score (0-100)")
-    rating_rank: int = Field(..., ge=1, description="Rating ranking (1=highest)")
-    price_rank: int = Field(..., ge=1, description="Price ranking (1=best value)")
     distance_rank: int = Field(..., ge=1, description="Distance ranking (1=closest)")
-    cuisine_match_score: float = Field(
-        ..., ge=0, le=1, description="Cuisine preference match score"
-    )
-    dietary_match_score: float = Field(
-        ..., ge=0, le=1, description="Dietary restriction match score"
-    )
-    local_specialty_bonus: float = Field(
-        ..., ge=0, le=1, description="Local specialty bonus points"
+    category_match_score: float = Field(
+        ..., ge=0, le=1, description="Category preference match score"
     )
     reasons: list[str] = Field(default_factory=list, description="Ranking reasons")
 

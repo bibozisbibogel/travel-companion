@@ -228,7 +228,7 @@ class AgentResultAggregator:
 
     def _convert_food_to_restaurant(self, food_item: dict[str, Any]) -> RestaurantOption:
         """Convert food recommendation to RestaurantOption."""
-        from travel_companion.models.external import CuisineType, PriceRange, RestaurantLocation
+        from travel_companion.models.external import RestaurantLocation
 
         # Parse location data
         location_data = food_item.get("location", {})
@@ -267,35 +267,21 @@ class AgentResultAggregator:
                 neighborhood=None,
             )
 
-        # Parse cuisine type
+        # Parse cuisine type as string category
         cuisine_str = food_item.get("cuisine", "International")
-        try:
-            cuisine_type = CuisineType(cuisine_str.lower())
-        except ValueError:
-            cuisine_type = CuisineType.OTHER
-
-        # Parse price range
-        price_str = food_item.get("price_range", "$")
-        try:
-            price_range = PriceRange(price_str)
-        except ValueError:
-            price_range = PriceRange.BUDGET
+        categories = [cuisine_str.lower().replace(" ", "_")]
 
         return RestaurantOption(
+            trip_id=None,  # Will be set later if needed
             external_id=food_item.get("id", "unknown"),
             name=food_item.get("name", "Restaurant"),
-            cuisine_type=cuisine_type,
+            categories=categories,
             location=location,
-            rating=food_item.get("rating"),
-            review_count=food_item.get("review_count"),
-            price_range=price_range,
-            average_cost_per_person=food_item.get("average_cost_per_person"),
-            hours=food_item.get("hours"),
-            contact=food_item.get("contact"),
-            booking_url=food_item.get("booking_url"),
-            provider=food_item.get("provider", "unknown"),
-            distance_km=food_item.get("distance_km"),
-            trip_id=None,  # Will be set later if needed
+            formatted_address=food_item.get("address"),
+            distance_meters=int(food_item.get("distance_km", 0) * 1000)
+            if food_item.get("distance_km")
+            else None,
+            provider=food_item.get("provider", "legacy_conversion"),
         )
 
     def _calculate_result_correlations(self, plan: AggregatedTripPlan) -> None:
@@ -549,8 +535,8 @@ class AgentResultAggregator:
         if preferred_cuisines and isinstance(preferred_cuisines, list | tuple):
             for restaurant in plan.restaurants:
                 cuisine_match = any(
-                    cuisine.lower() in restaurant.cuisine_type.lower()
-                    or restaurant.cuisine_type.lower() in cuisine.lower()
+                    any(cuisine.lower() in cat.lower() for cat in restaurant.categories)
+                    or any(cat.lower() in cuisine.lower() for cat in restaurant.categories)
                     for cuisine in preferred_cuisines
                     if isinstance(cuisine, str)
                 )
@@ -565,7 +551,7 @@ class AgentResultAggregator:
                             score=0.85,
                             explanation=f"Restaurant matches cuisine preferences: {restaurant.name}",
                             metadata={
-                                "restaurant_cuisine": restaurant.cuisine_type,
+                                "restaurant_cuisine": ", ".join(restaurant.categories),
                                 "preferred_cuisines": preferred_cuisines,
                                 "match": True,
                             },
@@ -696,17 +682,17 @@ class AgentResultAggregator:
                             "type": "dining",
                             "activity": f"Lunch at {lunch_restaurant.name}",
                             "time": "12:30",
-                            "details": f"{lunch_restaurant.cuisine_type} cuisine",
+                            "details": f"{', '.join(lunch_restaurant.categories)} cuisine",
                             "duration_hours": 1.5,
-                            "price_range": lunch_restaurant.price_range,
+                            "price_range": "varies",  # Price range not available in current model
                         },
                         {
                             "type": "dining",
                             "activity": f"Dinner at {dinner_restaurant.name}",
                             "time": "19:00",
-                            "details": f"{dinner_restaurant.cuisine_type} cuisine",
+                            "details": f"{', '.join(dinner_restaurant.categories)} cuisine",
                             "duration_hours": 2.0,
-                            "price_range": dinner_restaurant.price_range,
+                            "price_range": "varies",  # Price range not available in current model
                         },
                     ]
                 )
