@@ -21,15 +21,14 @@ from travel_companion.models.external import (
     ActivityOption,
     ActivitySearchRequest,
     ActivitySearchResponse,
-    CuisineType,
     FlightOption,
     FlightSearchRequest,
     FlightSearchResponse,
+    GeoapifyCateringCategory,  # New Geoapify categories
     HotelLocation,
     HotelOption,
     HotelSearchRequest,
     HotelSearchResponse,
-    PriceRange,
     RestaurantLocation,
     RestaurantOption,
     RestaurantSearchRequest,
@@ -684,7 +683,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             RestaurantOption(
                 external_id="fallback_restaurant",
                 name=f"Local Restaurant in {trip_request.destination.city}",
-                cuisine_type=CuisineType.LOCAL_SPECIALTY,
+                categories=[GeoapifyCateringCategory.RESTAURANT_REGIONAL.value],
                 location=RestaurantLocation(
                     latitude=trip_request.destination.latitude or 0.0,
                     longitude=trip_request.destination.longitude or 0.0,
@@ -695,16 +694,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     postal_code=None,
                     neighborhood=None,
                 ),
-                price_range=PriceRange.MODERATE,
-                rating=3.8,
+                distance_meters=1000,  # 1km from city center
                 provider="fallback",
-                trip_id=None,
-                review_count=None,
-                average_cost_per_person=None,
-                hours=None,
-                contact=None,
-                booking_url=None,
-                distance_km=None,
             )
         ]
 
@@ -874,8 +865,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             max_results=15,
             latitude=trip_request.destination.latitude,
             longitude=trip_request.destination.longitude,
-            cuisine_type=CuisineType.ITALIAN,
-            price_range=PriceRange.MODERATE,
+            categories=[GeoapifyCateringCategory.RESTAURANT_ITALIAN.value],
+            radius_meters=5000,
             budget_per_person=Decimal(50),
             meal_type="dinner",
             currency="USD",
@@ -1676,11 +1667,12 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         else:
             price_str = str(price_range)
 
+        # Note: Price ranges not available in Geoapify, using general budget estimates
         cost_mapping = {
-            PriceRange.BUDGET.value: Decimal("15.00"),  # $
-            PriceRange.MODERATE.value: Decimal("30.00"),  # $$
-            PriceRange.EXPENSIVE.value: Decimal("60.00"),  # $$$
-            PriceRange.VERY_EXPENSIVE.value: Decimal("100.00"),  # $$$$
+            "$": Decimal("15.00"),  # Budget
+            "$$": Decimal("30.00"),  # Moderate
+            "$$$": Decimal("60.00"),  # Expensive
+            "$$$$": Decimal("100.00"),  # Very expensive
         }
         return cost_mapping.get(price_str, Decimal("30.00"))  # Default moderate
 

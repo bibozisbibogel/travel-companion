@@ -628,27 +628,27 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
         prefs = trip_request.preferences or {}
         if "cuisine_types" in prefs and prefs["cuisine_types"]:
             # Map first cuisine type to the cuisine_type field
-            from travel_companion.models.external import CuisineType
+            from travel_companion.models.external import GeoapifyCateringCategory
 
-            cuisine_type_map = {
-                "french": CuisineType.FRENCH,
-                "italian": CuisineType.ITALIAN,
-                "chinese": CuisineType.CHINESE,
-                "japanese": CuisineType.JAPANESE,
-                "mexican": CuisineType.MEXICAN,
-                "indian": CuisineType.INDIAN,
-                "american": CuisineType.AMERICAN,
-                "mediterranean": CuisineType.MEDITERRANEAN,
+            cuisine_category_map = {
+                "french": GeoapifyCateringCategory.RESTAURANT_FRENCH.value,
+                "italian": GeoapifyCateringCategory.RESTAURANT_ITALIAN.value,
+                "chinese": GeoapifyCateringCategory.RESTAURANT_CHINESE.value,
+                "japanese": GeoapifyCateringCategory.RESTAURANT_JAPANESE.value,
+                "mexican": GeoapifyCateringCategory.RESTAURANT_MEXICAN.value,
+                "indian": GeoapifyCateringCategory.RESTAURANT_INDIAN.value,
+                "american": GeoapifyCateringCategory.RESTAURANT_AMERICAN.value,
+                "mediterranean": GeoapifyCateringCategory.RESTAURANT_MEDITERRANEAN.value,
             }
             cuisine_types = prefs["cuisine_types"]
             if isinstance(cuisine_types, list) and cuisine_types:
                 first_cuisine = cuisine_types[0].lower()
-                if first_cuisine in cuisine_type_map:
-                    food_request.cuisine_type = cuisine_type_map[first_cuisine]
+                if first_cuisine in cuisine_category_map:
+                    food_request.categories = [cuisine_category_map[first_cuisine]]
             elif isinstance(cuisine_types, str):
                 first_cuisine = cuisine_types.lower()
-                if first_cuisine in cuisine_type_map:
-                    food_request.cuisine_type = cuisine_type_map[first_cuisine]
+                if first_cuisine in cuisine_category_map:
+                    food_request.categories = [cuisine_category_map[first_cuisine]]
 
         # Execute food agent
         food_agent = FoodAgent()
@@ -663,23 +663,8 @@ async def execute_food_agent(state: TripPlanningWorkflowState) -> TripPlanningWo
         if food_response.restaurants:
             # Calculate estimated daily food cost based on average restaurant prices
             days = (trip_request.requirements.end_date - trip_request.requirements.start_date).days
-            avg_price_per_meal = (
-                sum(
-                    float(restaurant.average_cost_per_person)
-                    for restaurant in food_response.restaurants[:5]  # Top 5 restaurants
-                    if restaurant.average_cost_per_person is not None
-                )
-                / max(
-                    1,
-                    len(
-                        [
-                            r
-                            for r in food_response.restaurants[:5]
-                            if r.average_cost_per_person is not None
-                        ]
-                    ),
-                )
-            )
+            # Note: average_cost_per_person not available in Geoapify, using default estimate
+            avg_price_per_meal = 25.0  # Default moderate meal price estimate
 
             estimated_food_cost = (
                 avg_price_per_meal * 2 * days * trip_request.requirements.travelers

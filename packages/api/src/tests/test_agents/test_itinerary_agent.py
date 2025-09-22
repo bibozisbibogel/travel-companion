@@ -187,9 +187,7 @@ class TestItineraryAgent:
 
         # Sample restaurant data
         from travel_companion.models.external import (
-            CuisineType,
-            DietaryRestriction,
-            PriceRange,
+            GeoapifyCateringCategory,
             RestaurantLocation,
             RestaurantSearchResponse,
         )
@@ -199,29 +197,22 @@ class TestItineraryAgent:
                 RestaurantOption(
                     external_id="jules_verne_001",
                     name="Le Jules Verne",
-                    cuisine_type=CuisineType.FRENCH,
+                    categories=[GeoapifyCateringCategory.RESTAURANT_FRENCH.value],
                     location=RestaurantLocation(
                         latitude=48.8584, longitude=2.2945, address="Eiffel Tower, Paris"
                     ),
-                    price_range=PriceRange.VERY_EXPENSIVE,
-                    rating=4.5,
-                    dietary_accommodations=[DietaryRestriction.VEGETARIAN],
-                    provider="test_provider",
+                    distance_meters=300,
+                    provider="geoapify",
                 ),
                 RestaurantOption(
                     external_id="cafe_flore_001",
                     name="Cafe de Flore",
-                    cuisine_type=CuisineType.FRENCH,
+                    categories=[GeoapifyCateringCategory.RESTAURANT_FRENCH.value],
                     location=RestaurantLocation(
                         latitude=48.8532, longitude=2.3332, address="172 Bd Saint-Germain, Paris"
                     ),
-                    price_range=PriceRange.MODERATE,
-                    rating=4.0,
-                    dietary_accommodations=[
-                        DietaryRestriction.VEGETARIAN,
-                        DietaryRestriction.VEGAN,
-                    ],
-                    provider="test_provider",
+                    distance_meters=800,
+                    provider="geoapify",
                 ),
             ]
         )
@@ -292,7 +283,8 @@ class TestItineraryAgent:
 
         assert isinstance(food_request, RestaurantSearchRequest)
         assert food_request.location == "Paris"
-        assert food_request.party_size == sample_trip_request.requirements.travelers
+        # party_size field removed from RestaurantSearchRequest in Geoapify version
+        assert food_request.max_results == 15  # Check max_results instead
 
     # Test Budget Calculations
     @pytest.mark.asyncio
