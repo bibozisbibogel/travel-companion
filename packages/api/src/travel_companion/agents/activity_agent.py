@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from travel_companion.agents.base import BaseAgent
 from travel_companion.models.external import (
+    ActivityCategory,
     ActivityComparisonResult,
     ActivityOption,
     ActivitySearchRequest,
@@ -13,6 +14,7 @@ from travel_companion.models.external import (
 )
 from travel_companion.services.activity_cache import ActivityCacheManager
 from travel_companion.services.activity_repository import ActivityRepository
+from travel_companion.services.external_apis.geoapify import GeoapifyClient
 from travel_companion.services.external_apis.getyourguide import GetYourGuideAPIClient
 from travel_companion.services.external_apis.tripadvisor import TripAdvisorAPIClient
 from travel_companion.services.external_apis.viator import ViatorAPIClient
@@ -25,6 +27,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         """Initialize activity agent with API clients, database, and cache."""
         super().__init__(**kwargs)
 
+        self.geoapify_client = GeoapifyClient()
         self.tripadvisor_client = TripAdvisorAPIClient()
         self.viator_client = ViatorAPIClient()
         self.getyourguide_client = GetYourGuideAPIClient()
@@ -124,6 +127,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
 
         # Attempt parallel search from all providers
         search_tasks = [
+            self._search_geoapify(request),
             self._search_tripadvisor(request),
             self._search_viator(request),
             self._search_getyourguide(request),
@@ -132,7 +136,7 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         results = await asyncio.gather(*search_tasks, return_exceptions=True)
 
         for i, result in enumerate(results):
-            provider_name = ["TripAdvisor", "Viator", "GetYourGuide"][i]
+            provider_name = ["Geoapify", "TripAdvisor", "Viator", "GetYourGuide"][i]
 
             if isinstance(result, Exception):
                 self.logger.warning(f"{provider_name} search failed: {result}")
@@ -148,6 +152,21 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         self.logger.info(f"Total activities after deduplication: {len(unique_activities)}")
 
         return unique_activities
+
+    async def _search_geoapify(self, request: ActivitySearchRequest) -> list[ActivityOption]:
+        """Search activities from Geoapify API.
+
+        Args:
+            request: Activity search request
+
+        Returns:
+            List of Geoapify activities
+        """
+        try:
+            return await self.geoapify_client.search_activities(request)
+        except Exception as e:
+            self.logger.warning(f"Geoapify search failed: {e}")
+            return []
 
     async def _search_tripadvisor(self, request: ActivitySearchRequest) -> list[ActivityOption]:
         """Search activities from TripAdvisor API.
@@ -353,3 +372,91 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         )
         for i, result in enumerate(rating_sorted):
             result.rating_rank = i + 1
+
+    async def search_activities_with_geoapify(
+        self,
+        location: str,
+        category: ActivityCategory | None = None,
+        guest_count: int = 1,
+        max_results: int = 20,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        radius_meters: int = 5000,
+    ) -> ActivitySearchResponse:
+        """
+        Enhanced activity search using only Geoapify Places API.
+
+        Args:
+            location: Search location (city, address, etc.)
+            category: Activity category filter
+            guest_count: Number of guests
+            max_results: Maximum number of results
+            latitude: Latitude for geo-based search
+            longitude: Longitude for geo-based search
+            radius_meters: Search radius in meters
+
+        Returns:
+            ActivitySearchResponse with activities from Geoapify
+        """
+        start_time = datetime.now()
+
+        try:
+            # Create search request
+            search_request = ActivitySearchRequest(
+                location=location,
+                category=category,
+                guest_count=guest_count,
+                max_results=max_results,
+            )
+
+            self.logger.info(f"Searching activities in {location} via Geoapify only")
+
+            # Search activities from Geoapify
+            activities = await self.geoapify_client.search_activities(
+                search_request, latitude=latitude, longitude=longitude, radius_meters=radius_meters
+            )
+
+            # Rank activities (simplified ranking for Geoapify-only)
+            ranked_activities = await self._rank_activities(activities, search_request)
+
+            # Create response
+            search_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            response = ActivitySearchResponse(
+                activities=ranked_activities,
+                total_results=len(ranked_activities),
+                search_time_ms=search_time_ms,
+                search_metadata={
+                    "provider": "geoapify_only",
+                    "location": location,
+                    "category": category.value if category else None,
+                    "guest_count": guest_count,
+                    "radius_meters": radius_meters,
+                },
+                cached=False,
+                cache_expires_at=None,
+            )
+
+            self.logger.info(
+                f"Geoapify activity search completed: {len(ranked_activities)} activities found"
+            )
+            return response
+
+        except Exception as e:
+            self.logger.error(f"Geoapify activity search failed: {e}")
+            # Return empty response on error for graceful fallback
+            search_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            return ActivitySearchResponse(
+                activities=[],
+                total_results=0,
+                search_time_ms=search_time_ms,
+                search_metadata={
+                    "provider": "geoapify_only",
+                    "location": location,
+                    "category": category.value if category else None,
+                    "guest_count": guest_count,
+                    "radius_meters": radius_meters,
+                    "error": str(e),
+                },
+                cached=False,
+                cache_expires_at=None,
+            )

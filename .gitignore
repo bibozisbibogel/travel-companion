@@ -14,4 +14,6 @@ __pycache__
 .cursorindexingignore
 node_modules
 
+# Folders for different tests
 mihai/
+cristi/
