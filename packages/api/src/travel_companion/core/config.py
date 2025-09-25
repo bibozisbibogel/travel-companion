@@ -158,6 +158,7 @@ class Settings(BaseSettings):
 
     # Food & Restaurant APIs
     geoapify_api_key: str = ""  # Geoapify Places API key
+    google_places_api_key: str = ""  # Google Places API key
 
     # Hotel APIs
     liteapi_key: str = ""  # LiteAPI (Nuitée) key for hotel bookings
