@@ -12,6 +12,15 @@ from travel_companion.services.external_apis.google_places import GooglePlacesNe
 # Load environment variables from project root
 load_dotenv("../../.env")
 
+# Skip all tests in this module unless RUN_EXTERNAL_API_TESTS is set to "true"
+pytestmark = [
+    pytest.mark.external_api,
+    pytest.mark.skipif(
+        os.getenv("RUN_EXTERNAL_API_TESTS", "false").lower() != "true",
+        reason="External API tests are disabled. Set RUN_EXTERNAL_API_TESTS=true to enable"
+    )
+]
+
 
 @pytest_asyncio.fixture
 async def google_places_client() -> AsyncGenerator[GooglePlacesNewAPI, None]:

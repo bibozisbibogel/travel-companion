@@ -9,8 +9,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from project root
+load_dotenv("../../.env")
 
 # Add the src directory to the Python path
 import sys

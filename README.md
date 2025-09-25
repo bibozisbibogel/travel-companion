@@ -14,6 +14,18 @@ An AI-powered multi-agent travel planner that helps users plan trips end-to-end:
 - "food_agent"
 - "itinerary_agent"
 
+# Testing APIs
+Some pytest tests run live API calls and consume credits. 
+Use the RUN_EXTERNAL_API_TESTS environment variable to control their execution.
+Tests will skip unless this variable is set to "true".
+
+Example: `RUN_EXTERNAL_API_TESTS=true uv run pytest`
+
+# Standalone tests (not part of pytest)
+These are tests that can be run to test individual API calls. They are located in a separate folder 'src/test_api'. They must be run from the 'packages/api' folder.
+
+Example: `uv run python src/test_api/test_google_places.py`
+
 # Quick start
   ./scripts/setup.sh      # Initial setup
   ./scripts/dev.sh        # Start development environment  
