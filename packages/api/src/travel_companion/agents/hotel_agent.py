@@ -70,13 +70,11 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         self.timeout_seconds = getattr(self.settings, "hotel_api_timeout_seconds", 30)
 
         # Initialize API clients with fallback chain
-        self._booking_client = BookingClient(timeout=self.timeout_seconds)
-        self._expedia_client = ExpediaClient()
-        self._airbnb_client = AirbnbClient()
-
-        # Initialize new API clients
-        self._geoapify_client = GeoapifyClient()
-        self._liteapi_client = LiteAPIClient(timeout=self.timeout_seconds)
+        # self._booking_client = BookingClient(timeout=self.timeout_seconds)
+        # self._expedia_client = ExpediaClient()
+        # self._airbnb_client = AirbnbClient()
+        # self._geoapify_client = GeoapifyClient()
+        # self._liteapi_client = LiteAPIClient(timeout=self.timeout_seconds)
         self._google_places_client = GooglePlacesClient(redis_manager=self.redis)
 
         # Initialize enhanced cache manager

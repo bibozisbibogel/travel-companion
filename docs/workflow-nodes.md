@@ -145,6 +145,125 @@
   system for coordinating multiple travel planning agents while
   maintaining high performance and user experience quality.
 
+  # Nodes
+
+  The nodes.py file implements individual workflow node functions that are executed as part of the LangGraph trip planning workflow. Each node represents a specific step in the trip planning process.
+
+  ## Core Purpose
+
+  This file contains the execution logic for each agent in the trip planning workflow, handling:
+  - Agent initialization and coordination
+  - External API calls to travel services
+  - Error handling and graceful degradation
+  - State management and budget tracking
+  - Structured logging and metrics
+
+  ## Key Node Functions
+
+  1. initialize_trip_context()
+
+  - Purpose: Sets up initial workflow context and validates request data
+  - Key Actions:
+    - Validates trip request data
+    - Initializes budget tracking with allocations (40% flights, 30% hotels, 20% activities, 10% food)
+    - Sets up user preferences and optimization metrics
+    - Creates agent execution tracking structures
+
+  2. Agent Execution Nodes (All async functions):
+
+  execute_weather_agent()
+  - Fetches weather forecast data for the destination
+  - Uses WeatherAgent with OpenWeatherMap API
+  - Dependency: None (runs first)
+  - Handles: Weather-dependent activity filtering
+
+  execute_flight_agent()
+  - Searches for flight options using Amadeus API
+  - Updates budget tracking with cheapest flight option
+  - Dependency: Can run in parallel
+  - Handles: Flight search with origin/destination/dates
+
+  execute_hotel_agent()
+  - Searches for accommodation using Booking.com/Google Places APIs
+  - Calculates budget per night based on allocation
+  - Dependency: Can run in parallel
+  - Handles: Hotel search with check-in/check-out dates
+
+  execute_activity_agent()
+  - Finds activities and attractions using Google Places API
+  - Dependency: Requires weather data (depends on weather agent)
+  - Handles: Weather-aware activity filtering based on conditions
+
+  execute_food_agent()
+  - Searches for restaurant recommendations using Geoapify API
+  - Maps cuisine preferences to API categories
+  - Dependency: Can run in parallel
+  - Handles: Restaurant search with cuisine filtering
+
+  execute_itinerary_agent()
+  - Critical Final Step: Coordinates and optimizes all travel components
+  - Dependencies: Requires flight, hotel, activity, and food agents
+  - Handles: Creates comprehensive itinerary with daily schedules
+
+  3. finalize_trip_plan()
+
+  - Purpose: Creates final trip plan output with comprehensive results
+  - Key Features:
+    - Uses AgentResultAggregator for result correlation
+    - Calculates quality metrics and optimization scores
+    - Creates structured output with cost analysis
+    - Handles both successful aggregation and fallback scenarios
+
+  ## Architecture Patterns
+
+  ### Error Handling Strategy
+
+  try:
+      # Agent execution
+      agent = WeatherAgent()
+      response = await agent.process(request)
+  except (ExternalAPIError, CircuitBreakerOpenError) as e:
+      # Graceful degradation - continue workflow
+      state["weather_data"] = {"error": str(e), "degraded": True}
+  except Exception as e:
+      # Critical failure - stop workflow
+      raise
+
+  ### State Management
+
+  - Each node updates the shared TripPlanningWorkflowState
+  - Tracks completed/failed agents for dependency management
+  - Updates budget tracking throughout execution
+  - Maintains execution metrics and timing
+
+  ### Budget Tracking
+
+  - Initial Allocation: 40% flights, 30% hotels, 20% activities, 10% food
+  - Real-time Updates: Updates spent/remaining as agents complete
+  - Final Reconciliation: Aggregator provides final cost analysis
+
+  ### Dependency Management
+
+  - Weather → Activities: Weather data influences activity selection
+  - All Core Agents → Itinerary: Itinerary agent waits for others to complete
+  - Parallel Execution: Flight, hotel, food agents can run simultaneously
+
+  ## Integration with Orchestrator
+
+  The orchestrator (orchestrator.py) uses these nodes in its workflow definition:
+  - Sequential: initialize_trip → coordinated_execution → finalize_plan
+  - Parallel Optimization: The coordinated_execution node manages parallel agent execution
+  - Conditional Routing: Advanced routing functions handle different execution paths
+
+  ## Key Design Features
+
+  1. Resilient: Continues workflow even if individual agents fail
+  2. Observable: Comprehensive logging and metrics collection
+  3. Budget-Aware: Real-time budget tracking and allocation management
+  4. Weather-Aware: Activity selection considers forecast conditions
+  5. Preference-Driven: User preferences influence all agent decisions
+  6. Correlation-Aware: Final aggregation creates correlations between results
+
   # Agents
 
   ## Itinerary Agent (execute_itinerary_agent)
