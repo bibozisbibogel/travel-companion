@@ -18,7 +18,7 @@ from travel_companion.models.external import (
     FlightSearchResponse,
 )
 from travel_companion.models.trip import TravelClass
-from travel_companion.services.external_apis.amadeus import AmadeusFlightOffer
+from travel_companion.services.external_apis.aviationstack import AviationStackFlight
 from travel_companion.utils.circuit_breaker import CircuitState
 from travel_companion.utils.errors import ExternalAPIError
 
@@ -37,8 +37,7 @@ class TestFlightAgentComprehensive:
             database_url="test://localhost",
             redis_url="redis://localhost:6379/1",
             secret_key="test-secret",
-            amadeus_client_id="test_client_id",
-            amadeus_client_secret="test_client_secret",
+            aviationstack_api_key="test_api_key",
         )
 
     @pytest.fixture
@@ -93,23 +92,27 @@ class TestFlightAgentComprehensive:
             return json.load(f)
 
     @pytest.fixture
-    def mock_amadeus_offers(self, flight_fixtures):
-        """Create mock Amadeus flight offers."""
-        offers_data = flight_fixtures["amadeus_flight_response"]["data"]
-        return [AmadeusFlightOffer(**offer) for offer in offers_data]
+    def mock_aviationstack_flights(self, flight_fixtures):
+        """Create mock AviationStack flight data."""
+        flights_data = flight_fixtures["aviationstack_flight_response"]["data"]
+        return [AviationStackFlight(**flight) for flight in flights_data]
 
     @pytest.mark.asyncio
-    async def test_flight_search_with_amadeus_success(
-        self, flight_agent, sample_flight_request, mock_amadeus_offers
+    async def test_flight_search_with_aviationstack_success(
+        self, flight_agent, sample_flight_request, mock_aviationstack_flights
     ):
-        """Test successful flight search using Amadeus API."""
-        # Mock the Amadeus client
-        mock_amadeus_client = Mock()
-        mock_amadeus_client.__aenter__ = AsyncMock(return_value=mock_amadeus_client)
-        mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
-        mock_amadeus_client.search_flights = AsyncMock(return_value=mock_amadeus_offers)
+        """Test successful flight search using AviationStack API."""
+        # Mock the AviationStack client
+        mock_aviationstack_client = Mock()
+        mock_aviationstack_client.__aenter__ = AsyncMock(return_value=mock_aviationstack_client)
+        mock_aviationstack_client.__aexit__ = AsyncMock(return_value=None)
+        mock_aviationstack_client.search_flights = AsyncMock(
+            return_value=mock_aviationstack_flights
+        )
 
-        with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
+        with patch.object(
+            flight_agent, "_get_aviationstack_client", return_value=mock_aviationstack_client
+        ):
             flights = await flight_agent.search_flights(sample_flight_request)
 
         # Verify results
@@ -118,21 +121,24 @@ class TestFlightAgentComprehensive:
 
         # Verify first flight details
         first_flight = flights[0]
-        assert first_flight.external_id == "1"
-        assert first_flight.airline == "AA"
+        assert first_flight.external_id.startswith("aviationstack_")
+        assert first_flight.airline == "American Airlines"
         assert first_flight.origin == "JFK"
         assert first_flight.destination == "LAX"
-        assert first_flight.price == Decimal("299.99")
         assert first_flight.stops == 0
 
     @pytest.mark.asyncio
     async def test_flight_search_fallback_to_mock(self, flight_agent, sample_flight_request):
-        """Test fallback to mock data when Amadeus API fails."""
-        # Mock Amadeus client to raise exception
-        mock_amadeus_client = Mock()
-        mock_amadeus_client.__aenter__ = AsyncMock(side_effect=ExternalAPIError("API unavailable"))
+        """Test fallback to mock data when AviationStack API fails."""
+        # Mock AviationStack client to raise exception
+        mock_aviationstack_client = Mock()
+        mock_aviationstack_client.__aenter__ = AsyncMock(
+            side_effect=ExternalAPIError("API unavailable")
+        )
 
-        with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
+        with patch.object(
+            flight_agent, "_get_aviationstack_client", return_value=mock_aviationstack_client
+        ):
             flights = await flight_agent.search_flights(sample_flight_request)
 
         # Should fall back to mock data
@@ -144,22 +150,22 @@ class TestFlightAgentComprehensive:
     async def test_flight_search_timeout_handling(self, flight_agent, sample_flight_request):
         """Test timeout handling in flight search."""
 
-        # Mock Amadeus client that times out - use shorter timeout to prevent test hanging
+        # Mock AviationStack client that times out - use shorter timeout to prevent test hanging
         async def slow_search(*args, **kwargs):
             await asyncio.sleep(2)  # Shorter sleep to prevent hanging tests
             return []
 
-        mock_amadeus_client = Mock()
-        mock_amadeus_client.__aenter__ = AsyncMock(return_value=mock_amadeus_client)
-        mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
-        mock_amadeus_client.search_flights = slow_search
+        mock_aviationstack_client = Mock()
+        mock_aviationstack_client.__aenter__ = AsyncMock(return_value=mock_aviationstack_client)
+        mock_aviationstack_client.__aexit__ = AsyncMock(return_value=None)
+        mock_aviationstack_client.search_flights = slow_search
 
         # Patch the timeout to be very short for testing
         with patch("asyncio.wait_for") as mock_wait_for:
             mock_wait_for.side_effect = TimeoutError("Test timeout")
 
             with patch.object(
-                flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client
+                flight_agent, "_get_aviationstack_client", return_value=mock_aviationstack_client
             ):
                 flights = await flight_agent.search_flights(sample_flight_request)
 
@@ -171,8 +177,8 @@ class TestFlightAgentComprehensive:
     async def test_circuit_breaker_open_fallback(self, flight_agent, sample_flight_request):
         """Test fallback when circuit breaker is open."""
         # Force circuit breaker to open state
-        flight_agent._amadeus_circuit_breaker.state = CircuitState.OPEN
-        flight_agent._amadeus_circuit_breaker.next_attempt_time = datetime.now() + timedelta(
+        flight_agent._aviationstack_circuit_breaker.state = CircuitState.OPEN
+        flight_agent._aviationstack_circuit_breaker.next_attempt_time = datetime.now() + timedelta(
             minutes=5
         )
 
@@ -248,48 +254,50 @@ class TestFlightAgentComprehensive:
             assert 0 <= result.departure_preference_score <= 1
 
     @pytest.mark.asyncio
-    async def test_amadeus_offer_conversion(
-        self, flight_agent, sample_flight_request, mock_amadeus_offers
+    async def test_aviationstack_flight_conversion(
+        self, flight_agent, sample_flight_request, mock_aviationstack_flights
     ):
-        """Test conversion of Amadeus offers to FlightOption models."""
-        flights = flight_agent._convert_amadeus_offers_to_flights(
-            mock_amadeus_offers, sample_flight_request
+        """Test conversion of AviationStack flights to FlightOption models."""
+        flights = flight_agent._convert_aviationstack_flights_to_flights(
+            mock_aviationstack_flights, sample_flight_request
         )
 
         assert len(flights) == 3
 
         # Test first flight conversion
         first_flight = flights[0]
-        assert first_flight.external_id == "1"
-        assert first_flight.airline == "AA"
-        assert first_flight.flight_number == "AA123"
-        assert first_flight.price == Decimal("299.99")
+        assert first_flight.external_id.startswith("aviationstack_")
+        assert first_flight.airline == "American Airlines"
+        assert first_flight.flight_number == "123"
         assert first_flight.currency == "USD"
-        assert first_flight.stops == 0
+        assert first_flight.stops == 0  # AviationStack assumes direct flights
         assert first_flight.duration_minutes == 330  # 5h30m
+        assert first_flight.flight_status == "scheduled"
 
-        # Test flight with stops
+        # Test second flight
         second_flight = flights[1]
-        assert second_flight.external_id == "2"
-        assert second_flight.stops == 1  # Has 2 segments, so 1 stop
+        assert second_flight.airline == "Delta Air Lines"
+        assert second_flight.flight_number == "1452"
 
     @pytest.mark.asyncio
     async def test_process_method_end_to_end(
-        self, flight_agent, sample_flight_request, mock_amadeus_offers
+        self, flight_agent, sample_flight_request, mock_aviationstack_flights
     ):
         """Test the complete process method end-to-end."""
 
-        # Mock the Amadeus client with small delay to simulate real API
+        # Mock the AviationStack client with small delay to simulate real API
         async def mock_search_flights(*args, **kwargs):
             await asyncio.sleep(0.01)  # Small delay to simulate API call
-            return mock_amadeus_offers
+            return mock_aviationstack_flights
 
-        mock_amadeus_client = Mock()
-        mock_amadeus_client.__aenter__ = AsyncMock(return_value=mock_amadeus_client)
-        mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
-        mock_amadeus_client.search_flights = mock_search_flights
+        mock_aviationstack_client = Mock()
+        mock_aviationstack_client.__aenter__ = AsyncMock(return_value=mock_aviationstack_client)
+        mock_aviationstack_client.__aexit__ = AsyncMock(return_value=None)
+        mock_aviationstack_client.search_flights = mock_search_flights
 
-        with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
+        with patch.object(
+            flight_agent, "_get_aviationstack_client", return_value=mock_aviationstack_client
+        ):
             response = await flight_agent.process(sample_flight_request.model_dump())
 
         # Verify response structure
@@ -362,14 +370,14 @@ class TestFlightAgentComprehensive:
         ]
 
         for exception, test_name in test_cases:
-            # Mock Amadeus client to raise specific exception during search
-            mock_amadeus_client = Mock()
-            mock_amadeus_client.__aenter__ = AsyncMock(return_value=mock_amadeus_client)
-            mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
-            mock_amadeus_client.search_flights = AsyncMock(side_effect=exception)
+            # Mock AviationStack client to raise specific exception during search
+            mock_aviationstack_client = Mock()
+            mock_aviationstack_client.__aenter__ = AsyncMock(return_value=mock_aviationstack_client)
+            mock_aviationstack_client.__aexit__ = AsyncMock(return_value=None)
+            mock_aviationstack_client.search_flights = AsyncMock(side_effect=exception)
 
             with patch.object(
-                flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client
+                flight_agent, "_get_aviationstack_client", return_value=mock_aviationstack_client
             ):
                 flights = await flight_agent.search_flights(sample_flight_request)
 
@@ -387,32 +395,34 @@ class TestFlightAgentComprehensive:
     @pytest.mark.asyncio
     async def test_circuit_breaker_configuration(self, flight_agent):
         """Test circuit breaker is properly configured."""
-        circuit_breaker = flight_agent._amadeus_circuit_breaker
+        circuit_breaker = flight_agent._aviationstack_circuit_breaker
 
         assert circuit_breaker.failure_threshold == 3
         assert circuit_breaker.recovery_timeout == 30
-        assert circuit_breaker.name == "AmadeusAPI"
+        assert circuit_breaker.name == "AviationStackAPI"
         assert circuit_breaker.is_closed  # Should start in closed state
 
     @pytest.mark.asyncio
     async def test_performance_requirements(
-        self, flight_agent, sample_flight_request, mock_amadeus_offers
+        self, flight_agent, sample_flight_request, mock_aviationstack_flights
     ):
         """Test that flight search meets performance requirements."""
 
-        # Mock the Amadeus client with small delay to simulate real API
+        # Mock the AviationStack client with small delay to simulate real API
         async def mock_search_flights(*args, **kwargs):
             await asyncio.sleep(0.01)  # Small delay to simulate API call
-            return mock_amadeus_offers
+            return mock_aviationstack_flights
 
-        mock_amadeus_client = Mock()
-        mock_amadeus_client.__aenter__ = AsyncMock(return_value=mock_amadeus_client)
-        mock_amadeus_client.__aexit__ = AsyncMock(return_value=None)
-        mock_amadeus_client.search_flights = mock_search_flights
+        mock_aviationstack_client = Mock()
+        mock_aviationstack_client.__aenter__ = AsyncMock(return_value=mock_aviationstack_client)
+        mock_aviationstack_client.__aexit__ = AsyncMock(return_value=None)
+        mock_aviationstack_client.search_flights = mock_search_flights
 
         start_time = datetime.now()
 
-        with patch.object(flight_agent, "_get_amadeus_client", return_value=mock_amadeus_client):
+        with patch.object(
+            flight_agent, "_get_aviationstack_client", return_value=mock_aviationstack_client
+        ):
             response = await flight_agent.process(sample_flight_request.model_dump())
 
         end_time = datetime.now()

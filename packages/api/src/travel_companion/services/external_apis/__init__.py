@@ -1,5 +1,5 @@
 """External API integrations module."""
 
-from .amadeus import AmadeusClient
+from .aviationstack import AviationStackClient
 
-__all__ = ["AmadeusClient"]
+__all__ = ["AviationStackClient"]

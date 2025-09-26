@@ -534,6 +534,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                     total_results=0,
                     search_time_ms=int((time.time() - start_time) * 1000),
                     cached=False,
+                    cache_expires_at=None,
                 )
 
             self.logger.info(f"Found {len(geoapify_hotels)} hotels from Geoapify")
@@ -574,7 +575,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                 rates_request = LiteAPIRatesRequest(
                     stay=stay,
                     occupancies=occupancies,
-                    hotel_ids=liteapi_hotel_ids,
+                    hotel_ids=[id for id in liteapi_hotel_ids if id is not None],
                     currency="USD",
                 )
                 rates_data = await self._liteapi_client.get_full_rates(rates_request)
@@ -582,7 +583,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                 min_rates_request = LiteAPIMinRatesRequest(
                     stay=stay,
                     occupancies=occupancies,
-                    hotel_ids=liteapi_hotel_ids,
+                    hotel_ids=[id for id in liteapi_hotel_ids if id is not None],
                 )
                 rates_data = await self._liteapi_client.get_min_rates(min_rates_request)
 
@@ -621,6 +622,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                 total_results=len(hotels),
                 search_time_ms=search_time_ms,
                 cached=False,
+                cache_expires_at=None,
             )
 
         except Exception as e:
@@ -661,6 +663,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                 amenities=[],
                 photos=[],
                 booking_url=None,
+                trip_id=None,
                 created_at=datetime.now(UTC),
             )
             hotels.append(hotel)
@@ -675,6 +678,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             total_results=len(hotels),
             search_time_ms=int((time.time() - start_time) * 1000),
             cached=False,
+            cache_expires_at=None,
         )
 
     async def _combine_geoapify_liteapi_data(
@@ -727,19 +731,19 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             geo_lon = round(geo_hotel["longitude"], 3)
             location_key = (geo_lat, geo_lon)
 
-            liteapi_hotel = liteapi_by_location.get(location_key)
-            if not liteapi_hotel:
+            matched_liteapi_hotel = liteapi_by_location.get(location_key)
+            if not matched_liteapi_hotel:
                 # Try finding closest match within small radius
                 for (lat, lon), lite_hotel in liteapi_by_location.items():
                     distance = abs(lat - geo_lat) + abs(lon - geo_lon)  # Manhattan distance
                     if distance < 0.01:  # ~1km tolerance
-                        liteapi_hotel = lite_hotel
+                        matched_liteapi_hotel = lite_hotel
                         break
 
             # Get rate data
             rate_info = None
-            if liteapi_hotel and liteapi_hotel.get("id"):
-                rate_info = hotel_rates.get(liteapi_hotel["id"])
+            if matched_liteapi_hotel and matched_liteapi_hotel.get("id"):
+                rate_info = hotel_rates.get(matched_liteapi_hotel["id"])
 
             # Apply budget filter early if we have rate data
             min_rate = rate_info.get("min_rate") if rate_info else None
@@ -759,8 +763,8 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             # Create hotel option
             hotel = HotelOption(
                 external_id=(
-                    f"liteapi_{liteapi_hotel['id']}"
-                    if liteapi_hotel and liteapi_hotel.get("id")
+                    f"liteapi_{matched_liteapi_hotel['id']}"
+                    if matched_liteapi_hotel and matched_liteapi_hotel.get("id")
                     else f"geoapify_{geo_hotel.get('place_id', '')}"
                 ),
                 name=geo_hotel["name"],
@@ -771,6 +775,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
                 amenities=[],  # Could be enriched from LiteAPI
                 photos=[],
                 booking_url=None,
+                trip_id=None,
                 created_at=datetime.now(UTC),
             )
             hotels.append(hotel)
