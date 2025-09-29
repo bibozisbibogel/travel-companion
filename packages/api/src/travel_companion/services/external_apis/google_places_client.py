@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, cast
 
 from travel_companion.core.config import get_settings
 from travel_companion.models.external import (
@@ -50,8 +50,8 @@ class GooglePlacesClient:
     async def search_activities(
         self,
         request: ActivitySearchRequest,
-        latitude: Optional[float] = None,
-        longitude: Optional[float] = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
         radius_meters: int = 5000,
     ) -> list[ActivityOption]:
         """
@@ -69,15 +69,18 @@ class GooglePlacesClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._activity_circuit.call(
-            self._search_activities_impl, request, latitude, longitude, radius_meters
+        return cast(
+            list[ActivityOption],
+            await self._activity_circuit.call(
+                self._search_activities_impl, request, latitude, longitude, radius_meters
+            ),
         )
 
     async def _search_activities_impl(
         self,
         request: ActivitySearchRequest,
-        latitude: Optional[float] = None,
-        longitude: Optional[float] = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
         radius_meters: int = 5000,
     ) -> list[ActivityOption]:
         """Implementation of activity search with circuit breaker protection."""
@@ -200,7 +203,7 @@ class GooglePlacesClient:
 
     async def _convert_place_to_activity(
         self, place: Any, request: ActivitySearchRequest
-    ) -> Optional[ActivityOption]:
+    ) -> ActivityOption | None:
         """
         Convert Google Place to ActivityOption.
 
@@ -238,7 +241,9 @@ class GooglePlacesClient:
             if place.photos:
                 # Get URLs for first 3 photos
                 for photo in place.photos[:3]:
-                    photo_url = self.places_api.get_photo_url(photo.name, max_width=800, max_height=600)
+                    photo_url = self.places_api.get_photo_url(
+                        photo.name, max_width=800, max_height=600
+                    )
                     images.append(photo_url)
 
             # Create activity option
@@ -256,17 +261,8 @@ class GooglePlacesClient:
                 images=images,
                 booking_url=place.website_uri or place.google_maps_uri,
                 provider="google_places",
+                trip_id=None,  # Not associated with a specific trip at search time
                 created_at=datetime.now(),
-                # Additional fields
-                included=[],  # Could extract from reviews/description
-                excluded=[],
-                availability_status="available",  # Default
-                instant_confirmation=False,
-                free_cancellation=False,
-                accessibility_features=[],
-                age_restrictions=None,
-                group_size_min=1,
-                group_size_max=None,
             )
 
             return activity
@@ -275,7 +271,7 @@ class GooglePlacesClient:
             self.logger.warning(f"Failed to convert place to activity: {e}")
             return None
 
-    def _extract_city_from_address(self, address: Optional[str]) -> Optional[str]:
+    def _extract_city_from_address(self, address: str | None) -> str | None:
         """Extract city from formatted address."""
         if not address:
             return None
@@ -285,7 +281,7 @@ class GooglePlacesClient:
             return parts[-2]
         return None
 
-    def _extract_country_from_address(self, address: Optional[str]) -> Optional[str]:
+    def _extract_country_from_address(self, address: str | None) -> str | None:
         """Extract country from formatted address."""
         if not address:
             return None
@@ -296,7 +292,7 @@ class GooglePlacesClient:
         return None
 
     def _determine_category_from_types(
-        self, types: list[str], preferred: Optional[ActivityCategory]
+        self, types: list[str], preferred: ActivityCategory | None
     ) -> ActivityCategory:
         """
         Determine activity category from Google Places types.
@@ -341,7 +337,7 @@ class GooglePlacesClient:
         # Default to cultural for tourist attractions
         return ActivityCategory.CULTURAL
 
-    def _estimate_price_from_level(self, price_level: Optional[str]) -> Decimal:
+    def _estimate_price_from_level(self, price_level: str | None) -> Decimal:
         """
         Estimate price from Google's price level.
 

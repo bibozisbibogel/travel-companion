@@ -81,16 +81,15 @@ export class ApiClient {
     );
   }
 
-  private createTimeoutController(timeout: number): AbortController {
+  private createTimeoutController(timeout: number): { controller: AbortController; cleanup: () => void } {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
-    // Clear timeout if request completes normally
-    controller.signal.addEventListener('abort', () => {
+
+    const cleanup = () => {
       clearTimeout(timeoutId);
-    });
-    
-    return controller;
+    };
+
+    return { controller, cleanup };
   }
 
   private async makeRequest<T>(
@@ -108,13 +107,15 @@ export class ApiClient {
     let lastError: Error;
     
     for (let attempt = 0; attempt < retryConfig.attempts; attempt++) {
+      let cleanup: (() => void) | undefined;
       try {
-        const controller = this.createTimeoutController(timeout);
-        
+        const timeoutController = this.createTimeoutController(timeout);
+        cleanup = timeoutController.cleanup;
+
         const fetchConfig: RequestInit = {
           method,
           headers: this.getHeaders(additionalHeaders),
-          signal: controller.signal,
+          signal: timeoutController.controller.signal,
         };
 
         if (data && method !== 'GET') {
@@ -123,11 +124,15 @@ export class ApiClient {
 
         const response = await fetch(`${this.baseUrl}${endpoint}`, fetchConfig);
 
+        // Clean up timeout on successful fetch
+        cleanup();
+        cleanup = undefined;
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const error = new ApiError(
-            response.status, 
-            errorData.message || `API request failed: ${response.status}`, 
+            response.status,
+            errorData.message || `API request failed: ${response.status}`,
             errorData
           );
 
@@ -142,13 +147,18 @@ export class ApiClient {
 
         return response.json();
       } catch (error) {
+        // Clean up timeout on error
+        if (cleanup) {
+          cleanup();
+        }
+
         if (error instanceof ApiError) {
           throw error;
         }
 
         // Handle timeout and network errors
         const networkError = new ApiError(
-          0, 
+          0,
           error instanceof Error ? error.message : 'Network error occurred',
           { originalError: error }
         );

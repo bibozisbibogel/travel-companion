@@ -1,7 +1,7 @@
 """Tests for Google Places API (New) integration."""
 
 import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -17,8 +17,8 @@ pytestmark = [
     pytest.mark.external_api,
     pytest.mark.skipif(
         os.getenv("RUN_EXTERNAL_API_TESTS", "false").lower() != "true",
-        reason="External API tests are disabled. Set RUN_EXTERNAL_API_TESTS=true to enable"
-    )
+        reason="External API tests are disabled. Set RUN_EXTERNAL_API_TESTS=true to enable",
+    ),
 ]
 
 

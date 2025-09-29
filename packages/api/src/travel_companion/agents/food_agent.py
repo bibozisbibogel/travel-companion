@@ -480,7 +480,8 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         """
         try:
             async with self.geoapify_circuit_breaker:
-                return await self.geoapify_client.search_restaurants(search_request)
+                result = await self.geoapify_client.search_restaurants(search_request)
+                return result
         except CircuitBreakerOpenError as e:
             self.logger.warning(f"Geoapify circuit breaker is open: {e}")
             return RestaurantSearchResponse(
@@ -504,6 +505,16 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 search_time_ms=0,
                 cached=False,
             )
+
+        # This should never be reached, but added to satisfy mypy
+        return RestaurantSearchResponse(
+            restaurants=[],
+            cache_expires_at=None,
+            search_metadata={"error": "Unknown error"},
+            total_results=0,
+            search_time_ms=0,
+            cached=False,
+        )
 
     async def health_check(self) -> dict[str, Any]:
         """Enhanced health check including Geoapify API service status."""

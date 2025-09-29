@@ -13,8 +13,9 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent
 sys.path.insert(0, str(src_path))
 
-from travel_companion.core.config import get_settings
-from travel_companion.core.redis import RedisManager, get_redis_manager
+# Import after path setup
+from travel_companion.core.config import get_settings  # noqa: E402
+from travel_companion.core.redis import get_redis_manager  # noqa: E402
 
 
 async def test_redis_connection_basic():
@@ -75,8 +76,13 @@ async def test_redis_operations():
         exists_after_delete = await redis_manager.exists(test_key)
         print(f"   - Exists after delete: {exists_after_delete}")
 
-        if (set_result and get_result == test_value and exists_result and
-            delete_result and not exists_after_delete):
+        if (
+            set_result
+            and get_result == test_value
+            and exists_result
+            and delete_result
+            and not exists_after_delete
+        ):
             print("   ✅ All Redis operations successful")
             return True
         else:
@@ -101,14 +107,16 @@ async def test_redis_json_operations():
             "workflow_id": "test-123",
             "status": "running",
             "agents": ["flight", "hotel", "activity"],
-            "budget": 5000.0
+            "budget": 5000.0,
         }
 
         set_result = await redis_manager.set(test_key, test_data, expire=60)
         print(f"   - JSON set result: {set_result}")
 
         get_result = await redis_manager.get(test_key, json_decode=True)
-        print(f"   - JSON get result: {type(get_result)} with keys: {list(get_result.keys()) if isinstance(get_result, dict) else 'Not a dict'}")
+        print(
+            f"   - JSON get result: {type(get_result)} with keys: {list(get_result.keys()) if isinstance(get_result, dict) else 'Not a dict'}"
+        )
 
         # Verify data integrity
         if isinstance(get_result, dict) and get_result["workflow_id"] == "test-123":
@@ -151,12 +159,12 @@ async def test_redis_workflow_state():
             "trip_request": {
                 "destination": {"city": "Tokyo", "country": "Japan"},
                 "budget": 5000.0,
-                "travelers": 2
+                "travelers": 2,
             },
             "agents_completed": ["weather"],
             "agents_failed": [],
             "flight_results": [],
-            "hotel_results": []
+            "hotel_results": [],
         }
 
         state_key = f"workflow_state:{workflow_state['workflow_id']}"
@@ -212,7 +220,7 @@ async def test_redis_configuration():
         # Get Redis info (if connection works)
         try:
             info = await client.info()
-            redis_version = info.get('redis_version', 'unknown')
+            redis_version = info.get("redis_version", "unknown")
             print(f"   - Redis server version: {redis_version}")
             print(f"   - Redis server mode: {info.get('redis_mode', 'unknown')}")
             print(f"   - Connected clients: {info.get('connected_clients', 'unknown')}")
@@ -317,6 +325,7 @@ async def main():
     except Exception as e:
         print(f"\n💥 Unexpected error during testing: {e}")
         import traceback
+
         traceback.print_exc()
 
 

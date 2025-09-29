@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -100,7 +100,10 @@ class GeoapifyClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._restaurant_circuit.call(self._search_restaurants_impl, request)
+        return cast(
+            RestaurantSearchResponse,
+            await self._restaurant_circuit.call(self._search_restaurants_impl, request),
+        )
 
     async def _search_restaurants_impl(
         self, request: RestaurantSearchRequest
@@ -290,8 +293,11 @@ class GeoapifyClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._hotel_circuit.call(
-            self._search_hotels_impl, location, latitude, longitude, radius_meters, max_results
+        return cast(
+            list[dict[str, Any]],
+            await self._hotel_circuit.call(
+                self._search_hotels_impl, location, latitude, longitude, radius_meters, max_results
+            ),
         )
 
     async def _search_hotels_impl(
@@ -400,8 +406,11 @@ class GeoapifyClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._activity_circuit.call(
-            self._search_activities_impl, request, latitude, longitude, radius_meters
+        return cast(
+            list[ActivityOption],
+            await self._activity_circuit.call(
+                self._search_activities_impl, request, latitude, longitude, radius_meters
+            ),
         )
 
     async def _search_activities_impl(
@@ -491,6 +500,7 @@ class GeoapifyClient:
                     images=[],
                     booking_url=properties.get("website"),
                     provider="geoapify",
+                    trip_id=None,  # Not associated with a specific trip at search time
                     created_at=datetime.now(),
                 )
                 activities.append(activity)

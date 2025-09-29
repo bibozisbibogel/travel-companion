@@ -1,14 +1,15 @@
 """Test Google Places integration for Hotel Agent."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, UTC
+from datetime import datetime
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from travel_companion.agents.hotel_agent import HotelAgent
-from travel_companion.models.external import HotelSearchRequest, HotelSearchResponse, HotelOption
-from travel_companion.services.external_apis.google_places import Place, PlaceLocation
 from travel_companion.core.config import get_settings
+from travel_companion.models.external import HotelOption, HotelSearchRequest, HotelSearchResponse
+from travel_companion.services.external_apis.google_places import Place, PlaceLocation
 
 
 class TestHotelAgentGooglePlaces:
@@ -83,7 +84,7 @@ class TestHotelAgentGooglePlaces:
             assert call_args[1]["price_levels"] == [
                 "PRICE_LEVEL_INEXPENSIVE",
                 "PRICE_LEVEL_MODERATE",
-                "PRICE_LEVEL_EXPENSIVE"
+                "PRICE_LEVEL_EXPENSIVE",
             ]
 
             # Verify results were converted correctly
@@ -125,10 +126,18 @@ class TestHotelAgentGooglePlaces:
 
         # Test different price levels
         assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_FREE") == Decimal("30")
-        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_INEXPENSIVE") == Decimal("70")
-        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_MODERATE") == Decimal("150")
-        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_EXPENSIVE") == Decimal("300")
-        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_VERY_EXPENSIVE") == Decimal("500")
+        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_INEXPENSIVE") == Decimal(
+            "70"
+        )
+        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_MODERATE") == Decimal(
+            "150"
+        )
+        assert hotel_agent._estimate_hotel_price_from_level("PRICE_LEVEL_EXPENSIVE") == Decimal(
+            "300"
+        )
+        assert hotel_agent._estimate_hotel_price_from_level(
+            "PRICE_LEVEL_VERY_EXPENSIVE"
+        ) == Decimal("500")
         assert hotel_agent._estimate_hotel_price_from_level(None) == Decimal("120")  # Default
 
     def test_map_hotel_price_levels(self):
@@ -172,7 +181,9 @@ class TestHotelAgentGooglePlaces:
         assert "Daily Housekeeping" in amenities  # From lodging type
 
     @pytest.mark.asyncio
-    async def test_google_places_as_primary_in_search_flow(self, hotel_search_request, mock_google_place):
+    async def test_google_places_as_primary_in_search_flow(
+        self, hotel_search_request, mock_google_place
+    ):
         """Test that Google Places is called first in the search flow."""
         # Mock all API clients
         mock_places_api = AsyncMock()
@@ -181,10 +192,6 @@ class TestHotelAgentGooglePlaces:
         mock_google_client = AsyncMock()
         mock_google_client.__aenter__.return_value = mock_google_client
         mock_google_client.places_api = mock_places_api
-
-        mock_booking_client = AsyncMock()
-        mock_expedia_client = AsyncMock()
-        mock_airbnb_client = AsyncMock()
 
         with (
             patch(
@@ -195,9 +202,7 @@ class TestHotelAgentGooglePlaces:
             mock_google_places_client_class.return_value = mock_google_client
 
             hotel_agent = HotelAgent()
-            hotel_agent._booking_client = mock_booking_client
-            hotel_agent._expedia_client = mock_expedia_client
-            hotel_agent._airbnb_client = mock_airbnb_client
+            # No need to set fallback clients as they are disabled
 
             # Process the search request
             request_data = {
@@ -213,10 +218,7 @@ class TestHotelAgentGooglePlaces:
             # Verify Google Places was called
             mock_places_api.text_search.assert_called_once()
 
-            # Verify other APIs were NOT called since Google Places succeeded
-            mock_booking_client.search_hotels.assert_not_called()
-            mock_expedia_client.search_hotels.assert_not_called()
-            mock_airbnb_client.search_listings.assert_not_called()
+            # Verify Google Places was used successfully
 
             # Verify results
             assert isinstance(result, HotelSearchResponse)
@@ -249,7 +251,7 @@ class TestHotelAgentGooglePlaces:
             mock_google_places_client_class.return_value = mock_google_client
 
             hotel_agent = HotelAgent()
-            hotel_agent._booking_client = mock_booking_client
+            # Booking client is disabled, so no fallback will occur
 
             request_data = {
                 "location": hotel_search_request.location,
@@ -260,12 +262,11 @@ class TestHotelAgentGooglePlaces:
 
             result = await hotel_agent.process(request_data)
 
-            # Verify both APIs were attempted
+            # Verify Google Places was attempted
             mock_google_client.places_api.text_search.assert_called_once()
-            mock_booking_client.search_hotels.assert_called_once()
 
-            # Verify metadata shows the fallback
-            assert result.search_metadata["successful_api"] == "booking.com"
+            # Verify no successful API since Google Places failed and no fallback
+            assert result.search_metadata["successful_api"] is None
             assert "google_places" in result.search_metadata["apis_attempted"]
-            assert "booking.com" in result.search_metadata["apis_attempted"]
             assert "google_places" in result.search_metadata["api_errors"]
+            assert len(result.hotels) == 0

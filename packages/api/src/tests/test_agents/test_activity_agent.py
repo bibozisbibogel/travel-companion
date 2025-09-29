@@ -222,12 +222,8 @@ class TestActivityAgent:
         self, activity_agent, sample_activity_request, sample_activity_option
     ):
         """Test successful search across all providers."""
-        with (
-            patch.object(
-                activity_agent, "_search_tripadvisor", return_value=[sample_activity_option]
-            ),
-            patch.object(activity_agent, "_search_viator", return_value=[]),
-            patch.object(activity_agent, "_search_getyourguide", return_value=[]),
+        with patch.object(
+            activity_agent, "_search_google_places", return_value=[sample_activity_option]
         ):
             result = await activity_agent._search_all_providers(
                 ActivitySearchRequest(**sample_activity_request)
@@ -240,20 +236,16 @@ class TestActivityAgent:
     async def test_search_all_providers_with_failures(
         self, activity_agent, sample_activity_request, sample_activity_option
     ):
-        """Test search with some provider failures."""
-        with (
-            patch.object(
-                activity_agent, "_search_tripadvisor", return_value=[sample_activity_option]
-            ),
-            patch.object(activity_agent, "_search_viator", side_effect=Exception("API Error")),
-            patch.object(activity_agent, "_search_getyourguide", return_value=[]),
+        """Test search with provider failure."""
+        # Google Places fails, but we still get empty result
+        with patch.object(
+            activity_agent, "_search_google_places", side_effect=Exception("API Error")
         ):
             result = await activity_agent._search_all_providers(
                 ActivitySearchRequest(**sample_activity_request)
             )
 
-            assert len(result) == 1
-            assert result[0].provider == "tripadvisor"
+            assert len(result) == 0
 
     @pytest.mark.asyncio
     async def test_deduplicate_activities(self, activity_agent):

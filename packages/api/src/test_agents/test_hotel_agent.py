@@ -2,10 +2,8 @@
 
 import asyncio
 from datetime import datetime, timedelta
-from decimal import Decimal
 
 from travel_companion.agents.hotel_agent import HotelAgent
-from travel_companion.models.external import HotelSearchRequest, HotelSearchResponse
 
 
 async def test_hotel_agent():
@@ -33,7 +31,7 @@ async def test_hotel_agent():
         "room_count": 1,
         "budget": 200.0,  # Use budget instead of min/max price
         "currency": "USD",
-        "max_results": 5
+        "max_results": 5,
     }
 
     print(f"   Location: {request_data['location']}")
@@ -50,7 +48,7 @@ async def test_hotel_agent():
     try:
         response = await agent.process(request_data)
 
-        print(f"\n4. Results Summary:")
+        print("\n4. Results Summary:")
         print(f"   ✓ Found {response.total_results} hotels")
         print(f"   ✓ Search completed in {response.search_time_ms}ms")
 
@@ -65,7 +63,7 @@ async def test_hotel_agent():
                 if hotel.rating:
                     print(f"   Rating: {hotel.rating}/5.0")
                 else:
-                    print(f"   Rating: Not available")
+                    print("   Rating: Not available")
                 if hotel.location and hotel.location.address:
                     print(f"   Address: {hotel.location.address}")
                 elif hotel.location:
@@ -74,35 +72,36 @@ async def test_hotel_agent():
                     print(f"   Amenities: {', '.join(hotel.amenities[:5])}")
                 print(f"   External ID: {hotel.external_id}")
                 if hotel.booking_url:
-                    print(f"   Booking URL available: Yes")
+                    print("   Booking URL available: Yes")
         else:
             print("\n   ⚠ No hotels found matching criteria")
 
         # Display search metadata (new structure)
-        if hasattr(response, 'search_metadata') and response.search_metadata:
-            print(f"\n6. Search Metadata:")
+        if hasattr(response, "search_metadata") and response.search_metadata:
+            print("\n6. Search Metadata:")
             metadata = response.search_metadata
-            if 'successful_api' in metadata:
+            if "successful_api" in metadata:
                 print(f"   Successful API: {metadata['successful_api']}")
-            if 'apis_attempted' in metadata:
+            if "apis_attempted" in metadata:
                 print(f"   APIs attempted: {', '.join(metadata['apis_attempted'])}")
-            if 'google_places_results' in metadata:
+            if "google_places_results" in metadata:
                 print(f"   Google Places results: {metadata['google_places_results']}")
-            if 'api_errors' in metadata and metadata['api_errors']:
+            if "api_errors" in metadata and metadata["api_errors"]:
                 print(f"   API errors: {list(metadata['api_errors'].keys())}")
 
         # Show cache status
-        if hasattr(response, 'cached'):
-            print(f"\n7. Cache Information:")
+        if hasattr(response, "cached"):
+            print("\n7. Cache Information:")
             print(f"   Cached result: {'Yes' if response.cached else 'No'}")
-            if hasattr(response, 'cache_expires_at') and response.cache_expires_at:
+            if hasattr(response, "cache_expires_at") and response.cache_expires_at:
                 print(f"   Cache expires at: {response.cache_expires_at}")
 
-        print(f"\n✅ Test completed successfully!")
+        print("\n✅ Test completed successfully!")
 
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 60)
@@ -123,7 +122,7 @@ async def test_error_handling():
         "location": "Paris",
         "check_in_date": datetime.now().isoformat(),
         "check_out_date": (datetime.now() - timedelta(days=1)).isoformat(),
-        "guest_count": 2
+        "guest_count": 2,
     }
 
     try:
@@ -134,9 +133,7 @@ async def test_error_handling():
 
     # Test with missing required fields
     print("\n2. Testing missing required fields...")
-    incomplete_request = {
-        "location": "Paris"
-    }
+    incomplete_request = {"location": "Paris"}
 
     try:
         response = await agent.process(incomplete_request)
@@ -156,7 +153,7 @@ async def main():
     await test_hotel_agent()
 
     # Run error handling tests
-    #await test_error_handling()
+    # await test_error_handling()
 
     print("\n🎉 All tests completed!\n")
 

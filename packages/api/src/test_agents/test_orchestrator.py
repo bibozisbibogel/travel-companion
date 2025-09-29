@@ -14,14 +14,15 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent
 sys.path.insert(0, str(src_path))
 
-from travel_companion.models.trip import (
+# Import after path setup
+from travel_companion.models.trip import (  # noqa: E402
+    AccommodationType,
+    TravelClass,
     TripDestination,
     TripPlanRequest,
     TripRequirements,
-    TravelClass,
-    AccommodationType,
 )
-from travel_companion.workflows.orchestrator import TripPlanningWorkflow
+from travel_companion.workflows.orchestrator import TripPlanningWorkflow  # noqa: E402
 
 
 def create_test_trip_request() -> TripPlanRequest:
@@ -106,9 +107,7 @@ async def test_workflow_instantiation():
     try:
         trip_request = create_test_trip_request()
         initial_state = workflow.create_initial_state(
-            trip_request=trip_request,
-            user_id="test_user_123",
-            request_id="test_request_456"
+            trip_request=trip_request, user_id="test_user_123", request_id="test_request_456"
         )
 
         print(f"   - Workflow ID: {initial_state['workflow_id']}")
@@ -126,13 +125,13 @@ async def test_workflow_instantiation():
     print("\n✅ Test 5: Testing trip planning execution...")
     try:
         result = await workflow.execute_trip_planning(
-            trip_request=trip_request,
-            user_id="test_user_123",
-            request_id="test_request_789"
+            trip_request=trip_request, user_id="test_user_123", request_id="test_request_789"
         )
 
         print(f"   - Execution result type: {type(result)}")
-        print(f"   - Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        print(
+            f"   - Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+        )
         print("   ✅ Trip planning execution successful")
 
     except Exception as e:
@@ -164,6 +163,7 @@ async def main():
     except Exception as e:
         print(f"\n💥 Unexpected error: {e}")
         import traceback
+
         traceback.print_exc()
 
 

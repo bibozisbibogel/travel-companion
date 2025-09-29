@@ -5,25 +5,27 @@ Run with: python test_google_places.py
 
 import asyncio
 import os
-from typing import Optional
+import sys
 
 from dotenv import load_dotenv
 
 # Load environment variables from project root
-load_dotenv("../../.env")
+# Find the .env file relative to this script's location
+env_path = os.path.join(os.path.dirname(__file__), "../../../../.env")
+load_dotenv(env_path)
 
 # Add the src directory to the Python path
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from travel_companion.services.external_apis.google_places import GooglePlacesNewAPI
+# Import after path setup
+from travel_companion.services.external_apis.google_places import GooglePlacesNewAPI  # noqa: E402
 
 
 async def test_google_places_api():
     """Test Google Places API with real API calls."""
 
     # Get API key from environment
-    api_key = os.getenv('GOOGLE_PLACES_API_KEY')
+    api_key = os.getenv("GOOGLE_PLACES_API_KEY")
     if not api_key:
         print("❌ GOOGLE_PLACES_API_KEY not found in environment variables")
         print("Please set it in your .env file or environment")
@@ -32,13 +34,11 @@ async def test_google_places_api():
     print("Starting Google Places API tests...\n")
 
     async with GooglePlacesNewAPI(api_key=api_key) as client:
-
         # Test 1: Text Search
         print("1. Testing text search for 'coffee shops in San Francisco'...")
         try:
             places = await client.text_search(
-                text_query="coffee shops in San Francisco",
-                max_result_count=5
+                text_query="coffee shops in San Francisco", max_result_count=5
             )
             print(f"✅ Found {len(places)} places")
             if places:
@@ -59,12 +59,14 @@ async def test_google_places_api():
                 location=(40.7580, -73.9855),
                 radius=500,
                 included_types=["restaurant"],
-                max_result_count=5
+                max_result_count=5,
             )
             print(f"✅ Found {len(places)} nearby restaurants")
             if places:
                 for i, place in enumerate(places[:3], 1):
-                    print(f"   {i}. {place.display_name.get('text', 'Unknown')} - Rating: {place.rating}")
+                    print(
+                        f"   {i}. {place.display_name.get('text', 'Unknown')} - Rating: {place.rating}"
+                    )
         except Exception as e:
             print(f"❌ Nearby search failed: {e}")
 
@@ -75,8 +77,7 @@ async def test_google_places_api():
         try:
             # First, search for a place to get its ID
             search_results = await client.text_search(
-                text_query="Empire State Building",
-                max_result_count=1
+                text_query="Empire State Building", max_result_count=1
             )
 
             if search_results:
@@ -84,7 +85,9 @@ async def test_google_places_api():
                 print(f"   Getting details for place ID: {place_id[:20]}...")
 
                 place_details = await client.get_place(place_id)
-                print(f"✅ Retrieved details for: {place_details.display_name.get('text', 'Unknown')}")
+                print(
+                    f"✅ Retrieved details for: {place_details.display_name.get('text', 'Unknown')}"
+                )
                 print(f"   Address: {place_details.formatted_address}")
                 print(f"   Phone: {place_details.international_phone_number}")
                 print(f"   Website: {place_details.website_uri}")
@@ -95,9 +98,7 @@ async def test_google_places_api():
                 # Test photo URL generation
                 if place_details.photos:
                     photo_url = client.get_photo_url(
-                        place_details.photos[0].name,
-                        max_width=800,
-                        max_height=600
+                        place_details.photos[0].name, max_width=800, max_height=600
                     )
                     print(f"   Sample photo URL: {photo_url}")
             else:
@@ -115,7 +116,7 @@ async def test_google_places_api():
                 text_query="restaurants in Boston",
                 min_rating=4.0,
                 price_levels=["PRICE_LEVEL_INEXPENSIVE"],
-                max_result_count=5
+                max_result_count=5,
             )
             print(f"✅ Found {len(places)} filtered places")
             for place in places[:3]:

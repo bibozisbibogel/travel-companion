@@ -97,8 +97,9 @@ class AmadeusClient:
             rate_limit_per_second: Maximum requests per second
         """
         settings = get_settings()
-        self.client_id = client_id or settings.amadeus_client_id
-        self.client_secret = client_secret or settings.amadeus_client_secret
+        # Amadeus service is currently disabled, using fallback values
+        self.client_id = client_id or getattr(settings, "amadeus_client_id", "")
+        self.client_secret = client_secret or getattr(settings, "amadeus_client_secret", "")
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries

@@ -14,9 +14,9 @@ from travel_companion.models.external import (
 )
 from travel_companion.services.activity_cache import ActivityCacheManager
 from travel_companion.services.activity_repository import ActivityRepository
-from travel_companion.services.external_apis.google_places_client import GooglePlacesClient
 from travel_companion.services.external_apis.geoapify import GeoapifyClient
 from travel_companion.services.external_apis.getyourguide import GetYourGuideAPIClient
+from travel_companion.services.external_apis.google_places_client import GooglePlacesClient
 from travel_companion.services.external_apis.tripadvisor import TripAdvisorAPIClient
 from travel_companion.services.external_apis.viator import ViatorAPIClient
 

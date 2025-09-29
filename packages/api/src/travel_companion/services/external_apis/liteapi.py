@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from pydantic import BaseModel, Field
@@ -128,7 +128,10 @@ class LiteAPIClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._search_circuit.call(self._search_hotels_by_geo_impl, request)
+        return cast(
+            list[dict[str, Any]],
+            await self._search_circuit.call(self._search_hotels_by_geo_impl, request),
+        )
 
     async def _search_hotels_by_geo_impl(
         self, request: LiteAPIHotelSearchRequest
@@ -161,7 +164,7 @@ class LiteAPIClient:
             search_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
             # Transform response
-            hotels = data.get("data", [])
+            hotels = cast(list[dict[str, Any]], data.get("data", []))
 
             self.logger.info(
                 f"Found {len(hotels)} hotels via LiteAPI geo search in {search_time_ms}ms"
@@ -191,7 +194,10 @@ class LiteAPIClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._rates_circuit.call(self._get_min_rates_impl, request)
+        return cast(
+            dict[str, Any],
+            await self._rates_circuit.call(self._get_min_rates_impl, request),
+        )
 
     async def _get_min_rates_impl(self, request: LiteAPIMinRatesRequest) -> dict[str, Any]:
         """Implementation of min rates with circuit breaker protection."""
@@ -219,7 +225,7 @@ class LiteAPIClient:
             self.logger.info(
                 f"Retrieved min rates for {len(request.hotel_ids)} hotels in {search_time_ms}ms"
             )
-            return data
+            return cast(dict[str, Any], data)
 
         except httpx.HTTPStatusError as e:
             self.logger.error(f"LiteAPI min rates HTTP error: {e.response.status_code}")
@@ -244,7 +250,10 @@ class LiteAPIClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._rates_circuit.call(self._get_full_rates_impl, request)
+        return cast(
+            dict[str, Any],
+            await self._rates_circuit.call(self._get_full_rates_impl, request),
+        )
 
     async def _get_full_rates_impl(self, request: LiteAPIRatesRequest) -> dict[str, Any]:
         """Implementation of full rates with circuit breaker protection."""
@@ -272,7 +281,7 @@ class LiteAPIClient:
             self.logger.info(
                 f"Retrieved full rates for {len(request.hotel_ids)} hotels in {search_time_ms}ms"
             )
-            return data
+            return cast(dict[str, Any], data)
 
         except httpx.HTTPStatusError as e:
             self.logger.error(f"LiteAPI full rates HTTP error: {e.response.status_code}")

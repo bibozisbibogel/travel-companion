@@ -34,7 +34,7 @@ async def test_activity_agent():
         "accessibility_required": False,
         "child_friendly": False,
         "sort_by": "rating",
-        "limit": 5
+        "limit": 5,
     }
 
     print(f"   Location: {request_data['location']}")
@@ -50,7 +50,7 @@ async def test_activity_agent():
     try:
         response = await agent.process(request_data)
 
-        print(f"\n4. Results Summary:")
+        print("\n4. Results Summary:")
         print(f"   ✓ Found {response.total_results} activities")
         print(f"   ✓ Search completed in {response.search_time_ms}ms")
         print(f"   ✓ Cached: {response.cached}")
@@ -71,7 +71,11 @@ async def test_activity_agent():
                     print(f"   Duration: {activity.duration_minutes} minutes")
                 print(f"   Location: {activity.location}")
                 if activity.description:
-                    desc = activity.description[:100] + "..." if len(activity.description) > 100 else activity.description
+                    desc = (
+                        activity.description[:100] + "..."
+                        if len(activity.description) > 100
+                        else activity.description
+                    )
                     print(f"   Description: {desc}")
                 # Note: 'included' field may not be available from all providers
                 print(f"   Provider: {activity.provider}")
@@ -80,15 +84,16 @@ async def test_activity_agent():
 
         # Test search metadata
         if response.search_metadata:
-            print(f"\n6. Search Metadata:")
+            print("\n6. Search Metadata:")
             for key, value in response.search_metadata.items():
                 print(f"   {key}: {value}")
 
-        print(f"\n✅ Test completed successfully!")
+        print("\n✅ Test completed successfully!")
 
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 60)
@@ -118,7 +123,7 @@ async def test_different_categories():
             "duration_hours": 3.0,
             "min_price": 20.0,
             "max_price": 200.0,
-            "min_rating": 3.5
+            "min_rating": 3.5,
         }
 
         try:
@@ -152,7 +157,7 @@ async def test_error_handling():
         "location": "London",
         "date": (datetime.now() - timedelta(days=1)).isoformat(),
         "guest_count": 2,
-        "category": "cultural"
+        "category": "cultural",
     }
 
     try:
@@ -163,9 +168,7 @@ async def test_error_handling():
 
     # Test with missing required fields
     print("\n2. Testing missing required fields...")
-    incomplete_request = {
-        "location": "London"
-    }
+    incomplete_request = {"location": "London"}
 
     try:
         response = await agent.process(incomplete_request)
@@ -179,7 +182,7 @@ async def test_error_handling():
         "location": "London",
         "date": (datetime.now() + timedelta(days=1)).isoformat(),
         "guest_count": 2,
-        "category": "invalid_category"
+        "category": "invalid_category",
     }
 
     try:
@@ -196,7 +199,7 @@ async def test_error_handling():
         "guest_count": 2,
         "category": "cultural",
         "min_price": 200.0,
-        "max_price": 50.0  # Max less than min
+        "max_price": 50.0,  # Max less than min
     }
 
     try:

@@ -1,7 +1,7 @@
 """Google Places API (New) integration for place search and details."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
@@ -21,7 +21,7 @@ class PlaceLocation(BaseModel):
 class PlaceOpeningHours(BaseModel):
     """Opening hours information."""
 
-    open_now: Optional[bool] = None
+    open_now: bool | None = None
     periods: list[dict[str, Any]] = Field(default_factory=list)
     weekday_text: list[str] = Field(default_factory=list)
 
@@ -30,7 +30,7 @@ class PlaceReview(BaseModel):
     """User review information."""
 
     author_name: str
-    author_url: Optional[str] = None
+    author_url: str | None = None
     rating: float
     relative_time_description: str
     text: str
@@ -51,25 +51,25 @@ class Place(BaseModel):
 
     id: str
     display_name: dict[str, str]
-    formatted_address: Optional[str] = None
-    location: Optional[PlaceLocation] = None
+    formatted_address: str | None = None
+    location: PlaceLocation | None = None
     types: list[str] = Field(default_factory=list)
-    primary_type: Optional[str] = None
-    rating: Optional[float] = None
-    user_rating_count: Optional[int] = None
-    price_level: Optional[str] = None  # PRICE_LEVEL_INEXPENSIVE, PRICE_LEVEL_MODERATE, etc.
-    current_opening_hours: Optional[PlaceOpeningHours] = None
-    website_uri: Optional[str] = None
-    international_phone_number: Optional[str] = None
+    primary_type: str | None = None
+    rating: float | None = None
+    user_rating_count: int | None = None
+    price_level: str | None = None  # PRICE_LEVEL_INEXPENSIVE, PRICE_LEVEL_MODERATE, etc.
+    current_opening_hours: PlaceOpeningHours | None = None
+    website_uri: str | None = None
+    international_phone_number: str | None = None
     photos: list[PlacePhoto] = Field(default_factory=list)
     reviews: list[PlaceReview] = Field(default_factory=list)
-    google_maps_uri: Optional[str] = None
+    google_maps_uri: str | None = None
 
 
 class GooglePlacesNewAPI:
     """Google Places API (New) client for searching places and getting details."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize Google Places API (New) client."""
         self.api_key = api_key or get_settings().google_places_api_key
         if not self.api_key:
@@ -85,28 +85,28 @@ class GooglePlacesNewAPI:
             },
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "GooglePlacesNewAPI":
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.close()
 
-    async def close(self):
+    async def close(self) -> None:
         """Close HTTP client."""
         await self.client.aclose()
 
     async def text_search(
         self,
         text_query: str,
-        location_bias: Optional[tuple[float, float]] = None,
-        radius: Optional[int] = None,
-        min_rating: Optional[float] = None,
-        price_levels: Optional[list[str]] = None,
-        open_now: Optional[bool] = None,
+        location_bias: tuple[float, float] | None = None,
+        radius: int | None = None,
+        min_rating: float | None = None,
+        price_levels: list[str] | None = None,
+        open_now: bool | None = None,
         max_result_count: int = 20,
-        field_mask: Optional[str] = None,
+        field_mask: str | None = None,
     ) -> list[Place]:
         """
         Search for places using text query (New API).
@@ -199,13 +199,13 @@ class GooglePlacesNewAPI:
         self,
         location: tuple[float, float],
         radius: int = 1000,
-        included_types: Optional[list[str]] = None,
-        excluded_types: Optional[list[str]] = None,
-        min_rating: Optional[float] = None,
-        price_levels: Optional[list[str]] = None,
-        open_now: Optional[bool] = None,
+        included_types: list[str] | None = None,
+        excluded_types: list[str] | None = None,
+        min_rating: float | None = None,
+        price_levels: list[str] | None = None,
+        open_now: bool | None = None,
         max_result_count: int = 20,
-        field_mask: Optional[str] = None,
+        field_mask: str | None = None,
     ) -> list[Place]:
         """
         Search for places near a location (New API).
@@ -296,7 +296,7 @@ class GooglePlacesNewAPI:
     async def get_place(
         self,
         place_id: str,
-        field_mask: Optional[str] = None,
+        field_mask: str | None = None,
     ) -> Place:
         """
         Get detailed information about a place.
@@ -342,12 +342,12 @@ class GooglePlacesNewAPI:
 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error getting place details: {e.response.text}")
-            raise ValueError(f"Failed to get place details: {e.response.text}")
+            raise ValueError(f"Failed to get place details: {e.response.text}") from e
         except Exception as e:
             logger.error(f"Error getting place details: {e}")
             raise
 
-    def _parse_place(self, data: dict) -> Place:
+    def _parse_place(self, data: dict[str, Any]) -> Place:
         """Parse place data from API response."""
         # Parse location
         location = None
@@ -394,9 +394,7 @@ class GooglePlacesNewAPI:
                     author_name=review_data.get("authorName", ""),
                     author_url=review_data.get("authorUrl"),
                     rating=review_data.get("rating", 0),
-                    relative_time_description=review_data.get(
-                        "relativeTimeDescription", ""
-                    ),
+                    relative_time_description=review_data.get("relativeTimeDescription", ""),
                     text=text,
                     time=review_data.get("time", 0),
                 )
