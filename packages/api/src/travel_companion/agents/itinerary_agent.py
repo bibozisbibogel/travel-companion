@@ -692,6 +692,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     latitude=trip_request.destination.latitude or 0.0,
                     longitude=trip_request.destination.longitude or 0.0,
                     address=f"City Center, {trip_request.destination.city}",
+                    address_line2=None,
                     city=trip_request.destination.city,
                     state=None,
                     country=trip_request.destination.country,

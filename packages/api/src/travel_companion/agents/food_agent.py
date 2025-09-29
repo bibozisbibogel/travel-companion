@@ -42,6 +42,40 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         """Version of the agent for compatibility and debugging."""
         return "2.0.0"  # Updated version for Geoapify integration
 
+    async def _geocode_location_if_needed(
+        self, location: str | None, latitude: float | None, longitude: float | None
+    ) -> tuple[float | None, float | None]:
+        """Geocode location to coordinates if needed.
+
+        Args:
+            location: Location name to geocode
+            latitude: Existing latitude (if available)
+            longitude: Existing longitude (if available)
+
+        Returns:
+            Tuple of (latitude, longitude), either geocoded or original values
+        """
+        # If we already have coordinates or no location, return as-is
+        if (latitude and longitude) or not location:
+            return latitude, longitude
+
+        try:
+            self.logger.info(f"Geocoding location: {location}")
+            geocode_result = await self.geoapify_client.geocode_city(location)
+
+            geocoded_lat = geocode_result["latitude"]
+            geocoded_lon = geocode_result["longitude"]
+
+            self.logger.info(f"Geocoded '{location}' to: {geocoded_lat}, {geocoded_lon}")
+            return geocoded_lat, geocoded_lon
+
+        except ExternalAPIError as e:
+            self.logger.warning(
+                f"Failed to geocode location '{location}': {e}. Falling back to text-based search."
+            )
+            # Return original values if geocoding fails
+            return latitude, longitude
+
     async def process(self, request_data: dict[str, Any]) -> RestaurantSearchResponse:
         """Process restaurant search request using Geoapify Places API.
 
@@ -55,17 +89,25 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             # Validate and parse request
             search_request = RestaurantSearchRequest(**request_data)
 
-            # If location string is provided and no coordinates, log for clarity
-            if search_request.location and not (
-                search_request.latitude and search_request.longitude
-            ):
-                self.logger.info(
-                    f"Processing restaurant search for location: {search_request.location}"
-                )
-            elif search_request.latitude and search_request.longitude:
+            # Geocode location if needed
+            lat, lon = await self._geocode_location_if_needed(
+                search_request.location, search_request.latitude, search_request.longitude
+            )
+
+            # Update request with geocoded coordinates if we got them
+            if lat and lon and not (search_request.latitude and search_request.longitude):
+                search_request.latitude = lat
+                search_request.longitude = lon
+
+            # Log what we're searching
+            if search_request.latitude and search_request.longitude:
                 self.logger.info(
                     f"Processing restaurant search at coordinates: "
                     f"{search_request.latitude}, {search_request.longitude}"
+                )
+            elif search_request.location:
+                self.logger.info(
+                    f"Processing restaurant search for location: {search_request.location}"
                 )
 
             # Search using Geoapify with circuit breaker protection
@@ -120,6 +162,11 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             else:
                 category_str = cuisine_category
 
+            # Geocode location if needed
+            latitude, longitude = await self._geocode_location_if_needed(
+                location, latitude, longitude
+            )
+
             # Build search request
             search_request = RestaurantSearchRequest(
                 location=location,
@@ -160,6 +207,11 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             RestaurantSearchResponse with local specialty restaurants
         """
         try:
+            # Geocode location if needed
+            latitude, longitude = await self._geocode_location_if_needed(
+                location, latitude, longitude
+            )
+
             # Determine cuisine categories based on location
             specialty_categories = self._get_local_cuisine_categories(location)
 
@@ -449,6 +501,9 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         Returns:
             RestaurantSearchResponse with fast food options
         """
+        # Geocode location if needed
+        latitude, longitude = await self._geocode_location_if_needed(location, latitude, longitude)
+
         fast_food_categories = [
             GeoapifyCateringCategory.FAST_FOOD.value,
             GeoapifyCateringCategory.FAST_FOOD_BURGER.value,

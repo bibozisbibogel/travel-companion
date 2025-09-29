@@ -734,7 +734,10 @@ class RestaurantLocation(BaseModel):
 
     latitude: float = Field(..., ge=-90, le=90, description="Latitude coordinate")
     longitude: float = Field(..., ge=-180, le=180, description="Longitude coordinate")
-    address: str | None = Field(None, description="Restaurant address")
+    address: str | None = Field(None, description="Restaurant address (address_line1)")
+    address_line2: str | None = Field(
+        None, description="Secondary address line (street, postal, city)"
+    )
     city: str | None = Field(None, description="City name")
     state: str | None = Field(None, description="State/province name")
     country: str | None = Field(None, description="Country name")
