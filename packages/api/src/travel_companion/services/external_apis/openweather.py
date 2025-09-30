@@ -233,7 +233,9 @@ class OpenWeatherMapAPIClient:
                     response.raise_for_status()
 
                     data = response.json()
-                    return OpenWeatherMapResponse(**data)
+                    # Convert Current Weather API response to OneCall format  
+                    converted_data = self._convert_current_weather_to_onecall(data, lat, lon)
+                    return OpenWeatherMapResponse(**converted_data)
 
                 except httpx.HTTPError as e:
                     if attempt == self.max_retries - 1:
@@ -255,7 +257,7 @@ class OpenWeatherMapAPIClient:
         Returns:
             Dictionary with lat and lon coordinates
         """
-        url = "http://api.openweathermap.org/geo/1.0/direct"
+        url = "https://api.openweathermap.org/geo/1.0/direct"
         params: dict[str, str | int] = {"q": location, "limit": 1, "appid": self.api_key}
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -287,7 +289,8 @@ class OpenWeatherMapAPIClient:
         Returns:
             OpenWeatherMap One Call API response
         """
-        url = f"{self.base_url}/onecall"
+        # Use Current Weather API (free tier) instead of OneCall
+        url = f"{self.base_url}/weather"
         params: dict[str, str | int | float] = {
             "lat": lat,
             "lon": lon,
@@ -306,7 +309,9 @@ class OpenWeatherMapAPIClient:
                     response.raise_for_status()
 
                     data = response.json()
-                    return OpenWeatherMapResponse(**data)
+                    # Convert Current Weather API response to OneCall format  
+                    converted_data = self._convert_current_weather_to_onecall(data, lat, lon)
+                    return OpenWeatherMapResponse(**converted_data)
 
                 except httpx.HTTPError as e:
                     if attempt == self.max_retries - 1:
@@ -315,7 +320,46 @@ class OpenWeatherMapAPIClient:
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 
         # This should not be reached, but mypy requires it
-        raise RuntimeError("Failed to get onecall data after all retries")
+        raise RuntimeError("Failed to get weather data after all retries")
+
+    def _convert_current_weather_to_onecall(self, current_data: dict, lat: float, lon: float) -> dict:
+        """Convert Current Weather API response to OneCall API format.
+        
+        Args:
+            current_data: Response from Current Weather API
+            lat: Latitude coordinate  
+            lon: Longitude coordinate
+            
+        Returns:
+            Data in OneCall API format
+        """
+        return {
+            "lat": lat,
+            "lon": lon,
+            "timezone": "UTC",  # Current Weather API doesn't provide timezone
+            "timezone_offset": current_data.get("timezone", 0),
+            "current": {
+                "dt": current_data["dt"],
+                "sunrise": current_data["sys"]["sunrise"],
+                "sunset": current_data["sys"]["sunset"],
+                "temp": current_data["main"]["temp"],
+                "feels_like": current_data["main"]["feels_like"],
+                "pressure": current_data["main"]["pressure"],
+                "humidity": current_data["main"]["humidity"],
+                "dew_point": 0,  # Not available in Current Weather API
+                "uvi": 0,  # Not available in Current Weather API  
+                "clouds": current_data["clouds"]["all"],
+                "visibility": current_data.get("visibility", 10000),
+                "wind_speed": current_data["wind"]["speed"],
+                "wind_deg": current_data["wind"].get("deg", 0),
+                "weather": current_data["weather"],
+                "rain": current_data.get("rain"),
+                "snow": current_data.get("snow"),
+            },
+            "hourly": [],  # Not available in Current Weather API
+            "daily": [],   # Not available in Current Weather API
+            "alerts": [],  # Not available in Current Weather API
+        }
 
     def _convert_to_forecast(
         self, data: OpenWeatherMapResponse, location_name: str
