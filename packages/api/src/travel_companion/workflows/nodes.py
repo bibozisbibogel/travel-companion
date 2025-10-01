@@ -777,22 +777,36 @@ async def execute_itinerary_agent(state: TripPlanningWorkflowState) -> TripPlann
         # Create itinerary request with all available data as dictionary
         trip_request = state["trip_request"]
 
+        # Pass workflow state with pre-fetched agent results
+        # ItineraryAgent will detect this is workflow mode and use the pre-fetched data
         itinerary_request = {
-            "trip_id": state.get("trip_id", f"trip_{state['workflow_id'][:8]}"),
+            # Trip destination fields (for TripDestination reconstruction)
             "destination": trip_request.destination.city,
+            "country": trip_request.destination.country,
+            "country_code": trip_request.destination.country_code,
+            "airport_code": trip_request.destination.airport_code,
+            "latitude": trip_request.destination.latitude,
+            "longitude": trip_request.destination.longitude,
+            # Trip requirements fields (for TripRequirements reconstruction)
             "start_date": trip_request.requirements.start_date.isoformat(),
             "end_date": trip_request.requirements.end_date.isoformat(),
+            "budget": float(trip_request.requirements.budget),
+            "currency": trip_request.requirements.currency,
             "traveler_count": trip_request.requirements.travelers,
-            "budget_constraints": state["budget_tracking"],
-            # Agent results
+            "travel_class": trip_request.requirements.travel_class.value
+            if trip_request.requirements.travel_class
+            else "economy",
+            "accommodation_type": trip_request.requirements.accommodation_type.value
+            if trip_request.requirements.accommodation_type
+            else "hotel",
+            # User preferences
+            "user_preferences": state.get("user_preferences", {}),
+            # Pre-fetched agent results (workflow mode indicators)
             "flight_options": state.get("flight_results", []),
             "hotel_options": state.get("hotel_results", []),
             "activity_options": state.get("activity_results", []),
             "restaurant_options": state.get("food_recommendations", []),
             "weather_forecast": state.get("weather_data", {}),
-            # Optimization preferences
-            "optimization_criteria": ["budget", "time", "weather"],
-            "user_preferences": state.get("user_preferences", {}),
         }
 
         # Execute itinerary agent

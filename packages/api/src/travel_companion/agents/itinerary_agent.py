@@ -121,27 +121,47 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
     async def process(self, request_data: dict[str, Any]) -> ItineraryAgentResponse:
         """Process trip planning request with multi-agent coordination.
 
+        Supports two modes:
+        1. Standalone mode: Receives TripPlanRequest, coordinates all agents internally
+        2. Workflow mode: Receives pre-fetched agent results from workflow state
+
         Args:
-            request_data: Trip planning request data
+            request_data: Trip planning request data or workflow state with pre-fetched results
 
         Returns:
             Complete itinerary with all travel components integrated
         """
         try:
-            # Validate and parse request
-            trip_request = TripPlanRequest(**request_data)
-            self.logger.info(f"Processing itinerary for {trip_request.destination.city}")
+            # Check if this is workflow mode (pre-fetched data) or standalone mode
+            has_prefetched_data = self._has_prefetched_agent_results(request_data)
 
-            # Generate cache key and check cache
-            cache_key = await self._cache_key(request_data)
-            cached_result = await self._get_cached_result(cache_key)
-            if cached_result:
-                return cached_result
+            if has_prefetched_data:
+                # Workflow mode - use pre-fetched data
+                trip_request, agent_results = await self._extract_workflow_data(request_data)
+                self.logger.info(
+                    f"Processing itinerary for {trip_request.destination.city} "
+                    f"(workflow mode with pre-fetched data)"
+                )
+            else:
+                # Standalone mode - validate and parse request
+                trip_request = TripPlanRequest(**request_data)
+                self.logger.info(
+                    f"Processing itinerary for {trip_request.destination.city} "
+                    f"(standalone mode)"
+                )
 
-            # Coordinate with all agents concurrently
+                # Generate cache key and check cache
+                cache_key = await self._cache_key(request_data)
+                cached_result = await self._get_cached_result(cache_key)
+                if cached_result:
+                    return cached_result
+
+                # Coordinate with all agents concurrently
+                start_time = asyncio.get_event_loop().time()
+                agent_results = await self._coordinate_agents(trip_request)
+
+            # Common processing for both modes
             start_time = asyncio.get_event_loop().time()
-
-            agent_results = await self._coordinate_agents(trip_request)
 
             # Generate daily schedule and optimize
             daily_itinerary = await self._generate_daily_schedule(trip_request, agent_results)
@@ -210,25 +230,41 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             self.logger.error(f"Itinerary generation failed: {e}")
             raise ExternalAPIError(f"Itinerary generation failed: {e}") from e
 
-    async def _coordinate_agents(self, trip_request: TripPlanRequest) -> dict[str, Any]:
+    async def _coordinate_agents(
+        self, trip_request: TripPlanRequest, agents_to_fetch: list[str] | None = None
+    ) -> dict[str, Any]:
         """Enhanced agent coordination with fallback strategies and improved error handling.
 
         Args:
             trip_request: Trip planning request
+            agents_to_fetch: Optional list of specific agents to fetch. If None, fetches all agents.
 
         Returns:
-            Dictionary containing results from all agents with graceful degradation
+            Dictionary containing results from requested agents with graceful degradation
         """
         agent_results: dict[str, Any] = {}
 
-        # Prepare requests for each agent
-        agent_requests = {
-            "flights": self._prepare_flight_request(trip_request),
-            "hotels": self._prepare_hotel_request(trip_request),
-            "activities": self._prepare_activity_request(trip_request),
-            "weather": self._prepare_weather_request(trip_request),
-            "restaurants": self._prepare_food_request(trip_request),
+        # Prepare requests only for requested agents (or all if not specified)
+        all_agent_preparers = {
+            "flights": self._prepare_flight_request,
+            "hotels": self._prepare_hotel_request,
+            "activities": self._prepare_activity_request,
+            "weather": self._prepare_weather_request,
+            "restaurants": self._prepare_food_request,
         }
+
+        # If specific agents requested, only prepare those
+        if agents_to_fetch is not None:
+            agent_requests = {
+                name: preparer(trip_request)
+                for name, preparer in all_agent_preparers.items()
+                if name in agents_to_fetch
+            }
+        else:
+            # Prepare all agents (standalone mode)
+            agent_requests = {
+                name: preparer(trip_request) for name, preparer in all_agent_preparers.items()
+            }
 
         # Try to get cached results first
         cached_results = await self._get_cached_agent_results(agent_requests)
@@ -339,7 +375,15 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     "error_type": type(result).__name__,
                 }
             else:
-                agent_results[agent_name] = {"status": "success", "data": result, "cached": False}
+                # Normalize data format to match pre-fetched data structure
+                # Wrap response objects in dict format expected by downstream methods
+                normalized_data = self._normalize_agent_response(agent_name, result)
+
+                agent_results[agent_name] = {
+                    "status": "success",
+                    "data": normalized_data,
+                    "cached": False,
+                }
                 self.logger.debug(f"{agent_name} agent completed successfully")
 
         return agent_results
@@ -713,13 +757,34 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             cache_expires_at=None,
         )
 
+    def _make_serializable(self, data: Any) -> Any:
+        """Convert Pydantic models and other objects to JSON-serializable format."""
+        from pydantic import BaseModel
+
+        if isinstance(data, BaseModel):
+            return data.model_dump(mode="json")
+        elif isinstance(data, dict):
+            return {key: self._make_serializable(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self._make_serializable(item) for item in data]
+        elif isinstance(data, (datetime, date)):
+            return data.isoformat()
+        elif isinstance(data, Decimal):
+            return str(data)
+        else:
+            return data
+
     async def _cache_agent_results(self, agent_results: dict[str, Any]) -> None:
         """Cache successful agent results for future use."""
         for agent_name, result in agent_results.items():
             if result.get("status") == "success" and not result.get("cached", False):
                 try:
+                    # Convert Pydantic models to dicts for JSON serialization
+                    data = result["data"]
+                    serializable_data = self._make_serializable(data)
+
                     cache_data = {
-                        "data": result["data"],
+                        "data": serializable_data,
                         "cached_at": datetime.now().isoformat(),
                         "agent_name": agent_name,
                     }
@@ -831,14 +896,245 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             ),
         )
 
+    def _normalize_agent_response(self, agent_name: str, response: Any) -> dict[str, Any]:
+        """Normalize agent response to match pre-fetched data format.
+
+        Args:
+            agent_name: Name of the agent (flights, hotels, activities, etc.)
+            response: Raw agent response object
+
+        Returns:
+            Normalized dict with data wrapped in expected format
+        """
+        # Handle response objects - extract data and wrap in dict
+        if agent_name == "flights":
+            if hasattr(response, "flights"):
+                return {"flights": response.flights}
+            return {"flights": []}
+        elif agent_name == "hotels":
+            if hasattr(response, "hotels"):
+                return {"hotels": response.hotels}
+            return {"hotels": []}
+        elif agent_name == "activities":
+            if hasattr(response, "activities"):
+                return {"activities": response.activities}
+            return {"activities": []}
+        elif agent_name == "restaurants":
+            if hasattr(response, "restaurants"):
+                return {"restaurants": response.restaurants}
+            return {"restaurants": []}
+        elif agent_name == "weather":
+            # Weather is already a dict, return as-is
+            if isinstance(response, dict):
+                return response
+            # If it's a response object, try to extract data
+            if hasattr(response, "model_dump"):
+                return response.model_dump()
+            return {}
+        else:
+            # Unknown agent, return as-is
+            return response
+
+    def _has_prefetched_agent_results(self, request_data: dict[str, Any]) -> bool:
+        """Check if request_data contains pre-fetched agent results from workflow.
+
+        Args:
+            request_data: Request data dictionary
+
+        Returns:
+            True if this appears to be workflow mode with pre-fetched data
+        """
+        # Workflow mode has these keys that standalone mode doesn't
+        workflow_indicators = [
+            "flight_options",
+            "hotel_options",
+            "activity_options",
+            "restaurant_options",
+            "weather_forecast",
+        ]
+
+        # If any of these workflow-specific keys exist, we're in workflow mode
+        return any(key in request_data for key in workflow_indicators)
+
+    async def _extract_workflow_data(
+        self, request_data: dict[str, Any]
+    ) -> tuple[TripPlanRequest, dict[str, Any]]:
+        """Extract TripPlanRequest and agent results from workflow state.
+
+        Args:
+            request_data: Workflow state with pre-fetched agent results
+
+        Returns:
+            Tuple of (TripPlanRequest, agent_results dict)
+        """
+        # Reconstruct TripPlanRequest from workflow data
+        # The workflow sends individual fields, we need to reconstruct the proper structure
+        from ..models.trip import TripDestination, TripRequirements
+
+        # Build TripDestination
+        destination = TripDestination(
+            city=request_data.get("destination", "Unknown"),
+            country=request_data.get("country", "Unknown"),
+            country_code=request_data.get("country_code", "XX"),
+            airport_code=request_data.get("airport_code"),
+            latitude=request_data.get("latitude", 0.0),
+            longitude=request_data.get("longitude", 0.0),
+        )
+
+        # Build TripRequirements
+        from datetime import date
+
+        start_date_str = request_data.get("start_date", "")
+        end_date_str = request_data.get("end_date", "")
+
+        requirements = TripRequirements(
+            budget=Decimal(str(request_data.get("budget", 1000.0))),
+            currency=request_data.get("currency", "USD"),
+            start_date=date.fromisoformat(start_date_str) if start_date_str else date.today(),
+            end_date=date.fromisoformat(end_date_str)
+            if end_date_str
+            else date.today(),
+            travelers=request_data.get("traveler_count", 1),
+            travel_class=request_data.get("travel_class", "economy"),
+            accommodation_type=request_data.get("accommodation_type", "hotel"),
+        )
+
+        # Create TripPlanRequest
+        trip_request = TripPlanRequest(
+            destination=destination,
+            requirements=requirements,
+            preferences=request_data.get("user_preferences", {}),
+        )
+
+        # Extract pre-fetched agent results and convert to expected format
+        # Note: Some agents might have failed in workflow, so check if data is present
+        agent_results = {}
+
+        # Flight data - wrap in dict format expected by _add_flight_items
+        flight_data = request_data.get("flight_options", [])
+        if flight_data:  # Has data
+            agent_results["flights"] = {
+                "status": "success",
+                "data": {"flights": flight_data},  # Wrap in dict with "flights" key
+                "cached": False,
+                "prefetched": True,
+            }
+
+        # Hotel data - wrap in dict format expected by _add_hotel_items
+        hotel_data = request_data.get("hotel_options", [])
+        if hotel_data:  # Has data
+            agent_results["hotels"] = {
+                "status": "success",
+                "data": {"hotels": hotel_data},  # Wrap in dict with "hotels" key
+                "cached": False,
+                "prefetched": True,
+            }
+
+        # Activity data - wrap in dict format expected by _add_activity_items
+        activity_data = request_data.get("activity_options", [])
+        if activity_data:  # Has data
+            agent_results["activities"] = {
+                "status": "success",
+                "data": {"activities": activity_data},  # Wrap in dict with "activities" key
+                "cached": False,
+                "prefetched": True,
+            }
+
+        # Restaurant data - wrap in dict format expected by _add_meal_items
+        restaurant_data = request_data.get("restaurant_options", [])
+        if restaurant_data:  # Has data
+            agent_results["restaurants"] = {
+                "status": "success",
+                "data": {"restaurants": restaurant_data},  # Wrap in dict with "restaurants" key
+                "cached": False,
+                "prefetched": True,
+            }
+
+        # Weather data - already in correct format (dict with forecasts)
+        weather_data = request_data.get("weather_forecast", {})
+        if weather_data:  # Has data
+            agent_results["weather"] = {
+                "status": "success",
+                "data": weather_data,  # Weather data is already a dict
+                "cached": False,
+                "prefetched": True,
+            }
+
+        # Check for missing agents and call them if needed
+        missing_agents = []
+        if "flights" not in agent_results:
+            missing_agents.append("flights")
+        if "hotels" not in agent_results:
+            missing_agents.append("hotels")
+        if "activities" not in agent_results:
+            missing_agents.append("activities")
+        if "restaurants" not in agent_results:
+            missing_agents.append("restaurants")
+        if "weather" not in agent_results:
+            missing_agents.append("weather")
+
+        if missing_agents:
+            self.logger.warning(
+                f"Workflow mode: Missing data for {missing_agents}. "
+                f"Will call agents to fetch missing data."
+            )
+
+            # Call _coordinate_agents ONLY for missing agents (with caching and fallback)
+            missing_results = await self._coordinate_agents(trip_request, agents_to_fetch=missing_agents)
+
+            # Merge missing results with pre-fetched results
+            for agent_name in missing_agents:
+                if agent_name in missing_results:
+                    agent_results[agent_name] = missing_results[agent_name]
+
+        # Helper to safely get count of items
+        def get_item_count(agent_name: str) -> int:
+            if agent_name not in agent_results:
+                return 0
+            data = agent_results[agent_name].get("data")
+            if data is None:
+                return 0
+            # Handle dict with wrapped lists (workflow mode)
+            if isinstance(data, dict):
+                if "flights" in data:
+                    return len(data["flights"])
+                if "hotels" in data:
+                    return len(data["hotels"])
+                if "activities" in data:
+                    return len(data["activities"])
+                if "restaurants" in data:
+                    return len(data["restaurants"])
+            # Handle response objects (from agent calls)
+            if hasattr(data, "flights"):
+                return len(data.flights)
+            if hasattr(data, "hotels"):
+                return len(data.hotels)
+            if hasattr(data, "activities"):
+                return len(data.activities)
+            if hasattr(data, "restaurants"):
+                return len(data.restaurants)
+            return 0
+
+        self.logger.info(
+            f"Extracted workflow data: "
+            f"{get_item_count('flights')} flights, "
+            f"{get_item_count('hotels')} hotels, "
+            f"{get_item_count('activities')} activities, "
+            f"{get_item_count('restaurants')} restaurants"
+        )
+
+        return trip_request, agent_results
+
     def _prepare_activity_request(self, trip_request: TripPlanRequest) -> ActivitySearchRequest:
         """Prepare activity search request from trip request."""
-        return ActivitySearchRequest(
+        budget_per_person = Decimal(
+            trip_request.requirements.budget / trip_request.requirements.travelers / 4
+        )
+
+        request = ActivitySearchRequest(
             location=trip_request.destination.city,
             guest_count=trip_request.requirements.travelers,
-            budget_per_person=Decimal(
-                trip_request.requirements.budget / trip_request.requirements.travelers / 4
-            ),
+            budget_per_person=budget_per_person,
             max_results=10,
             check_in_date=datetime.combine(
                 trip_request.requirements.start_date, datetime.min.time()
@@ -850,6 +1146,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             duration_hours=4,
             currency="USD",
         )
+
+        return request
 
     def _prepare_weather_request(self, trip_request: TripPlanRequest) -> WeatherSearchRequest:
         """Prepare weather request from trip request."""
@@ -1190,78 +1488,88 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
             if hotels_list:
                 hotel = hotels_list[0]  # Take first hotel
-            # Check-in on first day (unless travel day)
-            if day_number == 1 and not self._is_travel_day(date, day_number, trip_request):
-                # Get hotel data safely
-                hotel_external_id = (
-                    hotel.external_id if hasattr(hotel, "external_id") else hotel["external_id"]
-                )
-                hotel_name = hotel.name if hasattr(hotel, "name") else hotel["name"]
-                hotel_price_per_night = (
-                    hotel.price_per_night
-                    if hasattr(hotel, "price_per_night")
-                    else hotel["price_per_night"]
+
+                # Check-in on first non-travel day (usually day 1, or day 2 if day 1 has late arrival)
+                # Check in on day 1 or 2, but not on last day
+                total_days = (
+                    trip_request.requirements.end_date - trip_request.requirements.start_date
+                ).days + 1
+                is_checkin_day = (
+                    (day_number == 1 and not self._is_travel_day(date, day_number, trip_request))
+                    or (day_number == 2 and day_number < total_days)
                 )
 
-                if hasattr(hotel, "location"):
-                    hotel_address = hotel.location.address
-                    hotel_latitude = hotel.location.latitude
-                    hotel_longitude = hotel.location.longitude
-                else:
-                    hotel_location = hotel["location"]
-                    hotel_address = hotel_location["address"]
-                    hotel_latitude = hotel_location["latitude"]
-                    hotel_longitude = hotel_location["longitude"]
-
-                items.append(
-                    ItineraryItem(
-                        item_id=f"hotel_checkin_{hotel_external_id}",
-                        item_type="hotel",
-                        name=f"Check-in at {hotel_name}",
-                        description=f"Hotel check-in at {hotel_address}",
-                        start_time=datetime.combine(
-                            date, datetime.min.time().replace(hour=15)
-                        ),  # 3 PM
-                        end_time=datetime.combine(
-                            date, datetime.min.time().replace(hour=15, minute=30)
-                        ),
-                        duration_minutes=30,
-                        cost=Decimal(str(hotel_price_per_night)),
-                        address=hotel_address,
-                        latitude=hotel_latitude,
-                        longitude=hotel_longitude,
-                        booking_reference=f"hotel_{hotel_external_id}",
-                        booking_url=None,
-                        cancellation_policy=None,
-                        special_instructions=None,
+                if is_checkin_day:
+                    # Get hotel data safely
+                    hotel_external_id = (
+                        hotel.external_id if hasattr(hotel, "external_id") else hotel["external_id"]
                     )
-                )
-
-            # Check-out on last day
-            elif date == trip_request.requirements.end_date:
-                items.append(
-                    ItineraryItem(
-                        item_id=f"hotel_checkout_{hotel_external_id}",
-                        item_type="hotel",
-                        name=f"Check-out from {hotel_name}",
-                        description="Hotel check-out",
-                        start_time=datetime.combine(
-                            date, datetime.min.time().replace(hour=11)
-                        ),  # 11 AM
-                        end_time=datetime.combine(
-                            date, datetime.min.time().replace(hour=11, minute=30)
-                        ),
-                        duration_minutes=30,
-                        cost=Decimal("0.00"),  # Cost already counted in check-in
-                        latitude=None,
-                        longitude=None,
-                        address=None,
-                        booking_reference=None,
-                        booking_url=None,
-                        cancellation_policy=None,
-                        special_instructions=None,
+                    hotel_name = hotel.name if hasattr(hotel, "name") else hotel["name"]
+                    hotel_price_per_night = (
+                        hotel.price_per_night
+                        if hasattr(hotel, "price_per_night")
+                        else hotel["price_per_night"]
                     )
-                )
+
+                    if hasattr(hotel, "location"):
+                        hotel_address = hotel.location.address
+                        hotel_latitude = hotel.location.latitude
+                        hotel_longitude = hotel.location.longitude
+                    else:
+                        hotel_location = hotel["location"]
+                        hotel_address = hotel_location["address"]
+                        hotel_latitude = hotel_location["latitude"]
+                        hotel_longitude = hotel_location["longitude"]
+
+                    items.append(
+                        ItineraryItem(
+                            item_id=f"hotel_checkin_{hotel_external_id}",
+                            item_type="hotel",
+                            name=f"Check-in at {hotel_name}",
+                            description=f"Hotel check-in at {hotel_address}",
+                            start_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=15)
+                            ),  # 3 PM
+                            end_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=15, minute=30)
+                            ),
+                            duration_minutes=30,
+                            cost=Decimal(str(hotel_price_per_night)),
+                            address=hotel_address,
+                            latitude=hotel_latitude,
+                            longitude=hotel_longitude,
+                            booking_reference=f"hotel_{hotel_external_id}",
+                            booking_url=None,
+                            cancellation_policy=None,
+                            special_instructions=None,
+                        )
+                    )
+
+                # Check-out on last day
+                elif date == trip_request.requirements.end_date:
+                    items.append(
+                        ItineraryItem(
+                            item_id=f"hotel_checkout_{hotel_external_id}",
+                            item_type="hotel",
+                            name=f"Check-out from {hotel_name}",
+                            description="Hotel check-out",
+                            start_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=11)
+                            ),  # 11 AM
+                            end_time=datetime.combine(
+                                date, datetime.min.time().replace(hour=11, minute=30)
+                            ),
+                            duration_minutes=30,
+                            cost=Decimal("0.00"),  # Cost already counted in check-in
+                            latitude=None,
+                            longitude=None,
+                            address=None,
+                            booking_reference=None,
+                            booking_url=None,
+                            cancellation_policy=None,
+                            special_instructions=None,
+                        )
+                    )
 
         except (TypeError, IndexError, AttributeError):
             # Handle Mock objects or empty lists
@@ -1296,20 +1604,37 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 return items
 
             if activities_list:
-                # Distribute activities across days (2-3 activities per day max)
-                activities_per_day = min(
-                    3, len(activities_list) // trip_request.requirements.end_date.day
-                )
+                # Distribute activities across non-travel days
+                # Calculate how many non-travel days we have
+                trip_duration = (
+                    trip_request.requirements.end_date - trip_request.requirements.start_date
+                ).days + 1
 
-                start_index = (day_number - 1) * activities_per_day
-                day_activities = activities_list[start_index : start_index + activities_per_day]
+                # Estimate non-travel days (usually trip_duration - 2 for arrival/departure)
+                # Schedule activities in morning (09:00) and afternoon (15:30) slots
+                # to avoid conflicts with lunch (14:00) and dinner (19:00)
 
-                current_time = 9  # Start at 9 AM
+                activity_index = (day_number - 2) % len(activities_list)  # Start from day 2
+
+                # Take up to 4 activities per day (2 morning, 2 afternoon)
+                day_activities = []
+                for i in range(4):
+                    idx = (activity_index + i) % len(activities_list)
+                    day_activities.append(activities_list[idx])
+                    if len(day_activities) >= min(4, len(activities_list)):
+                        break
+
+                # Define time slots with 2-hour gaps for 90-min activities + 30min travel buffer
+                # Morning: 09:00, 11:00 | Afternoon: 15:30, 17:30
+                time_slots = [9, 11, 15.5, 17.5]  # Hours as decimals
 
                 for i, activity in enumerate(day_activities):
-                    start_hour = current_time + (i * 3)  # 3 hours apart
-                    if start_hour > 18:  # Don't schedule after 6 PM
+                    if i >= len(time_slots):
                         break
+
+                    start_hour_decimal = time_slots[i]
+                    start_hour = int(start_hour_decimal)
+                    start_minute = int((start_hour_decimal - start_hour) * 60)
 
                     # Get activity data safely
                     activity_external_id = (
@@ -1326,8 +1651,10 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     activity_duration = (
                         activity.duration_minutes
                         if hasattr(activity, "duration_minutes")
-                        else activity.get("duration_minutes", 120)
+                        else activity.get("duration_minutes", 90)
                     )
+                    # Cap duration at 90 minutes to avoid overlaps
+                    activity_duration = min(activity_duration or 90, 90)
                     activity_price = (
                         activity.price if hasattr(activity, "price") else activity["price"]
                     )
@@ -1340,19 +1667,19 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         activity_latitude = activity_location["latitude"]
                         activity_longitude = activity_location["longitude"]
 
+                    start_time = datetime.combine(
+                        date, datetime.min.time().replace(hour=start_hour, minute=start_minute)
+                    )
+                    end_time = start_time + timedelta(minutes=activity_duration)
+
                     items.append(
                         ItineraryItem(
                             item_id=f"activity_{activity_external_id}_{date}",
                             item_type="activity",
                             name=activity_name,
                             description=activity_description,
-                            start_time=datetime.combine(
-                                date, datetime.min.time().replace(hour=start_hour)
-                            ),
-                            end_time=datetime.combine(
-                                date, datetime.min.time().replace(hour=start_hour)
-                            )
-                            + timedelta(minutes=activity_duration),
+                            start_time=start_time,
+                            end_time=end_time,
                             duration_minutes=activity_duration,
                             cost=Decimal(str(activity_price)),
                             latitude=activity_latitude,
@@ -1410,7 +1737,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 day_restaurants = restaurants_list[start_index : start_index + restaurants_per_day]
 
                 meal_times = [
-                    (12, 60, "Lunch"),  # 12 PM, 1 hour
+                    (14, 60, "Lunch"),  # 2 PM, 1 hour (after morning activities)
                     (19, 90, "Dinner"),  # 7 PM, 1.5 hours
                 ]
 
@@ -1429,28 +1756,22 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     restaurant_name = (
                         restaurant.name if hasattr(restaurant, "name") else restaurant["name"]
                     )
-                    cuisine_type = (
-                        restaurant.cuisine_type
-                        if hasattr(restaurant, "cuisine_type")
-                        else restaurant["cuisine_type"]
+
+                    # RestaurantOption doesn't have cuisine_type or price_range
+                    # Use categories field instead
+                    categories = (
+                        restaurant.categories
+                        if hasattr(restaurant, "categories")
+                        else restaurant.get("categories", [])
                     )
-                    price_range = (
-                        restaurant.price_range
-                        if hasattr(restaurant, "price_range")
-                        else restaurant["price_range"]
-                    )
-                    avg_cost = (
-                        getattr(restaurant, "average_cost_per_person", None)
-                        if hasattr(restaurant, "average_cost_per_person")
-                        else restaurant.get("average_cost_per_person")
+                    # Extract cuisine type from categories (e.g., "catering.restaurant.italian" -> "Italian")
+                    cuisine_str = (
+                        categories[0].split('.')[-1].title() if categories
+                        else "Restaurant"
                     )
 
-                    # Handle both enum objects and string values for cuisine_type and price_range
-                    cuisine_str = str(cuisine_type).title()
-                    price_str = str(price_range)
-
-                    # Calculate cost with fallback for None values
-                    cost_per_person = avg_cost or Decimal("25.00")  # Default $25 per person
+                    # RestaurantOption doesn't have average_cost_per_person, use default
+                    cost_per_person = Decimal("30.00")  # Default $30 per person for meals
                     total_cost = Decimal(str(cost_per_person)) * trip_request.requirements.travelers
 
                     items.append(
@@ -1458,7 +1779,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             item_id=f"meal_{restaurant_external_id}_{date}_{meal_type.lower()}",
                             item_type="restaurant",
                             name=f"{meal_type} at {restaurant_name}",
-                            description=f"{meal_type} - {cuisine_str} cuisine ({price_str} price range)",
+                            description=f"{meal_type} - {cuisine_str} cuisine",
                             start_time=datetime.combine(
                                 date, datetime.min.time().replace(hour=hour)
                             ),
@@ -1472,10 +1793,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             longitude=restaurant.location.longitude
                             if hasattr(restaurant, "location")
                             else restaurant["location"]["longitude"],
-                            booking_url=getattr(restaurant, "booking_url", None)
-                            if hasattr(restaurant, "booking_url")
-                            else restaurant.get("booking_url"),
-                            address=None,
+                            booking_url=None,  # RestaurantOption doesn't have booking_url
+                            address=restaurant.formatted_address if hasattr(restaurant, "formatted_address") else None,
                             booking_reference=None,
                             cancellation_policy=None,
                             special_instructions=None,
@@ -1501,21 +1820,36 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
         try:
             # Handle both dict and Pydantic model and Mock objects
-            if isinstance(weather_data, dict) and "daily_forecast" in weather_data:
-                daily_forecast = weather_data["daily_forecast"]
-            else:
-                # Handle Mock or other objects
+            daily_forecast = None
+            if isinstance(weather_data, dict):
+                # Try different key names for forecast data
+                if "daily_forecast" in weather_data:
+                    daily_forecast = weather_data["daily_forecast"]
+                elif "forecasts" in weather_data:
+                    daily_forecast = weather_data["forecasts"]
+
+            if not daily_forecast:
                 return "Weather information unavailable"
 
             if daily_forecast:
                 for forecast in daily_forecast:
-                    if (
-                        "date" in forecast
-                        and datetime.fromisoformat(forecast["date"]).date() == date
-                    ):
-                        return f"{forecast['condition']} - High: {forecast['high_temp']}°, Low: {forecast['low_temp']}°"
+                    if "date" in forecast:
+                        # Handle both string and date comparison
+                        forecast_date_str = forecast["date"]
+                        if isinstance(forecast_date_str, str):
+                            forecast_date = datetime.fromisoformat(forecast_date_str).date()
+                        else:
+                            forecast_date = forecast_date_str
 
-        except (TypeError, AttributeError):
+                        if forecast_date == date:
+                            # Handle different temperature field names
+                            high_temp = forecast.get("high_temp") or forecast.get("temperature_high")
+                            low_temp = forecast.get("low_temp") or forecast.get("temperature_low")
+                            condition = forecast.get("condition", "Unknown")
+
+                            return f"{condition.replace('_', ' ').title()} - High: {high_temp}°, Low: {low_temp}°"
+
+        except (TypeError, AttributeError, ValueError):
             # Handle Mock objects or other non-iterable data
             return None
 
@@ -1561,9 +1895,17 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
                 if flights_list:
                     for flight in flights_list:
-                        price = flight.price if hasattr(flight, "price") else flight["price"]
+                        price = (
+                            flight.price
+                            if hasattr(flight, "price")
+                            else flight.get("price") if isinstance(flight, dict)
+                            else Decimal("450.00")
+                        )
                         flight_currency = (
-                            flight.currency if hasattr(flight, "currency") else flight["currency"]
+                            getattr(flight, "currency", "USD")
+                            if hasattr(flight, "currency")
+                            else flight.get("currency", "USD") if isinstance(flight, dict)
+                            else "USD"
                         )
 
                         cost_breakdown["flights"] += Decimal(str(price))
@@ -1587,10 +1929,14 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         price_per_night = (
                             hotel.price_per_night
                             if hasattr(hotel, "price_per_night")
-                            else hotel["price_per_night"]
+                            else hotel.get("price_per_night") if isinstance(hotel, dict)
+                            else Decimal("100.00")
                         )
                         hotel_currency = (
-                            hotel.currency if hasattr(hotel, "currency") else hotel["currency"]
+                            getattr(hotel, "currency", "USD")
+                            if hasattr(hotel, "currency")
+                            else hotel.get("currency", "USD") if isinstance(hotel, dict)
+                            else "USD"
                         )
 
                         cost_breakdown["hotels"] += Decimal(str(price_per_night)) * nights
@@ -1610,12 +1956,18 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
                 if activities_list:
                     for activity in activities_list:
-                        price = activity.price if hasattr(activity, "price") else activity["price"]
+                        price = (
+                            activity.price
+                            if hasattr(activity, "price")
+                            else activity.get("price") if isinstance(activity, dict)
+                            else Decimal("25.00")
+                        )
                         if price:
                             activity_currency = (
-                                activity.currency
+                                getattr(activity, "currency", "USD")
                                 if hasattr(activity, "currency")
-                                else activity.get("currency", "USD")
+                                else activity.get("currency", "USD") if isinstance(activity, dict)
+                                else "USD"
                             )
                             cost_breakdown["activities"] += Decimal(str(price))
                             if not currency or currency == "USD":
@@ -1637,13 +1989,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
                 if restaurants_list:
                     for restaurant in restaurants_list:
-                        # Estimate cost based on price range (1-4 scale)
-                        price_range = (
-                            restaurant.price_range
-                            if hasattr(restaurant, "price_range")
-                            else restaurant["price_range"]
-                        )
-                        estimated_cost_per_meal = self._estimate_meal_cost(price_range)
+                        # RestaurantOption doesn't have price_range, use default estimate
+                        # In the future, could extract from categories or add field to model
+                        estimated_cost_per_meal = Decimal("30.00")  # Default $30 per meal
                         cost_breakdown["restaurants"] += estimated_cost_per_meal
 
             # Sum total cost
@@ -1701,15 +2049,27 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     for hotel in hotel_data["hotels"]:
                         # Calculate total hotel cost based on nights
                         nights = 1  # This should be calculated from stay duration
-                        cost_breakdown["hotels"] += Decimal(hotel["price_per_night"]) * nights
+                        price_per_night = (
+                            hotel.price_per_night
+                            if hasattr(hotel, "price_per_night")
+                            else hotel.get("price_per_night") if isinstance(hotel, dict)
+                            else Decimal("100.00")
+                        )
+                        cost_breakdown["hotels"] += Decimal(str(price_per_night)) * nights
 
             # Extract activity costs
             if "activities" in agent_results and agent_results["activities"]["status"] == "success":
                 activity_data = agent_results["activities"]["data"]
                 if "activities" in activity_data:
                     for activity in activity_data["activities"]:
-                        if activity["price"]:
-                            cost_breakdown["activities"] += Decimal(activity["price"])
+                        price = (
+                            activity.price
+                            if hasattr(activity, "price")
+                            else activity.get("price") if isinstance(activity, dict)
+                            else Decimal("25.00")
+                        )
+                        if price:
+                            cost_breakdown["activities"] += Decimal(str(price))
 
             # Extract restaurant costs
             if (
@@ -1719,9 +2079,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 restaurant_data = agent_results["restaurants"]["data"]
                 if "restaurants" in restaurant_data:
                     for restaurant in restaurant_data["restaurants"]:
-                        estimated_cost_per_meal = self._estimate_meal_cost(
-                            restaurant["price_range"]
-                        )
+                        # RestaurantOption doesn't have price_range, use default
+                        estimated_cost_per_meal = Decimal("30.00")
                         cost_breakdown["restaurants"] += estimated_cost_per_meal
 
         except Exception as e:

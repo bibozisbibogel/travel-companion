@@ -93,10 +93,10 @@ class GooglePlacesClient:
             if latitude is not None and longitude is not None:
                 location_bias = (latitude, longitude)
 
-            # Map to price levels if budget is provided
-            price_levels = None
-            if request.budget_per_person:
-                price_levels = self._map_price_levels(float(request.budget_per_person))
+            # NOTE: We don't use price_levels parameter for Google Places API because:
+            # 1. Passing multiple price levels returns 0 results (API bug or limitation)
+            # 2. We filter by budget_per_person later in the activity_agent ranking
+            # 3. This allows us to get all activities and apply accurate price filtering
 
             # Search for places
             places = await self.places_api.text_search(
@@ -104,7 +104,7 @@ class GooglePlacesClient:
                 location_bias=location_bias,
                 radius=radius_meters,
                 min_rating=None,  # ActivitySearchRequest doesn't have min_rating field
-                price_levels=price_levels,
+                price_levels=None,  # Don't filter by price at API level
                 open_now=None,  # Could be configured based on request date/time
                 max_result_count=min(request.max_results, 20),
             )
@@ -181,15 +181,16 @@ class GooglePlacesClient:
             List of applicable price levels
         """
         # Google Places price levels:
-        # PRICE_LEVEL_FREE = 0
+        # PRICE_LEVEL_FREE = 0 (NOT SUPPORTED in API searches - returns error)
         # PRICE_LEVEL_INEXPENSIVE = 1 (typically < $10-15)
         # PRICE_LEVEL_MODERATE = 2 (typically $15-50)
         # PRICE_LEVEL_EXPENSIVE = 3 (typically $50-100)
         # PRICE_LEVEL_VERY_EXPENSIVE = 4 (typically > $100)
 
         price_levels = []
-        if max_price >= 0:
-            price_levels.append("PRICE_LEVEL_FREE")
+        # Note: PRICE_LEVEL_FREE is not supported by Google Places API in search requests
+        # It returns error: "Invalid price_levels: FREE. Search by FREE price_level is currently not supported."
+        # We'll include INEXPENSIVE to catch free/cheap activities
         if max_price >= 10:
             price_levels.append("PRICE_LEVEL_INEXPENSIVE")
         if max_price >= 15:
@@ -198,6 +199,10 @@ class GooglePlacesClient:
             price_levels.append("PRICE_LEVEL_EXPENSIVE")
         if max_price >= 100:
             price_levels.append("PRICE_LEVEL_VERY_EXPENSIVE")
+
+        # If no price levels match (e.g., max_price < 10), still search with INEXPENSIVE
+        if not price_levels:
+            price_levels.append("PRICE_LEVEL_INEXPENSIVE")
 
         return price_levels
 
