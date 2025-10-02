@@ -1528,10 +1528,10 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             name=f"Check-in at {hotel_name}",
                             description=f"Hotel check-in at {hotel_address}",
                             start_time=datetime.combine(
-                                date, datetime.min.time().replace(hour=15)
-                            ),  # 3 PM
+                                date, datetime.min.time().replace(hour=13)
+                            ),  # 1 PM (before lunch at 14:00)
                             end_time=datetime.combine(
-                                date, datetime.min.time().replace(hour=15, minute=30)
+                                date, datetime.min.time().replace(hour=13, minute=30)
                             ),
                             duration_minutes=30,
                             cost=Decimal(str(hotel_price_per_night)),
@@ -1624,9 +1624,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     if len(day_activities) >= min(4, len(activities_list)):
                         break
 
-                # Define time slots with 2-hour gaps for 90-min activities + 30min travel buffer
-                # Morning: 09:00, 11:00 | Afternoon: 15:30, 17:30
-                time_slots = [9, 11, 15.5, 17.5]  # Hours as decimals
+                # Define time slots with proper spacing for 90-min activities + 30min travel buffer
+                # Morning slots: 09:00-10:30 (90min) + 30min buffer → next at 11:00-12:30
+                # Afternoon slots: 15:30-17:00 (90min) + 30min buffer → can't fit another before dinner at 19:00
+                # Solution: Only schedule 3 activities per day (2 morning, 1 afternoon)
+                time_slots = [9, 11, 15.5]  # Hours as decimals (allows 30min buffer between activities)
 
                 for i, activity in enumerate(day_activities):
                     if i >= len(time_slots):
