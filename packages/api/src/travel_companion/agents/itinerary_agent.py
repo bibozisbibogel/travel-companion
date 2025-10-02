@@ -118,6 +118,104 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         """Version of the agent for compatibility and debugging."""
         return "1.0.0"
 
+    async def _cache_key(self, request_data: dict[str, Any]) -> str:
+        """Generate cache key for itinerary request with proper field extraction.
+
+        Args:
+            request_data: Request data to generate key from
+
+        Returns:
+            Cache key string
+        """
+        import hashlib
+        import json
+        from datetime import date, datetime
+        from decimal import Decimal
+
+        def json_serializer(obj: Any) -> str:
+            """Custom JSON serializer for datetime, date and Decimal objects."""
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, date):
+                return obj.isoformat()
+            elif isinstance(obj, Decimal):
+                return str(obj)
+            raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+        # Extract location and dates from TripPlanRequest structure or workflow data
+        location = "unknown"
+        start_date = "no_date"
+
+        # Extract destination - could be dict, object, or string
+        if "destination" in request_data:
+            destination_data = request_data["destination"]
+            if isinstance(destination_data, str):
+                # Workflow mode - destination is a string
+                location = destination_data
+            elif isinstance(destination_data, dict):
+                # Standalone mode - destination is a dict
+                location = destination_data.get("city", "unknown")
+            elif hasattr(destination_data, "city"):
+                # Standalone mode - destination is a Pydantic model
+                location = destination_data.city
+
+        # Extract start date
+        if "requirements" in request_data:
+            requirements_data = request_data["requirements"]
+            if isinstance(requirements_data, dict):
+                date_value = requirements_data.get("start_date")
+                if isinstance(date_value, datetime):
+                    start_date = date_value.date().isoformat()
+                elif isinstance(date_value, date):
+                    start_date = date_value.isoformat()
+                elif date_value:
+                    start_date = str(date_value)
+            elif hasattr(requirements_data, "start_date"):
+                date_value = requirements_data.start_date
+                if isinstance(date_value, datetime):
+                    start_date = date_value.date().isoformat()
+                elif isinstance(date_value, date):
+                    start_date = date_value.isoformat()
+
+        # Try workflow mode structure
+        elif "start_date" in request_data:
+            date_value = request_data.get("start_date")
+            if isinstance(date_value, datetime):
+                start_date = date_value.date().isoformat()
+            elif isinstance(date_value, date):
+                start_date = date_value.isoformat()
+            elif date_value:
+                start_date = str(date_value)
+
+        # Create deterministic hash from request data
+        sorted_data = json.dumps(request_data, sort_keys=True, default=json_serializer)
+        hash_obj = hashlib.md5(sorted_data.encode())
+
+        # Create hierarchical cache key
+        location_part = str(location).lower().replace(" ", "_")[:20]
+        date_part = str(start_date).replace("-", "")
+
+        return f"{self.agent_name}:{location_part}:{date_part}:{hash_obj.hexdigest()}"
+
+    async def _get_cached_result(self, cache_key: str) -> ItineraryAgentResponse | None:
+        """Get cached result and convert to ItineraryAgentResponse.
+
+        Args:
+            cache_key: Cache key to lookup
+
+        Returns:
+            Cached ItineraryAgentResponse or None if not found
+        """
+        try:
+            cached_data = await self.redis.get(cache_key, json_decode=True)
+            if cached_data:
+                self.logger.debug(f"Cache hit for {self.agent_name}: {cache_key}")
+                # Convert dict back to ItineraryAgentResponse
+                return ItineraryAgentResponse(**cached_data)
+        except Exception as e:
+            self.logger.warning(f"Cache retrieval failed for {cache_key}: {e}")
+        return None
+
     async def process(self, request_data: dict[str, Any]) -> ItineraryAgentResponse:
         """Process trip planning request with multi-agent coordination.
 
@@ -132,8 +230,20 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             Complete itinerary with all travel components integrated
         """
         try:
+            # Generate cache key early for both modes
+            cache_key = await self._cache_key(request_data)
+
+            # Check cache first before any processing
+            cached_result = await self._get_cached_result(cache_key)
+            if cached_result:
+                self.logger.info("Using cached result")
+                return cached_result
+
             # Check if this is workflow mode (pre-fetched data) or standalone mode
             has_prefetched_data = self._has_prefetched_agent_results(request_data)
+
+            # Start timing for the entire itinerary generation
+            start_time = asyncio.get_event_loop().time()
 
             if has_prefetched_data:
                 # Workflow mode - use pre-fetched data
@@ -150,19 +260,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     f"(standalone mode)"
                 )
 
-                # Generate cache key and check cache
-                cache_key = await self._cache_key(request_data)
-                cached_result = await self._get_cached_result(cache_key)
-                if cached_result:
-                    return cached_result
-
                 # Coordinate with all agents concurrently
-                start_time = asyncio.get_event_loop().time()
                 agent_results = await self._coordinate_agents(trip_request)
 
             # Common processing for both modes
-            start_time = asyncio.get_event_loop().time()
-
+            
             # Generate daily schedule and optimize
             daily_itinerary = await self._generate_daily_schedule(trip_request, agent_results)
 
@@ -214,7 +316,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 cached=False,
             )
 
-            # Cache the result (convert to dict for JSON serialization)
+            # Cache the result for both modes (convert to dict for JSON serialization)
             try:
                 cache_data = response.model_dump(mode="json")
                 await self.redis.set(cache_key, json.dumps(cache_data), expire=self.cache_ttl)
@@ -282,9 +384,6 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             # Execute remaining agent calls with enhanced coordination
             fresh_results = await self._execute_agent_calls_with_fallback(agents_to_call)
             agent_results.update(fresh_results)
-
-            # Cache fresh results
-            await self._cache_agent_results(fresh_results)
 
         # Apply graceful degradation for failed agents
         degraded_results = await self._apply_graceful_degradation(agent_results, trip_request)
@@ -774,34 +873,6 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
         else:
             return data
 
-    async def _cache_agent_results(self, agent_results: dict[str, Any]) -> None:
-        """Cache successful agent results for future use."""
-        for agent_name, result in agent_results.items():
-            if result.get("status") == "success" and not result.get("cached", False):
-                try:
-                    # Convert Pydantic models to dicts for JSON serialization
-                    data = result["data"]
-                    serializable_data = self._make_serializable(data)
-
-                    cache_data = {
-                        "data": serializable_data,
-                        "cached_at": datetime.now().isoformat(),
-                        "agent_name": agent_name,
-                    }
-
-                    # Generate cache key (simplified)
-                    cache_key = f"agent_{agent_name}:recent"
-
-                    # Set expiration based on agent type
-                    expire_seconds = (
-                        7200 if agent_name == "weather" else 86400
-                    )  # 2h for weather, 24h for others
-
-                    await self.redis.set(cache_key, json.dumps(cache_data), expire=expire_seconds)
-                    self.logger.debug(f"Cached {agent_name} result for {expire_seconds / 3600}h")
-
-                except Exception as e:
-                    self.logger.warning(f"Failed to cache {agent_name} results: {e}")
 
     async def _agent_cache_key(self, request: Any) -> str:
         """Generate cache key for agent request."""

@@ -10,6 +10,7 @@ from travel_companion.models.external import (
     RestaurantSearchRequest,
     RestaurantSearchResponse,
 )
+from travel_companion.services.cache import CacheManager
 from travel_companion.services.external_apis.geoapify import GeoapifyClient
 from travel_companion.utils.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 from travel_companion.utils.errors import ExternalAPIError
@@ -29,6 +30,12 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         self.geoapify_circuit_breaker = CircuitBreaker(
             name="geoapify_api", failure_threshold=5, recovery_timeout=60
         )
+
+        # Initialize cache manager
+        self._cache_manager = CacheManager(self.redis)
+        self.cache_ttl_seconds = getattr(
+            self.settings, "food_cache_ttl_seconds", 1800
+        )  # 30 minutes default
 
         self.logger.info("FoodAgent initialized with Geoapify API client and circuit breaker")
 
@@ -86,6 +93,15 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             RestaurantSearchResponse with restaurant recommendations
         """
         try:
+            # Generate cache key
+            cache_key = await self._cache_key(request_data)
+
+            # Try to get cached result
+            cached_result = await self._cache_manager.get_restaurant_cache(cache_key)
+            if cached_result:
+                self.logger.info("Returning cached restaurant search results")
+                return cached_result
+
             # Validate and parse request
             search_request = RestaurantSearchRequest(**request_data)
 
@@ -121,6 +137,11 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 response.restaurants = sorted(
                     response.restaurants, key=lambda r: r.distance_meters or float("inf")
                 )
+
+            # Cache the result
+            await self._cache_manager.set_restaurant_cache(
+                cache_key, response, ttl_seconds=self.cache_ttl_seconds
+            )
 
             self.logger.info(
                 f"Restaurant search completed: {len(response.restaurants)} restaurants found "

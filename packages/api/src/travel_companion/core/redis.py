@@ -1,12 +1,29 @@
 """Redis connection and configuration for caching and rate limiting."""
 
 import json
+import logging
+from decimal import Decimal
 from functools import lru_cache
 from typing import Any, cast
+from uuid import UUID
 
 import redis.asyncio as redis
 
 from travel_companion.core.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for Redis that handles UUID and Decimal types."""
+
+    def default(self, obj: Any) -> Any:
+        """Handle special types for JSON serialization."""
+        if isinstance(obj, UUID):
+            return str(obj)
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
 
 
 class RedisManager:
@@ -49,15 +66,16 @@ class RedisManager:
     ) -> bool:
         """Set a value in Redis with optional expiration."""
         try:
-            # Serialize complex data types
+            # Serialize complex data types using custom encoder
             if isinstance(value, dict | list):
-                value = json.dumps(value)
+                value = json.dumps(value, cls=CustomJSONEncoder)
 
             if expire:
                 return bool(await self.client.setex(key, expire, value))
             else:
                 return bool(await self.client.set(key, value))
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to set Redis key '{key}': {e}")
             return False
 
     async def get(self, key: str, json_decode: bool = False) -> Any | None:

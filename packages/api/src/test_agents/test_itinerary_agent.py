@@ -10,6 +10,7 @@ This demonstrates the workflow mode behavior we implemented.
 """
 
 import asyncio
+import logging
 from datetime import datetime
 from decimal import Decimal
 
@@ -123,6 +124,13 @@ async def main():
     """Test ItineraryAgent with pre-fetched data (workflow mode)."""
     load_dotenv()
 
+    # Configure logging to show INFO level messages
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
     print("=" * 70)
     print("ITINERARY AGENT TEST - WORKFLOW MODE")
     print("=" * 70)
@@ -160,8 +168,9 @@ async def main():
         },
         # Pre-fetched data (workflow mode indicators)
         "flight_options": get_prefetched_flight_data(),
-        "weather_forecast": get_prefetched_weather_data(),
-        # Empty - will trigger API calls to Google Places
+        # "flight_options": [],
+        "weather_forecast": [],
+        # "weather_forecast": get_prefetched_weather_data(),
         "hotel_options": [],
         "activity_options": [],
         "restaurant_options": [],

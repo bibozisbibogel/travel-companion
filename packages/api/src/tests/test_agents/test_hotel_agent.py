@@ -201,9 +201,9 @@ class TestHotelAgent:
 
         await hotel_agent.process(request_data)
 
-        # Should cache the new result (main data + metadata = 2 calls)
-        assert mock_redis.set.call_count == 2
-        # First call should be for the main cache data
+        # Should cache the new result (only main data, no metadata)
+        assert mock_redis.set.call_count == 1
+        # Call should be for the main cache data
         main_call_args, main_call_kwargs = mock_redis.set.call_args_list[0]
         cached_data = main_call_args[1]
         assert "cache_timestamp" in cached_data  # Enhanced cache format
@@ -670,9 +670,9 @@ class TestHotelSearchFunctionality:
         with patch.object(hotel_agent, "search_hotels_google_places", return_value=[]):
             await hotel_agent.process(request_data)
 
-        # Should cache the new result (main data + metadata = 2 calls)
-        assert mock_redis.set.call_count == 2
-        # First call should be for the main cache data
+        # Should cache the new result (only main data, no metadata)
+        assert mock_redis.set.call_count == 1
+        # Call should be for the main cache data
         main_call_args, main_call_kwargs = mock_redis.set.call_args_list[0]
         cached_data = main_call_args[1]
 

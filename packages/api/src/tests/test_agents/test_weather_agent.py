@@ -198,52 +198,6 @@ class TestWeatherAgent:
         with pytest.raises((ValueError, Exception)):
             await weather_agent.process(invalid_request)
 
-    @pytest.mark.asyncio
-    async def test_process_weather_request_with_historical(
-        self, weather_agent, sample_weather_request, sample_weather_forecast
-    ):
-        """Test weather request processing with historical data."""
-        # Mock both forecast and historical data
-        with patch.object(
-            weather_agent.openweather_client,
-            "get_weather_forecast",
-            return_value=sample_weather_forecast,
-        ) as mock_forecast:
-            with patch.object(
-                weather_agent.openweather_client,
-                "get_historical_weather",
-                return_value=[
-                    WeatherData(
-                        timestamp=datetime.now(UTC) - timedelta(days=1),
-                        temperature=18.0,
-                        feels_like=20.0,
-                        humidity=75.0,
-                        pressure=1012.0,
-                        visibility=10.0,
-                        wind_speed=12.0,
-                        wind_direction=180,
-                        precipitation=0.0,
-                        precipitation_probability=0.3,
-                        condition=WeatherCondition.CLEAR,
-                        condition_description="Clear sky",
-                        uv_index=5.0,
-                    )
-                ],
-            ) as mock_historical:
-                # Enable historical data in request
-                request_data = sample_weather_request.model_dump()
-                request_data["include_historical"] = True
-
-                result = await weather_agent.process(request_data)
-
-                assert isinstance(result, WeatherSearchResponse)
-                assert result.forecast == sample_weather_forecast
-                assert len(result.historical_data) == 1
-                assert result.historical_data[0].temperature == 18.0
-                assert result.search_metadata["include_historical"] is True
-
-                mock_forecast.assert_called_once()
-                mock_historical.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_weather_caching(

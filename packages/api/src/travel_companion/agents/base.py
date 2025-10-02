@@ -162,9 +162,19 @@ class BaseAgent(ABC, Generic[T]):
 
         # Create hierarchical cache key structure for better organization
         location_part = normalized_data.get("location", "unknown").replace(" ", "_")[:20]
-        date_part = normalized_data.get("check_in_date", "no_date").replace("-", "")
 
-        return f"{self.agent_name}:{location_part}:{date_part}:{hash_obj.hexdigest()}"
+        # Use check_in_date, start_date, or date field if available
+        date_part = None
+        for date_field in ["check_in_date", "start_date", "date"]:
+            if date_field in normalized_data:
+                date_part = normalized_data[date_field].replace("-", "")
+                break
+
+        # Only include date part if it exists
+        if date_part:
+            return f"{self.agent_name}:{location_part}:{date_part}:{hash_obj.hexdigest()}"
+        else:
+            return f"{self.agent_name}:{location_part}:{hash_obj.hexdigest()}"
 
     async def _get_cached_result(self, cache_key: str) -> T | None:
         """Get cached result from Redis.
