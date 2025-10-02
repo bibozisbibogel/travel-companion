@@ -21,11 +21,11 @@ class DatabaseManager:
         """Get or create Supabase client instance."""
         if self._client is None:
             # Use service key if available, otherwise fall back to anon key
-            key = self._settings.supabase_service_key or self._settings.supabase_key
+            key = self._settings.supabase_key
 
             if not self._settings.supabase_url or not key:
                 raise ValueError(
-                    "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_KEY or SUPABASE_SERVICE_KEY"
+                    "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_KEY"
                 )
 
             self._client = create_client(self._settings.supabase_url, key)
@@ -39,7 +39,7 @@ class DatabaseManager:
                 return False
 
             # Simple health check by attempting to connect
-            key = self._settings.supabase_service_key or self._settings.supabase_key
+            key = self._settings.supabase_key
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self._settings.supabase_url}/rest/v1/",
