@@ -153,100 +153,12 @@ class OpenWeatherMapAPIClient:
             # Convert to our weather models
             forecast = self._convert_to_forecast(weather_data, request.location)
 
-            self.logger.info(f"Retrieved weather forecast for {request.location}")
+            self.logger.info(f"Retrieved weather forecast for {request.location}. Forecast: {forecast}")
             return forecast
 
         except Exception as e:
             self.logger.error(f"Failed to get weather forecast for {request.location}: {e}")
             raise
-
-    async def get_historical_weather(
-        self, lat: float, lon: float, start_timestamp: int, end_timestamp: int
-    ) -> list[WeatherData]:
-        """Get historical weather data for a location and time range.
-
-        Args:
-            lat: Latitude coordinate
-            lon: Longitude coordinate
-            start_timestamp: Start timestamp (Unix time)
-            end_timestamp: End timestamp (Unix time)
-
-        Returns:
-            List of historical weather data points
-
-        Note:
-            Historical data is only available for dates up to 5 days ago
-            and requires a paid OpenWeatherMap subscription.
-        """
-        try:
-            historical_data = []
-            current_time = start_timestamp
-
-            # Historical API requires separate calls for each day
-            while current_time <= end_timestamp:
-                try:
-                    daily_data = await self._get_historical_data(lat, lon, current_time)
-                    if daily_data and daily_data.current:
-                        weather_point = self._convert_current_weather(daily_data.current)
-                        historical_data.append(weather_point)
-                except Exception as e:
-                    self.logger.warning(
-                        f"Failed to get historical data for timestamp {current_time}: {e}"
-                    )
-
-                # Move to next day (86400 seconds = 1 day)
-                current_time += 86400
-
-            self.logger.info(f"Retrieved {len(historical_data)} historical weather data points")
-            return historical_data
-
-        except Exception as e:
-            self.logger.error(f"Failed to get historical weather data: {e}")
-            raise
-
-    async def _get_historical_data(
-        self, lat: float, lon: float, timestamp: int
-    ) -> OpenWeatherMapResponse:
-        """Get historical weather data for a specific timestamp.
-
-        Args:
-            lat: Latitude coordinate
-            lon: Longitude coordinate
-            timestamp: Unix timestamp
-
-        Returns:
-            OpenWeatherMap historical response
-        """
-        url = f"{self.base_url}/onecall/timemachine"
-        params: dict[str, str | int | float] = {
-            "lat": lat,
-            "lon": lon,
-            "dt": timestamp,
-            "appid": self.api_key,
-            "units": "metric",
-        }
-
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            for attempt in range(self.max_retries):
-                try:
-                    response = await client.get(url, params=params)
-                    response.raise_for_status()
-
-                    data = response.json()
-                    # Convert Current Weather API response to OneCall format  
-                    converted_data = self._convert_current_weather_to_onecall(data, lat, lon)
-                    return OpenWeatherMapResponse(**converted_data)
-
-                except httpx.HTTPError as e:
-                    if attempt == self.max_retries - 1:
-                        raise
-                    self.logger.warning(
-                        f"Historical API request failed, retrying in {self.retry_delay}s: {e}"
-                    )
-                    await asyncio.sleep(self.retry_delay * (attempt + 1))
-
-        # This should not be reached, but mypy requires it
-        raise RuntimeError("Failed to get historical data after all retries")
 
     async def _geocode_location(self, location: str) -> dict[str, float]:
         """Geocode location name to coordinates.
