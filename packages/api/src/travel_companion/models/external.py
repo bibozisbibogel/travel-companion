@@ -49,51 +49,6 @@ class FlightSearchRequest(BaseModel):
     )
 
 
-class AviationStackFlightInfo(BaseModel):
-    """AviationStack API flight information model."""
-
-    number: str = Field(..., description="Flight number")
-    iata: str | None = Field(None, description="Flight IATA code")
-    icao: str | None = Field(None, description="Flight ICAO code")
-    codeshared: dict[str, Any] | None = Field(None, description="Codeshared flight info")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class AviationStackAirline(BaseModel):
-    """AviationStack API airline information model."""
-
-    name: str = Field(..., description="Airline name")
-    iata: str | None = Field(None, description="Airline IATA code")
-    icao: str | None = Field(None, description="Airline ICAO code")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class AviationStackFlightData(BaseModel):
-    """AviationStack API flight data model."""
-
-    flight_date: str = Field(..., description="Flight date")
-    flight_status: str = Field(..., description="Flight status")
-    departure: dict[str, Any] = Field(..., description="Departure information")
-    arrival: dict[str, Any] = Field(..., description="Arrival information")
-    airline: AviationStackAirline = Field(..., description="Airline information")
-    flight: AviationStackFlightInfo = Field(..., description="Flight information")
-    aircraft: dict[str, Any] | None = Field(None, description="Aircraft information")
-    live: dict[str, Any] | None = Field(None, description="Live tracking data")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class AviationStackFlightResponse(BaseModel):
-    """AviationStack API flight search response model."""
-
-    pagination: dict[str, Any] = Field(default_factory=dict, description="Pagination info")
-    data: list[AviationStackFlightData] = Field(default_factory=list, description="Flight data")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
 class FlightOption(BaseModel):
     """Standardized flight option model for internal use."""
 

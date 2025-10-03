@@ -145,7 +145,6 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
 
     # External APIs
-    aviationstack_api_key: str = ""
     amadeus_api_key: str = ""
     amadeus_api_secret: str = ""
     booking_api_key: str = ""
