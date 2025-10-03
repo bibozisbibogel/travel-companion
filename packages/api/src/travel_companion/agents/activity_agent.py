@@ -16,6 +16,7 @@ from travel_companion.services.activity_cache import ActivityCacheManager
 from travel_companion.services.activity_repository import ActivityRepository
 from travel_companion.services.external_apis.geoapify import GeoapifyClient
 from travel_companion.services.external_apis.getyourguide import GetYourGuideAPIClient
+from travel_companion.services.external_apis.google_places_client import GooglePlacesClient
 from travel_companion.services.external_apis.tripadvisor import TripAdvisorAPIClient
 from travel_companion.services.external_apis.viator import ViatorAPIClient
 
@@ -27,6 +28,10 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         """Initialize activity agent with API clients, database, and cache."""
         super().__init__(**kwargs)
 
+        # Initialize Google Places as primary provider
+        self.google_places_client = GooglePlacesClient()
+
+        # Keep other providers available but not used by default
         self.geoapify_client = GeoapifyClient()
         self.tripadvisor_client = TripAdvisorAPIClient()
         self.viator_client = ViatorAPIClient()
@@ -125,18 +130,15 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         """
         activities: list[ActivityOption] = []
 
-        # Attempt parallel search from all providers
+        # Use Google Places API as the primary provider
         search_tasks = [
-            self._search_geoapify(request),
-            self._search_tripadvisor(request),
-            self._search_viator(request),
-            self._search_getyourguide(request),
+            self._search_google_places(request),
         ]
 
         results = await asyncio.gather(*search_tasks, return_exceptions=True)
 
         for i, result in enumerate(results):
-            provider_name = ["Geoapify", "TripAdvisor", "Viator", "GetYourGuide"][i]
+            provider_name = ["Google Places"][i]
 
             if isinstance(result, Exception):
                 self.logger.warning(f"{provider_name} search failed: {result}")
@@ -152,6 +154,21 @@ class ActivityAgent(BaseAgent[ActivitySearchResponse]):
         self.logger.info(f"Total activities after deduplication: {len(unique_activities)}")
 
         return unique_activities
+
+    async def _search_google_places(self, request: ActivitySearchRequest) -> list[ActivityOption]:
+        """Search activities from Google Places API.
+
+        Args:
+            request: Activity search request
+
+        Returns:
+            List of Google Places activities
+        """
+        try:
+            return await self.google_places_client.search_activities(request)
+        except Exception as e:
+            self.logger.warning(f"Google Places search failed: {e}")
+            return []
 
     async def _search_geoapify(self, request: ActivitySearchRequest) -> list[ActivityOption]:
         """Search activities from Geoapify API.

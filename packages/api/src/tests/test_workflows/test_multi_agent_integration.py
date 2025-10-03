@@ -245,7 +245,7 @@ class TestMultiAgentIntegrationScenarios:
         return FlightSearchResponse(
             flights=flights,
             search_time_ms=650,
-            search_metadata={"aviationstack_api": "cached", "search_radius_km": 50},
+            search_metadata={"amadeus_api": "cached", "search_radius_km": 50},
         )
 
     def create_realistic_hotel_response(self) -> HotelSearchResponse:

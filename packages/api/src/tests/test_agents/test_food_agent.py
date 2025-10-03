@@ -167,6 +167,75 @@ class TestRestaurantSearch:
         assert result.total_results == 1
 
     @pytest.mark.asyncio
+    async def test_process_with_geocoding(self, food_agent, sample_restaurant_response):
+        """Test restaurant search with geocoding when only location name is provided."""
+        # Mock geocoding result
+        geocode_result = {
+            "latitude": 40.7128,
+            "longitude": -74.0060,
+            "city": "New York",
+            "country": "United States",
+            "formatted_address": "New York, NY, USA",
+        }
+
+        food_agent.geoapify_client.geocode_city = AsyncMock(return_value=geocode_result)
+        food_agent.geoapify_client.search_restaurants = AsyncMock(
+            return_value=sample_restaurant_response
+        )
+
+        # Request with only location name (no coordinates)
+        request_data = {
+            "location": "New York",
+            "categories": [GeoapifyCateringCategory.RESTAURANT.value],
+            "radius_meters": 5000,
+            "max_results": 20,
+        }
+
+        result = await food_agent.process(request_data)
+
+        # Verify geocoding was called
+        food_agent.geoapify_client.geocode_city.assert_called_once_with("New York")
+
+        # Verify search was called with geocoded coordinates
+        search_call_args = food_agent.geoapify_client.search_restaurants.call_args[0][0]
+        assert search_call_args.latitude == 40.7128
+        assert search_call_args.longitude == -74.0060
+
+        assert isinstance(result, RestaurantSearchResponse)
+        assert len(result.restaurants) == 1
+
+    @pytest.mark.asyncio
+    async def test_process_geocoding_fallback(self, food_agent, sample_restaurant_response):
+        """Test fallback to text search when geocoding fails."""
+        # Mock geocoding failure
+        food_agent.geoapify_client.geocode_city = AsyncMock(
+            side_effect=ExternalAPIError("Geocoding failed")
+        )
+        food_agent.geoapify_client.search_restaurants = AsyncMock(
+            return_value=sample_restaurant_response
+        )
+
+        request_data = {
+            "location": "InvalidCity",
+            "categories": [GeoapifyCateringCategory.RESTAURANT.value],
+            "radius_meters": 5000,
+            "max_results": 20,
+        }
+
+        result = await food_agent.process(request_data)
+
+        # Verify geocoding was attempted
+        food_agent.geoapify_client.geocode_city.assert_called_once_with("InvalidCity")
+
+        # Verify search was still called with location string
+        search_call_args = food_agent.geoapify_client.search_restaurants.call_args[0][0]
+        assert search_call_args.location == "InvalidCity"
+        assert search_call_args.latitude is None
+        assert search_call_args.longitude is None
+
+        assert isinstance(result, RestaurantSearchResponse)
+
+    @pytest.mark.asyncio
     async def test_process_sorts_by_distance(self, food_agent, sample_restaurant_request):
         """Test that results are sorted by distance."""
         restaurant1 = RestaurantOption(
@@ -284,6 +353,51 @@ class TestCuisineSearch:
         call_args = food_agent.geoapify_client.search_restaurants.call_args[0][0]
         assert "catering.restaurant.sushi" in call_args.categories
 
+    @pytest.mark.asyncio
+    async def test_search_by_cuisine_with_geocoding(self, food_agent):
+        """Test cuisine search with geocoding when only location name is provided."""
+        geocode_result = {
+            "latitude": 35.6762,
+            "longitude": 139.6503,
+            "city": "Tokyo",
+            "country": "Japan",
+        }
+
+        expected_response = RestaurantSearchResponse(
+            restaurants=[
+                RestaurantOption(
+                    external_id="sushi_1",
+                    name="Tokyo Sushi",
+                    categories=["catering.restaurant.sushi"],
+                    location=RestaurantLocation(latitude=35.6762, longitude=139.6503),
+                    distance_meters=300,
+                    provider="geoapify",
+                )
+            ],
+            total_results=1,
+            search_time_ms=100,
+            cached=False,
+        )
+
+        food_agent.geoapify_client.geocode_city = AsyncMock(return_value=geocode_result)
+        food_agent.geoapify_client.search_restaurants = AsyncMock(return_value=expected_response)
+
+        result = await food_agent.search_by_cuisine(
+            location="Tokyo",
+            cuisine_category=GeoapifyCateringCategory.RESTAURANT_SUSHI,
+        )
+
+        # Verify geocoding was called
+        food_agent.geoapify_client.geocode_city.assert_called_once_with("Tokyo")
+
+        # Verify search was called with geocoded coordinates
+        call_args = food_agent.geoapify_client.search_restaurants.call_args[0][0]
+        assert call_args.latitude == 35.6762
+        assert call_args.longitude == 139.6503
+
+        assert len(result.restaurants) == 1
+        assert result.restaurants[0].name == "Tokyo Sushi"
+
 
 class TestLocalSpecialties:
     """Test local specialty search functionality."""
@@ -318,8 +432,51 @@ class TestLocalSpecialties:
         assert result.search_metadata["search_type"] == "local_specialties"
 
         # Verify Italian category was searched
+
+    @pytest.mark.asyncio
+    async def test_search_local_specialties_with_geocoding(self, food_agent):
+        """Test local specialty search with geocoding."""
+        geocode_result = {
+            "latitude": 41.9028,
+            "longitude": 12.4964,
+            "city": "Rome",
+            "country": "Italy",
+        }
+
+        italian_restaurants = [
+            RestaurantOption(
+                external_id="italian_1",
+                name="Trattoria Roma",
+                categories=["catering.restaurant.italian"],
+                location=RestaurantLocation(latitude=41.9028, longitude=12.4964),
+                distance_meters=150,
+                provider="geoapify",
+            )
+        ]
+
+        expected_response = RestaurantSearchResponse(
+            restaurants=italian_restaurants,
+            total_results=1,
+            search_time_ms=100,
+            cached=False,
+        )
+
+        food_agent.geoapify_client.geocode_city = AsyncMock(return_value=geocode_result)
+        food_agent.geoapify_client.search_restaurants = AsyncMock(return_value=expected_response)
+
+        result = await food_agent.search_local_specialties(location="Rome")
+
+        # Verify geocoding was called
+        food_agent.geoapify_client.geocode_city.assert_called_once_with("Rome")
+
+        # Verify search was called with geocoded coordinates
         call_args = food_agent.geoapify_client.search_restaurants.call_args[0][0]
+        assert call_args.latitude == 41.9028
+        assert call_args.longitude == 12.4964
         assert GeoapifyCateringCategory.RESTAURANT_ITALIAN.value in call_args.categories
+
+        assert len(result.restaurants) == 1
+        assert result.restaurants[0].name == "Trattoria Roma"
 
     @pytest.mark.asyncio
     async def test_search_local_specialties_japan(self, food_agent):

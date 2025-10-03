@@ -106,6 +106,7 @@ def airbnb_api_response():
     return [airbnb_listing]
 
 
+@pytest.mark.skip(reason="Booking, Expedia, and Airbnb clients are currently disabled")
 class TestHotelAgentFallback:
     """Test suite for Hotel Agent API fallback functionality."""
 

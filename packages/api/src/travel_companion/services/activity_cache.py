@@ -88,7 +88,7 @@ class ActivityCacheManager:
             ttl = custom_ttl or await self._calculate_dynamic_ttl(search_request, search_response)
 
             # Add caching metadata
-            response_dict = search_response.model_dump()
+            response_dict = search_response.model_dump(mode="json")
             response_dict["cache_expires_at"] = datetime.now(UTC).timestamp() + ttl
 
             await self.redis.set(cache_key, response_dict, expire=ttl)

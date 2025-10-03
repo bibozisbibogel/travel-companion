@@ -105,9 +105,10 @@ async def detailed_health_check(
 
     # Check external API keys configuration
     external_apis = {
-        "aviationstack": {
-            "configured": bool(settings.aviationstack_api_key),
-            "api_key_present": bool(settings.aviationstack_api_key),
+        "amadeus": {
+            "configured": bool(settings.amadeus_api_key and settings.amadeus_api_secret),
+            "api_key_present": bool(settings.amadeus_api_key),
+            "api_secret_present": bool(settings.amadeus_api_secret),
         },
         "booking": {
             "configured": bool(settings.booking_api_key),

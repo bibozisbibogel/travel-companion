@@ -95,6 +95,9 @@ testpaths = [
     "src/tests",
 ]
 asyncio_mode = "auto"
+markers = [
+    "external_api: marks tests that use external APIs and consume credits (deselect with '-m \"not external_api\"')",
+]
 
 [tool.coverage.run]
 source = ["src"]

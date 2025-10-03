@@ -362,15 +362,15 @@ class TestWorkflowPerformanceMonitor:
         )
 
         # Record API calls
-        await monitor.record_api_call("test-workflow", "aviationstack", 500.0, cached=False)
-        await monitor.record_api_call("test-workflow", "aviationstack", 10.0, cached=True)
+        await monitor.record_api_call("test-workflow", "amadeus", 500.0, cached=False)
+        await monitor.record_api_call("test-workflow", "amadeus", 10.0, cached=True)
 
         metrics = monitor.metrics["test-workflow"]
         assert metrics.total_api_calls == 2
         assert metrics.cached_api_calls == 1
-        assert len(metrics.api_call_times["aviationstack"]) == 2
-        assert metrics.api_call_times["aviationstack"][0] == 500.0
-        assert metrics.api_call_times["aviationstack"][1] == 10.0
+        assert len(metrics.api_call_times["amadeus"]) == 2
+        assert metrics.api_call_times["amadeus"][0] == 500.0
+        assert metrics.api_call_times["amadeus"][1] == 10.0
 
     @pytest.mark.asyncio
     async def test_complete_workflow_monitoring(self):
@@ -721,7 +721,7 @@ class TestMonitoringIntegration:
         # Record API calls
         await performance_monitor.record_api_call(
             "integration-test",
-            "aviationstack",
+            "amadeus",
             500.0,
             cached=False,
         )

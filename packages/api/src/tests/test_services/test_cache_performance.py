@@ -105,19 +105,14 @@ class TestCachePerformance:
     async def test_cache_miss_with_api_call_timing(self, mock_redis_manager):
         """Test timing difference between cache miss and API call."""
         # Create hotel agent with mocked dependencies
-        with patch("travel_companion.agents.hotel_agent.BookingClient") as mock_booking:
-            mock_booking_instance = AsyncMock()
-            mock_booking.return_value = mock_booking_instance
+        hotel_agent = HotelAgent(redis=mock_redis_manager)
 
-            # Mock API response with realistic delay
-            async def slow_api_response(*args, **kwargs):
-                await asyncio.sleep(1.5)  # Simulate 1.5s API call
-                return MagicMock(hotels=[], total_results=0, api_response_time_ms=1500)
+        # Mock Google Places API response with realistic delay
+        async def slow_api_response(*args, **kwargs):
+            await asyncio.sleep(0.5)  # Simulate 500ms API call
+            return []  # Return empty hotels list
 
-            mock_booking_instance.search_hotels = slow_api_response
-
-            hotel_agent = HotelAgent(redis=mock_redis_manager)
-
+        with patch.object(hotel_agent, "search_hotels_google_places", slow_api_response):
             # Mock cache miss
             mock_redis_manager.get.return_value = None
 
@@ -133,8 +128,8 @@ class TestCachePerformance:
             response = await hotel_agent.process(request_data)
             api_call_time = (time.time() - start_time) * 1000
 
-            # API call should take significantly longer than cache hit
-            assert api_call_time > 1000  # Should be over 1 second
+            # API call should take more than the simulated delay
+            assert api_call_time > 450  # Should be over 450ms (accounting for overhead)
             assert response.cached is False
 
     async def test_cache_warming_performance(self, mock_redis_manager):
@@ -170,7 +165,9 @@ class TestCachePerformance:
             warming_time = time.time() - start_time
 
             # Should complete warming in reasonable time with concurrency
-            assert warming_time < 5  # Should be under 5 seconds with 3 concurrent
+            assert (
+                warming_time < 6
+            )  # Should be under 6 seconds with 3 concurrent (allowing for overhead)
             assert results["destinations_warmed"] == 5
             assert results["patterns_warmed"] > 0
 

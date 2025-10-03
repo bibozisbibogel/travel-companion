@@ -505,7 +505,7 @@ class ParallelExecutionOptimizer:
         dependency_retry_count: dict[
             str, int
         ] = {}  # Track how many times we've retried each agent due to dependencies
-        max_dependency_retries = 100  # Prevent infinite loops
+        max_dependency_retries = 2  # Prevent infinite loops
 
         while True:
             # First, process any completed tasks to update state

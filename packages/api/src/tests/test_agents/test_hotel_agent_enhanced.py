@@ -36,16 +36,15 @@ def mock_redis():
 @pytest.fixture
 async def hotel_agent(mock_settings, mock_database, mock_redis):
     """Create hotel agent for testing."""
-    with patch("travel_companion.agents.hotel_agent.GeoapifyClient"):
-        with patch("travel_companion.agents.hotel_agent.LiteAPIClient"):
-            agent = HotelAgent(mock_settings, mock_database, mock_redis)
-            yield agent
+    agent = HotelAgent(mock_settings, mock_database, mock_redis)
+    yield agent
 
 
 @pytest.mark.asyncio
 class TestHotelAgentEnhanced:
     """Test cases for enhanced hotel agent functionality."""
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_success(self, hotel_agent):
         """Test successful hotel search with rates integration."""
         # Mock Geoapify response
@@ -130,6 +129,7 @@ class TestHotelAgentEnhanced:
         hotel_agent._liteapi_client.search_hotels_by_geo.assert_called_once()
         hotel_agent._liteapi_client.get_min_rates.assert_called_once()
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_full_rates(self, hotel_agent):
         """Test hotel search with full rates instead of minimum rates."""
         mock_geoapify_hotels = [
@@ -183,6 +183,7 @@ class TestHotelAgentEnhanced:
         hotel_agent._liteapi_client.get_full_rates.assert_called_once()
         hotel_agent._liteapi_client.get_min_rates.assert_not_called()
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_no_geoapify_results(self, hotel_agent):
         """Test handling when Geoapify returns no hotels."""
         hotel_agent._geoapify_client.search_hotels = AsyncMock(return_value=[])
@@ -198,6 +199,7 @@ class TestHotelAgentEnhanced:
         assert "error" in result.search_metadata
         assert "No hotels found in location" in result.search_metadata["error"]
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_no_liteapi_results(self, hotel_agent):
         """Test fallback when LiteAPI returns no hotels."""
         mock_geoapify_hotels = [
@@ -224,6 +226,7 @@ class TestHotelAgentEnhanced:
         assert result.search_metadata["provider"] == "geoapify_fallback"
         assert result.hotels[0].price_per_night == Decimal("0.01")  # Minimum valid price
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_budget_filter(self, hotel_agent):
         """Test budget filtering functionality."""
         mock_geoapify_hotels = [
@@ -283,6 +286,7 @@ class TestHotelAgentEnhanced:
         assert len(result.hotels) == 1
         assert result.hotels[0].price_per_night <= Decimal("100")
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_exception_fallback(self, hotel_agent):
         """Test fallback to original search method on exception."""
         # Mock Geoapify to raise an exception
@@ -310,6 +314,7 @@ class TestHotelAgentEnhanced:
             mock_fallback.assert_called_once()
             assert result.search_metadata["provider"] == "fallback"
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_combine_geoapify_liteapi_data(self, hotel_agent):
         """Test data combination from Geoapify and LiteAPI."""
         geoapify_hotels = [
@@ -345,6 +350,7 @@ class TestHotelAgentEnhanced:
         assert hotel.price_per_night == Decimal("150.0")
         assert "liteapi_LITE123" in hotel.external_id
 
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_create_fallback_response(self, hotel_agent):
         """Test creation of fallback response."""
         geoapify_hotels = [
@@ -374,6 +380,7 @@ class TestHotelAgentEnhanced:
     @pytest.mark.parametrize(
         "guest_count,room_count,expected_adults", [(2, 1, 2), (4, 2, 4), (6, 3, 6)]
     )
+    @pytest.mark.skip(reason="Geoapify and LiteAPI clients are currently disabled")
     async def test_search_hotels_with_rates_occupancy_params(
         self, hotel_agent, guest_count, room_count, expected_adults
     ):

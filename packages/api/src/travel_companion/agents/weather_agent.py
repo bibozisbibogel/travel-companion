@@ -66,45 +66,18 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             # Get weather forecast from OpenWeatherMap
             forecast = await self.openweather_client.get_weather_forecast(search_request)
 
-            # Get historical weather data if requested
-            historical_data = []
-            if search_request.include_historical:
-                try:
-                    # Calculate historical data timestamps (past 5 days from start_date)
-                    historical_start = int(
-                        (search_request.start_date - timedelta(days=5)).timestamp()
-                    )
-                    historical_end = int(search_request.start_date.timestamp())
-
-                    # Get coordinates from forecast location
-                    if forecast.location:
-                        lat = forecast.location.latitude
-                        lon = forecast.location.longitude
-
-                        if lat is not None and lon is not None:
-                            historical_data = await self.openweather_client.get_historical_weather(
-                                lat, lon, historical_start, historical_end
-                            )
-
-                            self.logger.info(
-                                f"Retrieved {len(historical_data)} historical weather data points"
-                            )
-                except Exception as e:
-                    self.logger.warning(f"Failed to get historical weather data: {e}")
-                    # Continue without historical data
-
             # Create response
             search_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             response = WeatherSearchResponse(
                 forecast=forecast,
-                historical_data=historical_data,
+                historical_data=[],
                 search_time_ms=search_time_ms,
                 search_metadata={
                     "location": search_request.location,
                     "start_date": search_request.start_date.isoformat(),
                     "end_date": search_request.end_date.isoformat(),
                     "include_alerts": search_request.include_alerts,
-                    "include_historical": search_request.include_historical,
+                    "include_historical": False,
                 },
                 data_source="OpenWeatherMap",
                 cached=False,
@@ -113,17 +86,14 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
 
             self.logger.info(
                 f"Weather search completed for {search_request.location}: "
-                f"{len(forecast.daily)} daily forecasts, {len(forecast.alerts)} alerts, "
-                f"{len(historical_data)} historical data points"
+                f"{len(forecast.daily)} daily forecasts, {len(forecast.alerts)} alerts"
             )
 
-            # Cache the response for 1-3 hours
+            # Cache the response for 1 hour (or 30 min with alerts)
             cache_ttl = 3600  # 1 hour default
 
-            # Adjust cache TTL based on data type
-            if search_request.include_historical:
-                cache_ttl = 10800  # 3 hours for historical data (changes less frequently)
-            elif forecast.alerts and len(forecast.alerts) > 0:
+            # Adjust cache TTL if there are weather alerts
+            if forecast.alerts and len(forecast.alerts) > 0:
                 cache_ttl = 1800  # 30 minutes if there are weather alerts (more volatile)
 
             await self.cache_manager.set_weather_cache(cache_key, response, cache_ttl)
@@ -219,7 +189,6 @@ class WeatherAgent(BaseAgent[WeatherSearchResponse]):
             request.start_date.strftime("%Y%m%d"),
             request.end_date.strftime("%Y%m%d"),
             str(request.include_alerts).lower(),
-            str(request.include_historical).lower(),
         ]
 
         # Add coordinates if provided

@@ -73,7 +73,7 @@ class CacheManager:
         """
         try:
             # Add cache timestamp for freshness checking
-            cache_data = response.model_dump()
+            cache_data = response.model_dump(mode="json")
             cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
             cache_data["cached"] = True
 
@@ -81,18 +81,6 @@ class CacheManager:
 
             if success:
                 self.logger.info(f"Cached hotel search results: {cache_key} (TTL: {ttl_seconds}s)")
-
-                # Store cache metadata for analytics and warming
-                metadata_key = f"{cache_key}:meta"
-                metadata = {
-                    "created_at": datetime.now(UTC).isoformat(),
-                    "ttl_seconds": ttl_seconds,
-                    "result_count": len(response.hotels),
-                    "search_params": response.search_metadata,
-                }
-                await self.redis.set(
-                    metadata_key, metadata, expire=ttl_seconds + 300
-                )  # Keep metadata slightly longer
 
             return success
 
@@ -244,11 +232,8 @@ class CacheManager:
             # Count cache keys
             hotel_keys = []
             async for key in self.redis.client.scan_iter(match="hotel_agent:*"):
-                if not key.endswith(":meta"):
-                    hotel_keys.append(key)
-                    stats["total_hotel_cache_keys"] = int(stats["total_hotel_cache_keys"]) + 1
-                else:
-                    stats["total_metadata_keys"] = int(stats["total_metadata_keys"]) + 1
+                hotel_keys.append(key)
+                stats["total_hotel_cache_keys"] = int(stats["total_hotel_cache_keys"]) + 1
 
             # Analyze cache timestamps
             timestamps = []
@@ -378,7 +363,7 @@ class CacheManager:
         """
         try:
             # Add cache timestamp and expiration info
-            cache_data = response.model_dump()
+            cache_data = response.model_dump(mode="json")
             cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
             cache_data["cached"] = True
             cache_data["cache_expires_at"] = (
@@ -391,20 +376,6 @@ class CacheManager:
                 self.logger.info(
                     f"Cached weather search results: {cache_key} (TTL: {ttl_seconds}s)"
                 )
-
-                # Store cache metadata for analytics
-                metadata_key = f"{cache_key}:meta"
-                metadata = {
-                    "created_at": datetime.now(UTC).isoformat(),
-                    "ttl_seconds": ttl_seconds,
-                    "forecast_days": len(response.forecast.daily),
-                    "alert_count": len(response.forecast.alerts),
-                    "historical_points": len(response.historical_data),
-                    "search_params": response.search_metadata,
-                }
-                await self.redis.set(
-                    metadata_key, metadata, expire=ttl_seconds + 300
-                )  # Keep metadata slightly longer
 
             return success
 
@@ -491,7 +462,7 @@ class CacheManager:
         """
         try:
             # Add cache timestamp and expiration info
-            cache_data = response.model_dump()
+            cache_data = response.model_dump(mode="json")
             cache_data["cache_timestamp"] = datetime.now(UTC).isoformat()
             cache_data["cached"] = True
             cache_data["cache_expires_at"] = (
@@ -504,18 +475,6 @@ class CacheManager:
                 self.logger.info(
                     f"Cached restaurant search results: {cache_key} (TTL: {ttl_seconds}s)"
                 )
-
-                # Store cache metadata for analytics
-                metadata_key = f"{cache_key}:meta"
-                metadata = {
-                    "created_at": datetime.now(UTC).isoformat(),
-                    "ttl_seconds": ttl_seconds,
-                    "restaurant_count": len(response.restaurants),
-                    "search_params": response.search_metadata,
-                }
-                await self.redis.set(
-                    metadata_key, metadata, expire=ttl_seconds + 300
-                )  # Keep metadata slightly longer
 
             return success
 

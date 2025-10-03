@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -28,8 +28,10 @@ class GeoapifyClient:
     """Client for interacting with Geoapify Places and Place Details APIs."""
 
     BASE_URL = "https://api.geoapify.com/v2"
+    GEOCODING_URL = "https://api.geoapify.com/v1/geocode"
     PLACES_ENDPOINT = f"{BASE_URL}/places"
     PLACE_DETAILS_ENDPOINT = f"{BASE_URL}/place-details"
+    GEOCODING_ENDPOINT = f"{GEOCODING_URL}/search"
 
     def __init__(self, redis_manager: Any = None) -> None:
         """Initialize Geoapify client with API credentials."""
@@ -63,6 +65,12 @@ class GeoapifyClient:
             recovery_timeout=60,
             expected_exception=(ExternalAPIError, httpx.HTTPError, httpx.TimeoutException),
             name="geoapify_activities",
+        )
+        self._geocoding_circuit = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=60,
+            expected_exception=(ExternalAPIError, httpx.HTTPError, httpx.TimeoutException),
+            name="geoapify_geocoding",
         )
 
     async def __aenter__(self) -> "GeoapifyClient":
@@ -100,7 +108,10 @@ class GeoapifyClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._restaurant_circuit.call(self._search_restaurants_impl, request)
+        return cast(
+            RestaurantSearchResponse,
+            await self._restaurant_circuit.call(self._search_restaurants_impl, request),
+        )
 
     async def _search_restaurants_impl(
         self, request: RestaurantSearchRequest
@@ -127,8 +138,21 @@ class GeoapifyClient:
                     f"circle:{request.longitude},{request.latitude},{request.radius_meters}"
                 )
             elif request.location:
-                # Use filter for location name search (bias requires coordinates)
-                params["filter"] = f"circle:{request.location},{request.radius_meters}"
+                # Need to geocode location name first to get coordinates
+                try:
+                    geocode_result = await self.geocode_city(request.location)
+                    lon = geocode_result["longitude"]
+                    lat = geocode_result["latitude"]
+                    params["filter"] = f"circle:{lon},{lat},{request.radius_meters}"
+                except ExternalAPIError as geocode_error:
+                    self.logger.warning(
+                        f"Failed to geocode location '{request.location}': {geocode_error}. "
+                        "Falling back to text-based search."
+                    )
+                    # Fallback: use text parameter without filter (less precise)
+                    params["text"] = request.location
+                    # Remove filter as we don't have coordinates
+                    params.pop("filter", None)
 
             # Make API request
             start_time = datetime.now()
@@ -163,6 +187,7 @@ class GeoapifyClient:
                         latitude=coords[1],
                         longitude=coords[0],
                         address=properties.get("address_line1"),
+                        address_line2=properties.get("address_line2"),
                         city=properties.get("city"),
                         state=properties.get("state"),
                         country=properties.get("country"),
@@ -290,8 +315,11 @@ class GeoapifyClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._hotel_circuit.call(
-            self._search_hotels_impl, location, latitude, longitude, radius_meters, max_results
+        return cast(
+            list[dict[str, Any]],
+            await self._hotel_circuit.call(
+                self._search_hotels_impl, location, latitude, longitude, radius_meters, max_results
+            ),
         )
 
     async def _search_hotels_impl(
@@ -400,8 +428,11 @@ class GeoapifyClient:
         Raises:
             ExternalAPIError: If API request fails
         """
-        return await self._activity_circuit.call(
-            self._search_activities_impl, request, latitude, longitude, radius_meters
+        return cast(
+            list[ActivityOption],
+            await self._activity_circuit.call(
+                self._search_activities_impl, request, latitude, longitude, radius_meters
+            ),
         )
 
     async def _search_activities_impl(
@@ -491,6 +522,7 @@ class GeoapifyClient:
                     images=[],
                     booking_url=properties.get("website"),
                     provider="geoapify",
+                    trip_id=None,  # Not associated with a specific trip at search time
                     created_at=datetime.now(),
                 )
                 activities.append(activity)
@@ -658,6 +690,138 @@ class GeoapifyClient:
         else:
             # Default fallback
             return requested_category or ActivityCategory.ENTERTAINMENT
+
+    async def geocode_city(
+        self, city_name: str, country: str | None = None, state: str | None = None
+    ) -> dict[str, Any]:
+        """
+        Get coordinates for a city using Geoapify Geocoding API.
+
+        Args:
+            city_name: Name of the city to geocode
+            country: Optional country name or ISO code for more precise results
+            state: Optional state/province name for more precise results
+
+        Returns:
+            Dictionary with city coordinates and details:
+                - latitude: City latitude
+                - longitude: City longitude
+                - formatted_address: Full formatted address
+                - city: Normalized city name
+                - country: Country name
+                - state: State/province name
+                - bbox: Bounding box coordinates
+                - confidence: Geocoding confidence score
+
+        Raises:
+            ExternalAPIError: If geocoding fails or no results found
+        """
+        return cast(
+            dict[str, Any],
+            await self._geocoding_circuit.call(self._geocode_city_impl, city_name, country, state),
+        )
+
+    async def _geocode_city_impl(
+        self, city_name: str, country: str | None = None, state: str | None = None
+    ) -> dict[str, Any]:
+        """Implementation of city geocoding with circuit breaker protection."""
+        try:
+            # Check rate limit
+            self._check_rate_limit()
+
+            # Build search text
+            search_parts = [city_name]
+            if state:
+                search_parts.append(state)
+            if country:
+                search_parts.append(country)
+            search_text = ", ".join(search_parts)
+
+            # Build API parameters
+            params: dict[str, str | int] = {
+                "apiKey": self.api_key,
+                "text": search_text,
+                "type": "city",  # Focus on city-level results
+                "format": "json",
+                "limit": 1,  # Get best match only
+                "lang": "en",
+            }
+
+            # Add filters if provided
+            if country:
+                # Support both country names and ISO codes
+                params["filter"] = f"countrycode:{country.lower()}" if len(country) == 2 else ""
+
+            # Make API request
+            start_time = datetime.now()
+            response = await self.client.get(self.GEOCODING_ENDPOINT, params=params)
+            response.raise_for_status()
+            self._request_count += 1
+
+            # Parse response
+            data = response.json()
+            search_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            # Check if we got results
+            results = data.get("results", [])
+            if not results:
+                raise ExternalAPIError(f"No geocoding results found for city: {search_text}")
+
+            # Get the best result (first one)
+            best_result = results[0]
+
+            # Extract bounding box
+            bbox = best_result.get("bbox", {})
+
+            # Build response dictionary
+            # Note: Geocoding API returns fields at result level, not in properties
+            geocoding_result = {
+                "latitude": best_result.get("lat"),
+                "longitude": best_result.get("lon"),
+                "formatted_address": best_result.get("formatted", ""),
+                "city": best_result.get("city", city_name),
+                "country": best_result.get("country", ""),
+                "country_code": best_result.get("country_code", ""),
+                "state": best_result.get("state", ""),
+                "county": best_result.get("county", ""),
+                "postcode": best_result.get("postcode", ""),
+                "bbox": {
+                    "min_lat": bbox.get("lat1"),
+                    "max_lat": bbox.get("lat2"),
+                    "min_lon": bbox.get("lon1"),
+                    "max_lon": bbox.get("lon2"),
+                },
+                "confidence": best_result.get("rank", {}).get("confidence", 0),
+                "importance": best_result.get("rank", {}).get("importance", 0),
+                "place_id": best_result.get("place_id", ""),
+                "osm_id": best_result.get("osm_id", ""),
+                "search_time_ms": search_time_ms,
+            }
+
+            # Validate we have coordinates
+            if geocoding_result["latitude"] is None or geocoding_result["longitude"] is None:
+                raise ExternalAPIError(f"Invalid coordinates returned for city: {search_text}")
+
+            self.logger.info(
+                f"Geocoded city '{search_text}' to "
+                f"({geocoding_result['latitude']}, {geocoding_result['longitude']}) "
+                f"in {search_time_ms}ms"
+            )
+
+            return geocoding_result
+
+        except httpx.HTTPStatusError as e:
+            self.logger.error(f"Geoapify Geocoding API HTTP error: {e.response.status_code}")
+            raise ExternalAPIError(f"Geoapify Geocoding API error: {e.response.text}") from e
+        except httpx.TimeoutException:
+            self.logger.error("Geoapify Geocoding API request timeout")
+            raise ExternalAPIError("Geoapify Geocoding API request timeout") from None
+        except ExternalAPIError:
+            # Re-raise our custom errors as-is
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in Geoapify geocoding: {str(e)}")
+            raise ExternalAPIError(f"Failed to geocode city: {str(e)}") from e
 
     async def close(self) -> None:
         """Close the HTTP client."""
