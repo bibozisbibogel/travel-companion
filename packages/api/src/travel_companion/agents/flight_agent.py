@@ -13,9 +13,9 @@ from travel_companion.models.external import (
     FlightSearchRequest,
     FlightSearchResponse,
 )
-from travel_companion.services.external_apis.aviationstack import (
-    AviationStackClient,
-    AviationStackFlight,
+from travel_companion.services.external_apis.amadeus import (
+    AmadeusClient,
+    AmadeusFlightOffer,
     FlightSearchParams,
 )
 from travel_companion.utils.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
@@ -26,16 +26,16 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
     """Agent responsible for flight search and comparison operations."""
 
     def __init__(self, **kwargs: Any) -> None:
-        """Initialize FlightAgent with AviationStack client and circuit breaker."""
+        """Initialize FlightAgent with Amadeus client and circuit breaker."""
         super().__init__(**kwargs)
-        self._aviationstack_client: AviationStackClient | None = None
+        self._amadeus_client: AmadeusClient | None = None
 
-        # Circuit breaker for AviationStack API calls
-        self._aviationstack_circuit_breaker = CircuitBreaker(
+        # Circuit breaker for Amadeus API calls
+        self._amadeus_circuit_breaker = CircuitBreaker(
             failure_threshold=3,  # Open after 3 failures
             recovery_timeout=30,  # Wait 30s before retry
             expected_exception=ExternalAPIError,
-            name="AviationStackAPI",
+            name="AmadeusAPI",
         )
 
     @property
@@ -48,11 +48,11 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         """Version of the flight agent."""
         return "1.0.0"
 
-    async def _get_aviationstack_client(self) -> AviationStackClient:
-        """Get or create AviationStack client."""
-        if self._aviationstack_client is None:
-            self._aviationstack_client = AviationStackClient()
-        return self._aviationstack_client
+    async def _get_amadeus_client(self) -> AmadeusClient:
+        """Get or create Amadeus client."""
+        if self._amadeus_client is None:
+            self._amadeus_client = AmadeusClient()
+        return self._amadeus_client
 
     async def process(self, request_data: dict[str, Any]) -> FlightSearchResponse:
         """Process flight search request.
@@ -154,21 +154,21 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         self.logger.debug(f"Searching flights for request: {request}")
 
         try:
-            # Try to use AviationStack API first with circuit breaker and timeout
+            # Try to use Amadeus API first with circuit breaker and timeout
             flights = await self._search_flights_with_resilience(request)
-            self.logger.debug(f"Found {len(flights)} flight options from AviationStack API")
+            self.logger.debug(f"Found {len(flights)} flight options from Amadeus API")
             return flights
 
         except CircuitBreakerOpenError as e:
-            self.logger.warning(f"AviationStack circuit breaker is open: {e}. Using mock data.")
+            self.logger.warning(f"Amadeus circuit breaker is open: {e}. Using mock data.")
             mock_flights = await self._get_mock_flight_data(request)
             return mock_flights
         except TimeoutError:
-            self.logger.warning("AviationStack API timeout. Falling back to mock data.")
+            self.logger.warning("Amadeus API timeout. Falling back to mock data.")
             mock_flights = await self._get_mock_flight_data(request)
             return mock_flights
         except ExternalAPIError as e:
-            self.logger.warning(f"AviationStack API failed: {e}. Falling back to mock data.")
+            self.logger.warning(f"Amadeus API failed: {e}. Falling back to mock data.")
             mock_flights = await self._get_mock_flight_data(request)
             return mock_flights
         except Exception as e:
@@ -259,13 +259,13 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
     async def _search_flights_with_resilience(
         self, request: FlightSearchRequest
     ) -> list[FlightOption]:
-        """Search flights using AviationStack API with circuit breaker and timeout.
+        """Search flights using Amadeus API with circuit breaker and timeout.
 
         Args:
             request: Flight search request parameters
 
         Returns:
-            List of flight options from AviationStack API
+            List of flight options from Amadeus API
 
         Raises:
             CircuitBreakerOpenError: If circuit breaker is open
@@ -274,9 +274,9 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         """
 
         async def _api_call() -> list[FlightOption]:
-            aviationstack_client = await self._get_aviationstack_client()
+            amadeus_client = await self._get_amadeus_client()
 
-            # Convert request to AviationStack format
+            # Convert request to Amadeus format
             search_params = FlightSearchParams(
                 origin=request.origin,
                 destination=request.destination,
@@ -287,15 +287,13 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
                 adults=request.passengers,
                 children=0,  # Default to 0 children
                 infants=0,  # Default to 0 infants
-                max_results=min(request.max_results, 100),  # AviationStack limit
+                max_results=min(request.max_results, 100),
                 currency=request.currency,
             )
 
-            async with aviationstack_client:
-                aviationstack_flights = await aviationstack_client.search_flights(search_params)
-                return self._convert_aviationstack_flights_to_flights(
-                    aviationstack_flights, request
-                )
+            async with amadeus_client:
+                amadeus_flights = await amadeus_client.search_flights(search_params)
+                return self._convert_amadeus_flights_to_flights(amadeus_flights, request)
 
         # Use circuit breaker with 30-second timeout
         try:
@@ -303,15 +301,13 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
             async def _wrapped_call() -> list[FlightOption]:
                 return await asyncio.wait_for(_api_call(), timeout=30.0)
 
-            result: list[FlightOption] = await self._aviationstack_circuit_breaker.call(
-                _wrapped_call
-            )
+            result: list[FlightOption] = await self._amadeus_circuit_breaker.call(_wrapped_call)
             return result
         except TimeoutError:
             self.logger.warning("Flight search timed out after 30 seconds")
             raise
         except CircuitBreakerOpenError:
-            self.logger.warning("Circuit breaker is open for AviationStack API")
+            self.logger.warning("Circuit breaker is open for Amadeus API")
             raise
         except Exception as e:
             self.logger.error(f"Flight search failed: {e}")
@@ -319,13 +315,13 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
                 raise
             raise ExternalAPIError(f"Flight search failed: {str(e)}") from e
 
-    def _convert_aviationstack_flights_to_flights(
-        self, aviationstack_flights: list[AviationStackFlight], request: FlightSearchRequest
+    def _convert_amadeus_flights_to_flights(
+        self, amadeus_flights: list[AmadeusFlightOffer], request: FlightSearchRequest
     ) -> list[FlightOption]:
-        """Convert AviationStack flight data to FlightOption models.
+        """Convert Amadeus flight offers to FlightOption models.
 
         Args:
-            aviationstack_flights: List of AviationStack flight data
+            amadeus_flights: List of Amadeus flight offers
             request: Original search request for context
 
         Returns:
@@ -333,70 +329,91 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
         """
         flights = []
 
-        for flight_data in aviationstack_flights:
+        for offer in amadeus_flights:
             try:
-                # Extract departure info
-                departure_info = flight_data.departure
+                # Get first itinerary (outbound flight)
+                itinerary = offer.itineraries[0]
+                segments = itinerary.get("segments", [])
+
+                if not segments:
+                    continue
+
+                # Extract first and last segment for departure/arrival info
+                first_segment = segments[0]
+                last_segment = segments[-1]
+
+                # Parse departure time
                 departure_time = datetime.fromisoformat(
-                    departure_info.get(
-                        "scheduled",
-                        departure_info.get("estimated", departure_info.get("actual", "")),
-                    )
+                    first_segment.get("departure", {}).get("at", "").replace("Z", "+00:00")
                 )
 
-                # Extract arrival info
-                arrival_info = flight_data.arrival
+                # Parse arrival time
                 arrival_time = datetime.fromisoformat(
-                    arrival_info.get(
-                        "scheduled", arrival_info.get("estimated", arrival_info.get("actual", ""))
-                    )
+                    last_segment.get("arrival", {}).get("at", "").replace("Z", "+00:00")
                 )
 
-                # Calculate duration
-                duration_minutes = int((arrival_time - departure_time).total_seconds() / 60)
+                # Calculate duration from ISO 8601 duration string (e.g., "PT6H15M")
+                duration_str = itinerary.get("duration", "")
+                duration_minutes = self._parse_iso8601_duration(duration_str)
 
                 # Extract airline info
-                airline_name = flight_data.airline.get("name", "Unknown Airline")
-                flight_number = flight_data.flight.get("number", "Unknown")
+                carrier_code = first_segment.get("carrierCode", "Unknown")
+                flight_number = f"{carrier_code}{first_segment.get('number', '')}"
 
-                # Generate a mock price since AviationStack doesn't provide pricing
-                import random
+                # Get price
+                price = Decimal(str(offer.price.get("grandTotal", "0")))
+                currency = offer.price.get("currency", request.currency)
 
-                base_price = Decimal("400.00")
-                price_multiplier = Decimal(str(random.uniform(0.7, 2.5)))
-                price = (base_price * price_multiplier).quantize(Decimal("0.01"))
-
-                # Assume direct flights for now (AviationStack doesn't provide segment info)
-                stops = 0
+                # Count stops (segments - 1)
+                stops = len(segments) - 1
 
                 flight = FlightOption(
                     flight_id=uuid4(),
                     trip_id=None,
-                    external_id=f"aviationstack_{flight_data.flight.get('iata', flight_number)}",
-                    airline=airline_name,
+                    external_id=f"amadeus_{offer.id}",
+                    airline=carrier_code,
                     flight_number=flight_number,
-                    origin=request.origin,
-                    destination=request.destination,
+                    origin=first_segment.get("departure", {}).get("iataCode", request.origin),
+                    destination=last_segment.get("arrival", {}).get("iataCode", request.destination),
                     departure_time=departure_time,
                     arrival_time=arrival_time,
                     duration_minutes=duration_minutes,
                     stops=stops,
                     price=price,
-                    currency=request.currency,
+                    currency=currency,
                     travel_class=request.travel_class,
-                    flight_status=flight_data.flight_status,
+                    flight_status="scheduled",
                     booking_url=None,
                 )
 
                 flights.append(flight)
 
             except Exception as e:
-                self.logger.warning(
-                    f"Failed to convert AviationStack flight {flight_data.flight.get('number', 'unknown')}: {e}"
-                )
+                self.logger.warning(f"Failed to convert Amadeus flight offer {offer.id}: {e}")
                 continue
 
         return flights
+
+    def _parse_iso8601_duration(self, duration: str) -> int:
+        """Parse ISO 8601 duration string to minutes.
+
+        Args:
+            duration: ISO 8601 duration string (e.g., "PT6H15M")
+
+        Returns:
+            Duration in minutes
+        """
+        hours = 0
+        minutes = 0
+
+        if "H" in duration:
+            hours = int(duration.split("T")[1].split("H")[0].replace("PT", ""))
+
+        if "M" in duration:
+            part = duration.split("H")[-1] if "H" in duration else duration.split("T")[1]
+            minutes = int(part.split("M")[0].replace("PT", ""))
+
+        return hours * 60 + minutes
 
     async def _get_mock_flight_data(self, request: FlightSearchRequest) -> list[FlightOption]:
         """Generate mock flight data for development/testing.

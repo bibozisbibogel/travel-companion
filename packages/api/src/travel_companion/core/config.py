@@ -146,6 +146,8 @@ class Settings(BaseSettings):
 
     # External APIs
     aviationstack_api_key: str = ""
+    amadeus_api_key: str = ""
+    amadeus_api_secret: str = ""
     booking_api_key: str = ""
     expedia_api_key: str = ""
     expedia_secret_key: str = ""

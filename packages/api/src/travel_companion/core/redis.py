@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 from typing import Any, cast
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class CustomJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder for Redis that handles UUID and Decimal types."""
+    """Custom JSON encoder for Redis that handles UUID, Decimal, and datetime types."""
 
     def default(self, obj: Any) -> Any:
         """Handle special types for JSON serialization."""
@@ -23,6 +24,8 @@ class CustomJSONEncoder(json.JSONEncoder):
             return str(obj)
         if isinstance(obj, Decimal):
             return float(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
         return super().default(obj)
 
 

@@ -58,15 +58,15 @@ class AmadeusFlightOffer(BaseModel):
 
     id: str
     source: str
-    instant_ticketing_required: bool
-    non_homogeneous: bool
-    one_way: bool
+    instant_ticketing_required: bool = False
+    non_homogeneous: bool = False
+    one_way: bool = True
     last_ticketing_date: str | None = None
     price: dict[str, Any]
     itineraries: list[dict[str, Any]]
-    pricing_options: dict[str, Any]
-    validating_airline_codes: list[str]
-    traveler_pricings: list[dict[str, Any]]
+    pricing_options: dict[str, Any] = {}
+    validating_airline_codes: list[str] = []
+    traveler_pricings: list[dict[str, Any]] = []
 
 
 class AmadeusClient:
@@ -80,7 +80,7 @@ class AmadeusClient:
         self,
         client_id: str | None = None,
         client_secret: str | None = None,
-        base_url: str = "https://api.amadeus.com",
+        base_url: str = "https://test.api.amadeus.com",
         timeout: float = 30.0,
         max_retries: int = 3,
         rate_limit_per_second: int = 10,
@@ -97,9 +97,8 @@ class AmadeusClient:
             rate_limit_per_second: Maximum requests per second
         """
         settings = get_settings()
-        # Amadeus service is currently disabled, using fallback values
-        self.client_id = client_id or getattr(settings, "amadeus_client_id", "")
-        self.client_secret = client_secret or getattr(settings, "amadeus_client_secret", "")
+        self.client_id = client_id or settings.amadeus_api_key
+        self.client_secret = client_secret or settings.amadeus_api_secret
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
