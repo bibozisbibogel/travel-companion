@@ -13,6 +13,94 @@ from travel_companion.models.external import FlightSearchRequest
 logger = logging.getLogger(__name__)
 
 
+# Common city to airport code mappings
+CITY_TO_AIRPORT = {
+    "new york": "JFK",
+    "nyc": "JFK",
+    "los angeles": "LAX",
+    "la": "LAX",
+    "chicago": "ORD",
+    "houston": "IAH",
+    "phoenix": "PHX",
+    "philadelphia": "PHL",
+    "san antonio": "SAT",
+    "san diego": "SAN",
+    "dallas": "DFW",
+    "san jose": "SJC",
+    "austin": "AUS",
+    "jacksonville": "JAX",
+    "san francisco": "SFO",
+    "columbus": "CMH",
+    "fort worth": "DFW",
+    "charlotte": "CLT",
+    "detroit": "DTW",
+    "miami": "MIA",
+    "seattle": "SEA",
+    "denver": "DEN",
+    "boston": "BOS",
+    "washington": "IAD",
+    "dc": "IAD",
+    "las vegas": "LAS",
+    "portland": "PDX",
+    "orlando": "MCO",
+    "london": "LHR",
+    "paris": "CDG",
+    "tokyo": "NRT",
+    "rome": "FCO",
+    "madrid": "MAD",
+    "barcelona": "BCN",
+    "dubai": "DXB",
+    "sydney": "SYD",
+    "singapore": "SIN",
+    "hong kong": "HKG",
+    "amsterdam": "AMS",
+    "frankfurt": "FRA",
+    "munich": "MUC",
+    "zurich": "ZRH",
+    "vienna": "VIE",
+    "athens": "ATH",
+    "istanbul": "IST",
+    "cairo": "CAI",
+    "johannesburg": "JNB",
+    "bangkok": "BKK",
+    "delhi": "DEL",
+    "mumbai": "BOM",
+    "beijing": "PEK",
+    "shanghai": "PVG",
+    "seoul": "ICN",
+    "toronto": "YYZ",
+    "vancouver": "YVR",
+    "montreal": "YUL",
+    "mexico city": "MEX",
+    "sao paulo": "GRU",
+    "buenos aires": "EZE",
+    "rio de janeiro": "GIG",
+}
+
+
+def normalize_airport_code(location: str) -> str:
+    """
+    Convert city name to airport code or validate existing airport code.
+
+    Args:
+        location: City name or airport code
+
+    Returns:
+        Valid 3-4 letter airport code
+    """
+    # Try to find city in mapping first
+    normalized = location.lower().strip()
+    if normalized in CITY_TO_AIRPORT:
+        return CITY_TO_AIRPORT[normalized]
+
+    # If already a valid airport code (3-4 letters), return uppercase
+    if len(location) in (3, 4) and location.replace(" ", "").isalpha():
+        return location.upper().strip()
+
+    # If no match found, return original (will fail validation and provide helpful error)
+    return location.upper().strip()
+
+
 # Tool input schema for flight search
 FLIGHT_SEARCH_SCHEMA = {
     "type": "object",
@@ -66,7 +154,7 @@ FLIGHT_SEARCH_SCHEMA = {
     "travel class, number of passengers, and maximum results.",
     FLIGHT_SEARCH_SCHEMA
 )
-async def search_flights_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+async def search_flights(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for flights between origin and destination.
 
@@ -127,10 +215,18 @@ async def search_flights_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 "isError": True,
             }
 
+        # Normalize airport codes (convert city names to codes if needed)
+        origin_code = normalize_airport_code(origin)
+        destination_code = normalize_airport_code(destination)
+
+        logger.info(
+            f"Normalized locations: {origin} -> {origin_code}, {destination} -> {destination_code}"
+        )
+
         # Create flight search request
         search_request = FlightSearchRequest(
-            origin=origin,
-            destination=destination,
+            origin=origin_code,
+            destination=destination_code,
             departure_date=departure_date,
             return_date=return_date,
             passengers=passengers,

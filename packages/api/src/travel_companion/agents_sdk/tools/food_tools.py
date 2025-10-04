@@ -61,7 +61,7 @@ FOOD_SEARCH_SCHEMA = {
     "and maximum results.",
     FOOD_SEARCH_SCHEMA
 )
-async def search_food_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+async def search_restaurants(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for restaurants and dining options at a location.
 
@@ -141,31 +141,21 @@ async def search_food_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             "cached": search_response.cached,
             "restaurants": [
                 {
-                    "food_id": str(restaurant.food_id),
+                    "restaurant_id": str(restaurant.restaurant_id),
                     "external_id": restaurant.external_id,
                     "name": restaurant.name,
-                    "cuisine_type": restaurant.cuisine_type,
+                    "categories": restaurant.categories,
                     "location": {
                         "latitude": restaurant.location.latitude,
                         "longitude": restaurant.location.longitude,
                         "address": restaurant.location.address,
                         "city": restaurant.location.city,
-                        "country": restaurant.location.country,
                     },
-                    "price_range": restaurant.price_range,
-                    "average_cost_per_person": (
-                        float(restaurant.average_cost_per_person)
-                        if restaurant.average_cost_per_person
-                        else None
-                    ),
-                    "currency": restaurant.currency,
-                    "rating": restaurant.rating,
-                    "photos": restaurant.photos[:3] if restaurant.photos else [],
-                    "menu_url": restaurant.menu_url,
-                    "booking_url": restaurant.booking_url,
-                    "dietary_options": restaurant.dietary_options,
+                    "formatted_address": restaurant.formatted_address,
+                    "distance_meters": restaurant.distance_meters,
+                    "provider": restaurant.provider,
                 }
-                for restaurant in search_response.food_options[:max_results]
+                for restaurant in search_response.restaurants[:max_results]
             ],
         }
 

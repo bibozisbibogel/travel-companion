@@ -10,7 +10,7 @@ This test demonstrates the agent's capabilities:
 
 import asyncio
 import logging
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from dotenv import load_dotenv
@@ -29,7 +29,7 @@ async def test_plan_trip():
 
     # Configure logging to show INFO level messages
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%H:%M:%S",
     )
@@ -56,9 +56,11 @@ async def test_plan_trip():
     )
 
     # Create trip requirements
+    tomorrow = date.today() + timedelta(days=1)
+    week_after = tomorrow + timedelta(days=7)
     requirements = TripRequirements(
-        start_date=date(2025, 6, 15),
-        end_date=date(2025, 6, 20),
+        start_date=tomorrow,
+        end_date=week_after,
         budget=Decimal("3000.00"),
         currency="USD",
         travelers=2,

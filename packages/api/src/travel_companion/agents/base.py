@@ -167,7 +167,10 @@ class BaseAgent(ABC, Generic[T]):
         date_part = None
         for date_field in ["check_in_date", "start_date", "date"]:
             if date_field in normalized_data:
-                date_part = normalized_data[date_field].replace("-", "")
+                date_value = normalized_data[date_field]
+                # Convert to string if not already (handles datetime, date objects)
+                date_str = str(date_value) if date_value is not None else ""
+                date_part = date_str.replace("-", "")
                 break
 
         # Only include date part if it exists

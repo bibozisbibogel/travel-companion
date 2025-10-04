@@ -65,7 +65,7 @@ HOTEL_SEARCH_SCHEMA = {
     "by budget, number of guests, rooms, and maximum results.",
     HOTEL_SEARCH_SCHEMA
 )
-async def search_hotels_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+async def search_hotels(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for hotels at a specific location.
 

@@ -7,14 +7,10 @@ from mcp import types
 from mcp.server import Server
 
 from travel_companion.agents_sdk.tools import (
-    activity_search_tool,
-    flight_search_tool,
-    food_search_tool,
-    hotel_search_tool,
-    search_activities_tool,
-    search_flights_tool,
-    search_food_tool,
-    search_hotels_tool,
+    search_activities,
+    search_flights,
+    search_restaurants,
+    search_hotels,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,10 +57,10 @@ async def call_tool(
 
     # Map tool names to handler functions
     tool_handlers = {
-        "search_flights": search_flights_tool,
-        "search_hotels": search_hotels_tool,
-        "search_activities": search_activities_tool,
-        "search_restaurants": search_food_tool,
+        "search_flights": search_flights,
+        "search_hotels": search_hotels,
+        "search_activities": search_activities,
+        "search_restaurants": search_restaurants,
     }
 
     if name not in tool_handlers:

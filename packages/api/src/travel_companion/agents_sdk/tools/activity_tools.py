@@ -64,7 +64,7 @@ ACTIVITY_SEARCH_SCHEMA = {
     "information. Supports filtering by activity type, budget, and maximum results.",
     ACTIVITY_SEARCH_SCHEMA
 )
-async def search_activities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+async def search_activities(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for activities and attractions at a location.
 
@@ -153,14 +153,15 @@ async def search_activities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                         "city": activity.location.city,
                         "country": activity.location.country,
                     },
-                    "activity_type": activity.activity_type,
+                    "category": activity.category,
                     "price": float(activity.price),
                     "currency": activity.currency,
                     "duration_minutes": activity.duration_minutes,
                     "rating": activity.rating,
-                    "photos": activity.photos[:3] if activity.photos else [],
+                    "review_count": activity.review_count,
+                    "images": activity.images[:3] if activity.images else [],
                     "booking_url": activity.booking_url,
-                    "available_times": activity.available_times,
+                    "provider": activity.provider,
                 }
                 for activity in search_response.activities[:max_results]
             ],

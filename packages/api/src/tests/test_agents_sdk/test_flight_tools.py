@@ -8,7 +8,7 @@ from decimal import Decimal
 @pytest.mark.asyncio
 async def test_flight_search_tool_basic():
     """Test basic flight search tool functionality."""
-    from travel_companion.agents_sdk.tools.flight_tools import search_flights_tool
+    from travel_companion.agents_sdk.tools.flight_tools import search_flights
 
     # Prepare test arguments
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -26,7 +26,7 @@ async def test_flight_search_tool_basic():
     }
 
     # Execute tool
-    result = await search_flights_tool(arguments)
+    result = await search_flights(arguments)
 
     # Verify result structure
     assert "content" in result
@@ -48,7 +48,7 @@ async def test_flight_search_tool_basic():
 @pytest.mark.asyncio
 async def test_flight_search_tool_missing_fields():
     """Test flight search tool with missing required fields."""
-    from travel_companion.agents_sdk.tools.flight_tools import search_flights_tool
+    from travel_companion.agents_sdk.tools.flight_tools import search_flights
 
     # Missing destination
     arguments = {
@@ -56,7 +56,7 @@ async def test_flight_search_tool_missing_fields():
         "departure_date": "2025-06-01",
     }
 
-    result = await search_flights_tool(arguments)
+    result = await search_flights(arguments)
 
     # Should return error
     import json
@@ -69,7 +69,7 @@ async def test_flight_search_tool_missing_fields():
 @pytest.mark.asyncio
 async def test_flight_search_tool_invalid_date():
     """Test flight search tool with invalid date format."""
-    from travel_companion.agents_sdk.tools.flight_tools import search_flights_tool
+    from travel_companion.agents_sdk.tools.flight_tools import search_flights
 
     arguments = {
         "origin": "JFK",
@@ -77,7 +77,7 @@ async def test_flight_search_tool_invalid_date():
         "departure_date": "invalid-date",
     }
 
-    result = await search_flights_tool(arguments)
+    result = await search_flights(arguments)
 
     # Should return error about date format
     import json
@@ -90,7 +90,7 @@ async def test_flight_search_tool_invalid_date():
 @pytest.mark.asyncio
 async def test_flight_search_tool_with_defaults():
     """Test flight search tool using default values."""
-    from travel_companion.agents_sdk.tools.flight_tools import search_flights_tool
+    from travel_companion.agents_sdk.tools.flight_tools import search_flights
 
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -101,7 +101,7 @@ async def test_flight_search_tool_with_defaults():
         "departure_date": tomorrow,
     }
 
-    result = await search_flights_tool(arguments)
+    result = await search_flights(arguments)
 
     # Should succeed with defaults
     import json

@@ -5,13 +5,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, AsyncIterator
 
-from claude_agent_sdk import ClaudeAgentOptions, create_sdk_mcp_server, query
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, create_sdk_mcp_server
 from travel_companion.core.config import Settings, get_settings
 from travel_companion.agents_sdk.tools import (
-    search_activities_tool,
-    search_flights_tool,
-    search_food_tool,
-    search_hotels_tool,
+    search_activities,
+    search_flights,
+    search_restaurants,
+    search_hotels,
 )
 from travel_companion.models.trip import TripPlanRequest
 
@@ -50,12 +50,11 @@ Your role is to help users plan comprehensive trips by:
 2. Searching for suitable flights using the search_flights tool
 3. Finding appropriate accommodations using the search_hotels tool
 4. Discovering activities and attractions using the search_activities tool
-5. Recommending restaurants using the search_food tool
+5. Recommending restaurants using the search_restaurants tool
 6. Creating a well-organized itinerary that fits their budget and preferences
 
 When planning trips:
 - Always use the specialized travel tools provided
-- Ask for clarification if requirements are unclear
 - Stay within the user's budget constraints
 - Consider travel time, distances, and logistics
 - Provide multiple options when appropriate
@@ -68,10 +67,10 @@ Be proactive, helpful, and thorough in your planning."""
             name="travel-planning-tools",
             version="1.0.0",
             tools=[
-                search_flights_tool,
-                search_hotels_tool,
-                search_activities_tool,
-                search_food_tool,
+                search_flights,
+                search_hotels,
+                search_activities,
+                search_restaurants,
             ],
         )
 
@@ -113,21 +112,22 @@ Be proactive, helpful, and thorough in your planning."""
         options = ClaudeAgentOptions(
             system_prompt=self.system_prompt,
             mcp_servers={"travel": self.mcp_server},
-            # Explicitly allow only our travel planning tools (no WebSearch, Bash, etc.)
             allowed_tools=[
                 "mcp__travel__search_flights",
                 "mcp__travel__search_hotels",
                 "mcp__travel__search_activities",
-                "mcp__travel__search_food",
+                "mcp__travel__search_restaurants",
             ],
         )
 
         try:
-            # Stream planning using claude_agent_sdk.query()
+            # Stream planning using ClaudeSDKClient
             logger.info(f"Starting query with MCP server: travel")
-            async for message in query(prompt=prompt, options=options):
-                # Convert SDK message to our format
-                yield self._convert_message(message)
+            async with ClaudeSDKClient(options) as client:
+                await client.query(prompt)
+                async for message in client.receive_response():
+                    # Convert SDK message to our format
+                    yield self._convert_message(message)
 
         except Exception as e:
             logger.error(f"Error during trip planning: {e}", exc_info=True)
@@ -215,19 +215,20 @@ Be proactive, helpful, and thorough in your planning."""
         options = ClaudeAgentOptions(
             system_prompt=self.system_prompt,
             mcp_servers={"travel": self.mcp_server},
-            # Explicitly allow only our travel planning tools (no WebSearch, Bash, etc.)
             allowed_tools=[
                 "mcp__travel__search_flights",
                 "mcp__travel__search_hotels",
                 "mcp__travel__search_activities",
-                "mcp__travel__search_food",
+                "mcp__travel__search_restaurants",
             ],
         )
 
         try:
-            # Stream query results using claude_agent_sdk.query()
-            async for message in query(prompt=user_query, options=options):
-                yield self._convert_message(message)
+            # Stream query results using ClaudeSDKClient
+            async with ClaudeSDKClient(options) as client:
+                await client.query(user_query)
+                async for message in client.receive_response():
+                    yield self._convert_message(message)
 
         except Exception as e:
             logger.error(f"Error during query: {e}", exc_info=True)
