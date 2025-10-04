@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from mcp import Tool
+from claude_agent_sdk import tool
 
 from travel_companion.agents.flight_agent import FlightAgent
 from travel_companion.models.external import FlightSearchRequest
@@ -59,6 +59,13 @@ FLIGHT_SEARCH_SCHEMA = {
 }
 
 
+@tool(
+    "search_flights",
+    "Search for flights between two locations. Returns available flight options "
+    "with pricing, schedules, and airline information. Supports filtering by "
+    "travel class, number of passengers, and maximum results.",
+    FLIGHT_SEARCH_SCHEMA
+)
 async def search_flights_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for flights between origin and destination.
@@ -188,15 +195,3 @@ async def search_flights_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             ],
             "isError": True,
         }
-
-
-# Create the tool definition for MCP server
-flight_search_tool = Tool(
-    name="search_flights",
-    description=(
-        "Search for flights between two locations. Returns available flight options "
-        "with pricing, schedules, and airline information. Supports filtering by "
-        "travel class, number of passengers, and maximum results."
-    ),
-    inputSchema=FLIGHT_SEARCH_SCHEMA,
-)

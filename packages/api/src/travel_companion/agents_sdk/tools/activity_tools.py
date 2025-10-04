@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from mcp import Tool
+from claude_agent_sdk import tool
 
 from travel_companion.agents.activity_agent import ActivityAgent
 
@@ -57,6 +57,13 @@ ACTIVITY_SEARCH_SCHEMA = {
 }
 
 
+@tool(
+    "search_activities",
+    "Search for activities, attractions, and experiences at a specific location. "
+    "Returns available activity options with pricing, ratings, duration, and booking "
+    "information. Supports filtering by activity type, budget, and maximum results.",
+    ACTIVITY_SEARCH_SCHEMA
+)
 async def search_activities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for activities and attractions at a location.
@@ -186,15 +193,3 @@ async def search_activities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             ],
             "isError": True,
         }
-
-
-# Create the tool definition for MCP server
-activity_search_tool = Tool(
-    name="search_activities",
-    description=(
-        "Search for activities, attractions, and experiences at a specific location. "
-        "Returns available activity options with pricing, ratings, duration, and booking "
-        "information. Supports filtering by activity type, budget, and maximum results."
-    ),
-    inputSchema=ACTIVITY_SEARCH_SCHEMA,
-)

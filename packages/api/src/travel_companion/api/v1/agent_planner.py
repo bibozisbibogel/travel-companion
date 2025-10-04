@@ -167,7 +167,7 @@ async def travel_query_sdk(
             try:
                 yield f"data: {json.dumps({'type': 'start', 'query': query})}\n\n"
 
-                async for update in agent.query(query):
+                async for update in agent.query_agent(query):
                     yield f"data: {json.dumps(update)}\n\n"
 
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"

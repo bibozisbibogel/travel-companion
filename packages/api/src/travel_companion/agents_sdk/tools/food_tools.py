@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from mcp import Tool
+from claude_agent_sdk import tool
 
 from travel_companion.agents.food_agent import FoodAgent
 
@@ -53,6 +53,14 @@ FOOD_SEARCH_SCHEMA = {
 }
 
 
+@tool(
+    "search_restaurants",
+    "Search for restaurants and dining options at a specific location. "
+    "Returns available restaurant options with cuisine types, pricing, ratings, "
+    "and booking information. Supports filtering by meal type, cuisine, budget, "
+    "and maximum results.",
+    FOOD_SEARCH_SCHEMA
+)
 async def search_food_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for restaurants and dining options at a location.
@@ -188,16 +196,3 @@ async def search_food_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             ],
             "isError": True,
         }
-
-
-# Create the tool definition for MCP server
-food_search_tool = Tool(
-    name="search_restaurants",
-    description=(
-        "Search for restaurants and dining options at a specific location. "
-        "Returns available restaurant options with cuisine types, pricing, ratings, "
-        "and booking information. Supports filtering by meal type, cuisine, budget, "
-        "and maximum results."
-    ),
-    inputSchema=FOOD_SEARCH_SCHEMA,
-)

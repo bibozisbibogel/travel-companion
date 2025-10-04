@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from mcp import Tool
+from claude_agent_sdk import tool
 
 from travel_companion.agents.hotel_agent import HotelAgent
 
@@ -58,6 +58,13 @@ HOTEL_SEARCH_SCHEMA = {
 }
 
 
+@tool(
+    "search_hotels",
+    "Search for hotels at a specific location. Returns available hotel options "
+    "with pricing, ratings, amenities, and location information. Supports filtering "
+    "by budget, number of guests, rooms, and maximum results.",
+    HOTEL_SEARCH_SCHEMA
+)
 async def search_hotels_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Search for hotels at a specific location.
@@ -194,15 +201,3 @@ async def search_hotels_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             ],
             "isError": True,
         }
-
-
-# Create the tool definition for MCP server
-hotel_search_tool = Tool(
-    name="search_hotels",
-    description=(
-        "Search for hotels at a specific location. Returns available hotel options "
-        "with pricing, ratings, amenities, and location information. Supports filtering "
-        "by budget, number of guests, rooms, and maximum results."
-    ),
-    inputSchema=HOTEL_SEARCH_SCHEMA,
-)
