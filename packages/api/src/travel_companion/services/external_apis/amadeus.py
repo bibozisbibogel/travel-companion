@@ -80,7 +80,7 @@ class AmadeusClient:
         self,
         client_id: str | None = None,
         client_secret: str | None = None,
-        base_url: str = "https://test.api.amadeus.com",
+        base_url: str | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
         rate_limit_per_second: int = 10,
@@ -99,7 +99,7 @@ class AmadeusClient:
         settings = get_settings()
         self.client_id = client_id or settings.amadeus_api_key
         self.client_secret = client_secret or settings.amadeus_api_secret
-        self.base_url = base_url.rstrip("/")
+        self.base_url = (base_url or settings.amadeus_base_url).rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
         self.rate_limit_per_second = rate_limit_per_second
@@ -233,8 +233,11 @@ class AmadeusClient:
             try:
                 await self._rate_limit()
 
-                access_token = await self._get_access_token()
-                headers = {"Authorization": f"Bearer {access_token}"}
+                # Only use OAuth authentication for non-test URLs
+                headers = {}
+                if self.base_url == "https://test.api.amadeus.com":
+                    access_token = await self._get_access_token()
+                    headers = {"Authorization": f"Bearer {access_token}"}
 
                 response = await self._client.request(
                     method=method,
