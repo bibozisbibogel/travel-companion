@@ -11,12 +11,19 @@ This demonstrates the workflow mode behavior we implemented.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from dotenv import load_dotenv
 
 from travel_companion.agents.itinerary_agent import ItineraryAgent
+from travel_companion.models.trip import (
+    AccommodationType,
+    TravelClass,
+    TripDestination,
+    TripPlanRequest,
+    TripRequirements,
+)
 
 
 def get_prefetched_flight_data():
@@ -144,42 +151,48 @@ async def main():
 
     agent = ItineraryAgent()
 
-    # Build workflow-style request with pre-fetched data
-    itinerary_request = {
-        # Trip destination fields
-        "destination": "Rome",
-        "country": "Italy",
-        "country_code": "IT",
-        "airport_code": "FCO",
-        "latitude": 41.9028,
-        "longitude": 12.4964,
-        # Trip requirements fields
-        "start_date": "2024-06-15",
-        "end_date": "2024-06-20",  # Changed from 06-18 to 06-20 for 5-day trip
-        "budget": 3000.00,  # Increased budget for longer trip
-        "currency": "USD",
-        "traveler_count": 2,
-        "travel_class": "economy",
-        "accommodation_type": "hotel",
-        # User preferences
-        "user_preferences": {
+    # Build workflow-style request using Pydantic models
+    destination = TripDestination(
+        city="Rome",
+        country="Italy",
+        country_code="IT",
+        airport_code="FCO",
+        latitude=41.9028,
+        longitude=12.4964,
+    )
+
+    requirements = TripRequirements(
+        budget=Decimal("3000.00"),
+        currency="USD",
+        start_date=date(2024, 6, 15),
+        end_date=date(2024, 6, 20),
+        travelers=2,
+        travel_class=TravelClass.ECONOMY,
+        accommodation_type=AccommodationType.HOTEL,
+    )
+
+    # Create TripPlanRequest with workflow mode data
+    trip_plan_request = TripPlanRequest(
+        destination=destination,
+        requirements=requirements,
+        preferences={
             "cuisine": ["italian", "local"],
             "activities": ["culture", "sightseeing", "historical"],
         },
-        # Pre-fetched data (workflow mode indicators)
-        "flight_options": get_prefetched_flight_data(),
-        # "flight_options": [],
-        "weather_forecast": [],
-        # "weather_forecast": get_prefetched_weather_data(),
-        "hotel_options": [],
-        "activity_options": [],
-        "restaurant_options": [],
-    }
+        # Workflow mode: pre-fetched agent results (None = will call agent)
+        flight_options=get_prefetched_flight_data(),
+        # weather_forecast=None,  # Will call weather agent
+        weather_forecast=get_prefetched_weather_data(),  # Uncomment to use pre-fetched
+        hotel_options=None,  # Will call hotel agent
+        activity_options=None,  # Will call activity agent
+        restaurant_options=None,  # Will call food agent
+    )
 
     print("Calling ItineraryAgent.process()...\n")
 
     try:
-        response = await agent.process(itinerary_request)
+        # Pass TripPlanRequest directly - no dict conversion needed!
+        response = await agent.process(trip_plan_request)
 
         print("\n" + "=" * 70)
         print("ITINERARY GENERATION SUCCESSFUL")

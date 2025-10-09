@@ -774,42 +774,27 @@ async def execute_itinerary_agent(state: TripPlanningWorkflowState) -> TripPlann
                 "Critical travel agents (flight or hotel) failed to complete"
             )
 
-        # Create itinerary request with all available data as dictionary
+        # Get base trip request from state
         trip_request = state["trip_request"]
 
-        # Pass workflow state with pre-fetched agent results
-        # ItineraryAgent will detect this is workflow mode and use the pre-fetched data
-        itinerary_request = {
-            # Trip destination fields (for TripDestination reconstruction)
-            "destination": trip_request.destination.city,
-            "country": trip_request.destination.country,
-            "country_code": trip_request.destination.country_code,
-            "airport_code": trip_request.destination.airport_code,
-            "latitude": trip_request.destination.latitude,
-            "longitude": trip_request.destination.longitude,
-            # Trip requirements fields (for TripRequirements reconstruction)
-            "start_date": trip_request.requirements.start_date.isoformat(),
-            "end_date": trip_request.requirements.end_date.isoformat(),
-            "budget": float(trip_request.requirements.budget),
-            "currency": trip_request.requirements.currency,
-            "traveler_count": trip_request.requirements.travelers,
-            "travel_class": trip_request.requirements.travel_class.value
-            if trip_request.requirements.travel_class
-            else "economy",
-            "accommodation_type": trip_request.requirements.accommodation_type.value
-            if trip_request.requirements.accommodation_type
-            else "hotel",
-            # User preferences
-            "user_preferences": state.get("user_preferences", {}),
-            # Pre-fetched agent results (workflow mode indicators)
-            "flight_options": state.get("flight_results", []),
-            "hotel_options": state.get("hotel_results", []),
-            "activity_options": state.get("activity_results", []),
-            "restaurant_options": state.get("food_recommendations", []),
-            "weather_forecast": state.get("weather_data", {}),
-        }
+        # Create enhanced TripPlanRequest with workflow mode data
+        # Import here to avoid circular import
+        from ..models.trip import TripPlanRequest
 
-        # Execute itinerary agent
+        # Create new TripPlanRequest with workflow fields populated
+        itinerary_request = TripPlanRequest(
+            destination=trip_request.destination,
+            requirements=trip_request.requirements,
+            preferences=trip_request.preferences,
+            # Workflow mode: pre-fetched agent results from state
+            flight_options=state.get("flight_results", []) or None,
+            hotel_options=state.get("hotel_results", []) or None,
+            activity_options=state.get("activity_results", []) or None,
+            restaurant_options=state.get("food_recommendations", []) or None,
+            weather_forecast=state.get("weather_data", {}) or None,
+        )
+
+        # Execute itinerary agent with TripPlanRequest model
         itinerary_agent = ItineraryAgent()
         itinerary_response = await itinerary_agent.process(itinerary_request)
 
