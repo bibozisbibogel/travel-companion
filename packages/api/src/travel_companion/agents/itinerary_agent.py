@@ -216,22 +216,30 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             self.logger.warning(f"Cache retrieval failed for {cache_key}: {e}")
         return None
 
-    async def process(self, request_data: dict[str, Any]) -> ItineraryAgentResponse:
+    async def process(
+        self, request_data: TripPlanRequest | dict[str, Any]
+    ) -> ItineraryAgentResponse:
         """Process trip planning request with multi-agent coordination.
 
         Supports two modes:
-        1. Standalone mode: Receives TripPlanRequest, coordinates all agents internally
-        2. Workflow mode: Receives pre-fetched agent results from workflow state
+        1. Standalone mode: TripPlanRequest without workflow fields (all None)
+        2. Workflow mode: TripPlanRequest with pre-fetched agent results populated
 
         Args:
-            request_data: Trip planning request data or workflow state with pre-fetched results
+            request_data: TripPlanRequest (Pydantic model) or dict that can be parsed into one
 
         Returns:
             Complete itinerary with all travel components integrated
         """
         try:
+            # Parse to TripPlanRequest if dict provided (for backward compatibility)
+            if isinstance(request_data, dict):
+                trip_request = TripPlanRequest(**request_data)
+            else:
+                trip_request = request_data
+
             # Generate cache key early for both modes
-            cache_key = await self._cache_key(request_data)
+            cache_key = await self._cache_key(trip_request.model_dump())
 
             # Check cache first before any processing
             cached_result = await self._get_cached_result(cache_key)
@@ -239,22 +247,21 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 self.logger.info("Using cached result")
                 return cached_result
 
-            # Check if this is workflow mode (pre-fetched data) or standalone mode
-            has_prefetched_data = self._has_prefetched_agent_results(request_data)
+            # Check if this is workflow mode (has pre-fetched data) or standalone mode
+            has_prefetched_data = self._has_prefetched_agent_results(trip_request)
 
             # Start timing for the entire itinerary generation
             start_time = asyncio.get_event_loop().time()
 
             if has_prefetched_data:
                 # Workflow mode - use pre-fetched data
-                trip_request, agent_results = await self._extract_workflow_data(request_data)
+                agent_results = await self._extract_workflow_data(trip_request)
                 self.logger.info(
                     f"Processing itinerary for {trip_request.destination.city} "
                     f"(workflow mode with pre-fetched data)"
                 )
             else:
-                # Standalone mode - validate and parse request
-                trip_request = TripPlanRequest(**request_data)
+                # Standalone mode - all workflow fields are None
                 self.logger.info(
                     f"Processing itinerary for {trip_request.destination.city} "
                     f"(standalone mode)"
@@ -1006,127 +1013,80 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             # Unknown agent, return as-is
             return response
 
-    def _has_prefetched_agent_results(self, request_data: dict[str, Any]) -> bool:
-        """Check if request_data contains pre-fetched agent results from workflow.
+    def _has_prefetched_agent_results(self, trip_request: TripPlanRequest) -> bool:
+        """Check if TripPlanRequest contains pre-fetched agent results from workflow.
 
         Args:
-            request_data: Request data dictionary
+            trip_request: Trip planning request
 
         Returns:
             True if this appears to be workflow mode with pre-fetched data
         """
-        # Workflow mode has these keys that standalone mode doesn't
-        workflow_indicators = [
-            "flight_options",
-            "hotel_options",
-            "activity_options",
-            "restaurant_options",
-            "weather_forecast",
-        ]
+        # Workflow mode: at least one workflow field is not None
+        return any(
+            [
+                trip_request.flight_options is not None,
+                trip_request.hotel_options is not None,
+                trip_request.activity_options is not None,
+                trip_request.restaurant_options is not None,
+                trip_request.weather_forecast is not None,
+            ]
+        )
 
-        # If any of these workflow-specific keys exist, we're in workflow mode
-        return any(key in request_data for key in workflow_indicators)
-
-    async def _extract_workflow_data(
-        self, request_data: dict[str, Any]
-    ) -> tuple[TripPlanRequest, dict[str, Any]]:
-        """Extract TripPlanRequest and agent results from workflow state.
+    async def _extract_workflow_data(self, trip_request: TripPlanRequest) -> dict[str, Any]:
+        """Extract agent results from TripPlanRequest workflow fields.
 
         Args:
-            request_data: Workflow state with pre-fetched agent results
+            trip_request: Trip planning request with pre-fetched agent results
 
         Returns:
-            Tuple of (TripPlanRequest, agent_results dict)
+            Agent results dict ready for itinerary generation
         """
-        # Reconstruct TripPlanRequest from workflow data
-        # The workflow sends individual fields, we need to reconstruct the proper structure
-        from ..models.trip import TripDestination, TripRequirements
-
-        # Build TripDestination
-        destination = TripDestination(
-            city=request_data.get("destination", "Unknown"),
-            country=request_data.get("country", "Unknown"),
-            country_code=request_data.get("country_code", "XX"),
-            airport_code=request_data.get("airport_code"),
-            latitude=request_data.get("latitude", 0.0),
-            longitude=request_data.get("longitude", 0.0),
-        )
-
-        # Build TripRequirements
-        from datetime import date
-
-        start_date_str = request_data.get("start_date", "")
-        end_date_str = request_data.get("end_date", "")
-
-        requirements = TripRequirements(
-            budget=Decimal(str(request_data.get("budget", 1000.0))),
-            currency=request_data.get("currency", "USD"),
-            start_date=date.fromisoformat(start_date_str) if start_date_str else date.today(),
-            end_date=date.fromisoformat(end_date_str)
-            if end_date_str
-            else date.today(),
-            travelers=request_data.get("traveler_count", 1),
-            travel_class=request_data.get("travel_class", "economy"),
-            accommodation_type=request_data.get("accommodation_type", "hotel"),
-        )
-
-        # Create TripPlanRequest
-        trip_request = TripPlanRequest(
-            destination=destination,
-            requirements=requirements,
-            preferences=request_data.get("user_preferences", {}),
-        )
-
-        # Extract pre-fetched agent results and convert to expected format
-        # Note: Some agents might have failed in workflow, so check if data is present
+        # Extract pre-fetched agent results from TripPlanRequest workflow fields
+        # Note: Fields are None if not provided (standalone mode behavior)
         agent_results = {}
 
         # Flight data - wrap in dict format expected by _add_flight_items
-        flight_data = request_data.get("flight_options", [])
-        if flight_data:  # Has data
+        if trip_request.flight_options is not None:
             agent_results["flights"] = {
                 "status": "success",
-                "data": {"flights": flight_data},  # Wrap in dict with "flights" key
+                "data": {"flights": trip_request.flight_options},
                 "cached": False,
                 "prefetched": True,
             }
 
         # Hotel data - wrap in dict format expected by _add_hotel_items
-        hotel_data = request_data.get("hotel_options", [])
-        if hotel_data:  # Has data
+        if trip_request.hotel_options is not None:
             agent_results["hotels"] = {
                 "status": "success",
-                "data": {"hotels": hotel_data},  # Wrap in dict with "hotels" key
+                "data": {"hotels": trip_request.hotel_options},
                 "cached": False,
                 "prefetched": True,
             }
 
         # Activity data - wrap in dict format expected by _add_activity_items
-        activity_data = request_data.get("activity_options", [])
-        if activity_data:  # Has data
+        if trip_request.activity_options is not None:
             agent_results["activities"] = {
                 "status": "success",
-                "data": {"activities": activity_data},  # Wrap in dict with "activities" key
+                "data": {"activities": trip_request.activity_options},
                 "cached": False,
                 "prefetched": True,
             }
 
         # Restaurant data - wrap in dict format expected by _add_meal_items
-        restaurant_data = request_data.get("restaurant_options", [])
-        if restaurant_data:  # Has data
+        if trip_request.restaurant_options is not None:
             agent_results["restaurants"] = {
                 "status": "success",
-                "data": {"restaurants": restaurant_data},  # Wrap in dict with "restaurants" key
+                "data": {"restaurants": trip_request.restaurant_options},
                 "cached": False,
                 "prefetched": True,
             }
 
         # Weather data - already in correct format (dict with forecasts)
-        weather_data = request_data.get("weather_forecast", {})
-        if weather_data:  # Has data
+        if trip_request.weather_forecast is not None:
             agent_results["weather"] = {
                 "status": "success",
-                "data": weather_data,  # Weather data is already a dict
+                "data": trip_request.weather_forecast,
                 "cached": False,
                 "prefetched": True,
             }
@@ -1194,7 +1154,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             f"{get_item_count('restaurants')} restaurants"
         )
 
-        return trip_request, agent_results
+        return agent_results
 
     def _prepare_activity_request(self, trip_request: TripPlanRequest) -> ActivitySearchRequest:
         """Prepare activity search request from trip request."""

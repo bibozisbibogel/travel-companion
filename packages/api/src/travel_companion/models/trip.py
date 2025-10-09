@@ -86,12 +86,41 @@ class TripRequirements(BaseModel):
 
 
 class TripPlanRequest(BaseModel):
-    """Request model for trip planning."""
+    """Request model for trip planning.
+
+    Supports two execution modes:
+    1. Standalone mode: Only destination, requirements, and preferences are provided.
+       The itinerary agent will call all other agents (flight, hotel, activity, etc.)
+    2. Workflow mode: Pre-fetched agent results are provided in optional fields.
+       The itinerary agent uses these results directly without calling other agents.
+    """
 
     destination: TripDestination = Field(..., description="Trip destination")
     requirements: TripRequirements = Field(..., description="Trip requirements")
     preferences: dict[str, str | int | bool | list[str]] | None = Field(
         None, description="Additional preferences from user profile"
+    )
+
+    # Workflow mode: optional pre-fetched agent results
+    flight_options: list[Any] | None = Field(
+        None,
+        description="Pre-fetched flight options (workflow mode). If None, flight agent will be called.",
+    )
+    weather_forecast: dict[str, Any] | None = Field(
+        None,
+        description="Pre-fetched weather data (workflow mode). If None, weather agent will be called.",
+    )
+    hotel_options: list[Any] | None = Field(
+        None,
+        description="Pre-fetched hotel options (workflow mode). If None, hotel agent will be called.",
+    )
+    activity_options: list[Any] | None = Field(
+        None,
+        description="Pre-fetched activity options (workflow mode). If None, activity agent will be called.",
+    )
+    restaurant_options: list[Any] | None = Field(
+        None,
+        description="Pre-fetched restaurant options (workflow mode). If None, food agent will be called.",
     )
 
 
