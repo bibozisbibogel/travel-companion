@@ -7,6 +7,7 @@ from typing import Any, AsyncIterator
 
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, create_sdk_mcp_server
 from travel_companion.core.config import Settings, get_settings
+from travel_companion.agents_sdk.constants import TRAVEL_PLANNER_SYSTEM_PROMPT
 from travel_companion.agents_sdk.tools import (
     search_activities,
     search_flights,
@@ -43,24 +44,7 @@ class TravelPlannerAgent:
         self.settings = settings or get_settings()
 
         # System prompt for travel planning
-        self.system_prompt = """You are an expert travel planning assistant with access to specialized tools for searching flights, hotels, activities, and restaurants.
-
-Your role is to help users plan comprehensive trips by:
-1. Understanding their travel requirements (destination, dates, budget, preferences)
-2. Searching for suitable flights using the search_flights tool
-3. Finding appropriate accommodations using the search_hotels tool
-4. Discovering activities and attractions using the search_activities tool
-5. Recommending restaurants using the search_restaurants tool
-6. Creating a well-organized itinerary that fits their budget and preferences
-
-When planning trips:
-- Always use the specialized travel tools provided
-- Stay within the user's budget constraints
-- Consider travel time, distances, and logistics
-- Provide multiple options when appropriate
-- Include practical details like booking URLs and pricing
-
-Be proactive, helpful, and thorough in your planning."""
+        self.system_prompt = TRAVEL_PLANNER_SYSTEM_PROMPT
 
         # Create MCP server with travel planning tools
         self.mcp_server = create_sdk_mcp_server(
@@ -168,13 +152,15 @@ Be proactive, helpful, and thorough in your planning."""
                 prefs.append(
                     f"Accommodation preference: {trip_request.preferences['accommodation_type']}"
                 )
-            if trip_request.preferences.get("activity_types"):
+            activity_types = trip_request.preferences.get("activity_types")
+            if activity_types and isinstance(activity_types, list):
                 prefs.append(
-                    f"Interested in: {', '.join(trip_request.preferences['activity_types'])}"
+                    f"Interested in: {', '.join(activity_types)}"
                 )
-            if trip_request.preferences.get("cuisine_preferences"):
+            cuisine_preferences = trip_request.preferences.get("cuisine_preferences")
+            if cuisine_preferences and isinstance(cuisine_preferences, list):
                 prefs.append(
-                    f"Cuisine preferences: {', '.join(trip_request.preferences['cuisine_preferences'])}"
+                    f"Cuisine preferences: {', '.join(cuisine_preferences)}"
                 )
             if prefs:
                 prompt_parts.append("\n".join(prefs))
@@ -252,7 +238,10 @@ Be proactive, helpful, and thorough in your planning."""
 
         logger.debug(f"Converting SDK message: {type(sdk_message).__name__}")
 
-        message_dict = {"type": "unknown"}
+        message_dict = {
+            "type": "unknown",
+            "content": str(sdk_message)
+        }
 
         try:
             # Check if it's a text message (AssistantMessage, UserMessage, etc.)
@@ -277,6 +266,30 @@ Be proactive, helpful, and thorough in your planning."""
                             "input": content_block.input if hasattr(content_block, "input") else {},
                         }
 
+                    # Handle ToolResultBlock
+                    elif block_type == "ToolResultBlock":
+                        # Extract content from ToolResultBlock
+                        result_content = ""
+                        if hasattr(content_block, "content"):
+                            # content is typically a list of content blocks
+                            if isinstance(content_block.content, list):
+                                for result_item in content_block.content:
+                                    if hasattr(result_item, "text"):
+                                        result_content += result_item.text
+                                    elif isinstance(result_item, dict) and "text" in result_item:
+                                        result_content += result_item["text"]
+                                    else:
+                                        result_content += str(result_item)
+                            else:
+                                result_content = str(content_block.content)
+                        
+                        message_dict = {
+                            "type": "tool_result",
+                            "tool_use_id": content_block.tool_use_id if hasattr(content_block, "tool_use_id") else None,
+                            "content": result_content,
+                            "is_error": content_block.is_error if hasattr(content_block, "is_error") else None,
+                        }
+
             # Handle ResultMessage (final completion)
             if type(sdk_message).__name__ == "ResultMessage":
                 message_dict = {
@@ -284,10 +297,27 @@ Be proactive, helpful, and thorough in your planning."""
                     "result": sdk_message.result if hasattr(sdk_message, "result") else None,
                 }
 
+            # Handle SystemMessage (initialization and system events)
+            elif type(sdk_message).__name__ == "SystemMessage":
+                # Extract subtype and data if available
+                subtype = None
+                data = None
+                
+                if hasattr(sdk_message, "subtype"):
+                    subtype = sdk_message.subtype
+                if hasattr(sdk_message, "data"):
+                    data = sdk_message.data
+                
+                message_dict = {
+                    "type": "system",
+                    "subtype": subtype,
+                    "data": data,
+                }
+
         except Exception as e:
             logger.warning(f"Error converting message: {e}", exc_info=True)
             message_dict = {
-                "type": "text",
+                "type": "error",
                 "content": str(sdk_message),
             }
 
