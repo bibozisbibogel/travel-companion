@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from travel_companion.agents_sdk.travel_planner_agent import TravelPlannerAgent
 from travel_companion.api.deps import get_current_user
 from travel_companion.models.base import PaginatedResponse, PaginationMeta, SuccessResponse
 from travel_companion.models.trip import (
@@ -20,7 +21,6 @@ from travel_companion.models.trip import (
 )
 from travel_companion.models.user import User
 from travel_companion.utils.logging import get_client_ip, get_user_agent
-from travel_companion.workflows.orchestrator import TripPlanningWorkflow
 
 router = APIRouter()
 
@@ -38,11 +38,11 @@ async def generate_trip_plan(
     current_user: User = Depends(get_current_user),
 ) -> SuccessResponse[TripResponse]:
     """
-    Generate a travel plan using AI agents workflow.
+    Generate a travel plan using Claude Agent SDK.
 
     This endpoint:
     - Validates trip requirements and destination
-    - Initiates the LangGraph workflow for trip planning
+    - Uses TravelPlannerAgent with Claude Agent SDK for trip planning
     - Returns a comprehensive travel plan with flights, hotels, and activities
     - Saves the plan as a draft trip for the authenticated user
 
@@ -51,30 +51,28 @@ async def generate_trip_plan(
     get_client_ip(request)
     get_user_agent(request)
 
-    # Initialize workflow orchestrator
-    workflow = TripPlanningWorkflow()
+    # Initialize TravelPlannerAgent
+    agent = TravelPlannerAgent()
 
     try:
-        # Execute the trip planning workflow
-        result = await workflow.execute_trip_planning(
-            trip_request=trip_request,
-            user_id=str(current_user.user_id),
-            request_id=request.headers.get("X-Request-ID"),
-        )
+        # Stream planning responses and collect itinerary
+        itinerary_data = None
+        async for message in agent.plan_trip(trip_request):
+            # Extract structured itinerary when received
+            if message["type"] == "itinerary":
+                # ItineraryOutput model instance
+                itinerary_data = message["data"]
+                break
 
-        # Extract workflow results
-        trip_id = result.get("trip_id", UUID("00000000-0000-4000-8000-000000000001"))
-        plan_data = result.get("itinerary_data")
-
-        # Create trip response with workflow results
+        # Create trip response with agent results
         trip_response = TripResponse(
-            trip_id=trip_id if isinstance(trip_id, UUID) else UUID(trip_id),
+            trip_id=UUID("00000000-0000-4000-8000-000000000001"),
             user_id=current_user.user_id,
             name=f"Trip to {trip_request.destination.city}",
             description=f"AI-generated travel plan for {trip_request.destination.city}",
             destination=trip_request.destination,
             requirements=trip_request.requirements,
-            plan=plan_data,  # Can be None or partial data for testing
+            plan=itinerary_data if itinerary_data else None,
             created_at=current_user.created_at,
             updated_at=current_user.updated_at,
         )
@@ -87,8 +85,8 @@ async def generate_trip_plan(
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
             detail={
-                "message": "Trip planning workflow timed out",
-                "error_code": "WORKFLOW_TIMEOUT",
+                "message": "Trip planning timed out",
+                "error_code": "PLANNING_TIMEOUT",
                 "details": str(e),
             },
         ) from e

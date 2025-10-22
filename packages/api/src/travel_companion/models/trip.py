@@ -8,7 +8,7 @@ from typing import Any, Union
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
+from travel_companion.models.itinerary_output import ItineraryOutput
 
 class TripStatus(str, Enum):
     """Trip status enumeration."""
@@ -212,7 +212,7 @@ class TripResponse(TripBase):
 
     trip_id: UUID = Field(..., description="Trip ID")
     user_id: UUID = Field(..., description="Owner user ID")
-    plan: TripPlan | None = Field(None, description="Generated trip plan")
+    plan: ItineraryOutput | None = Field(None, description="Generated trip plan")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 
