@@ -1,19 +1,23 @@
 """Main travel planner agent using Claude Agent SDK."""
 
+import json
 import logging
-from datetime import datetime
-from decimal import Decimal
-from typing import Any, AsyncIterator
+import re
+from collections.abc import AsyncIterator
+from typing import Any
 
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, create_sdk_mcp_server
-from travel_companion.core.config import Settings, get_settings
+from pydantic import ValidationError
+
 from travel_companion.agents_sdk.constants import TRAVEL_PLANNER_SYSTEM_PROMPT
 from travel_companion.agents_sdk.tools import (
     search_activities,
     search_flights,
-    search_restaurants,
     search_hotels,
+    search_restaurants,
 )
+from travel_companion.core.config import Settings, get_settings
+from travel_companion.models.itinerary_output import ItineraryOutput
 from travel_companion.models.trip import TripPlanRequest
 
 logger = logging.getLogger(__name__)
@@ -67,13 +71,15 @@ class TravelPlannerAgent:
         Plan a complete trip based on user requirements.
 
         This method streams the planning process, yielding updates as each
-        component of the trip is planned.
+        component of the trip is planned. After all streaming completes,
+        it yields a final 'itinerary' message with the parsed JSON structure.
 
         Args:
             trip_request: Trip planning request with destination, dates, budget, etc.
 
         Yields:
-            Planning progress updates and final trip plan
+            Planning progress updates (text, tool_use, tool_result, system)
+            Final message with type='itinerary' containing TripItinerary object
 
         Example:
             >>> agent = TravelPlannerAgent()
@@ -85,7 +91,9 @@ class TravelPlannerAgent:
             ...     travelers=2
             ... )
             >>> async for update in agent.plan_trip(request):
-            ...     print(update)
+            ...     if update["type"] == "itinerary":
+            ...         itinerary = update["data"]  # TripItinerary object
+            ...         print(f"Total cost: {itinerary.total_cost}")
         """
         logger.info(f"Starting trip planning for: {trip_request.destination}")
 
@@ -104,14 +112,46 @@ class TravelPlannerAgent:
             ],
         )
 
+        # Accumulate all text responses for final parsing
+        accumulated_text = []
+
         try:
             # Stream planning using ClaudeSDKClient
-            logger.info(f"Starting query with MCP server: travel")
+            logger.info("Starting query with MCP server: travel")
             async with ClaudeSDKClient(options) as client:
                 await client.query(prompt)
                 async for message in client.receive_response():
                     # Convert SDK message to our format
-                    yield self._convert_message(message)
+                    converted = self._convert_message(message)
+
+                    # Accumulate text messages for parsing
+                    if converted["type"] == "text":
+                        accumulated_text.append(converted["content"])
+
+                    # Yield streaming updates
+                    yield converted
+
+            # After streaming completes, parse the accumulated text
+            full_response = "\n".join(accumulated_text)
+            logger.debug(f"Accumulated {len(accumulated_text)} text messages")
+
+            itinerary = self._parse_itinerary_response(full_response)
+
+            if itinerary:
+                # Yield final structured itinerary
+                yield {
+                    "type": "itinerary",
+                    "data": itinerary,
+                    "raw_json": itinerary.model_dump(mode="json"),
+                }
+                logger.info("Successfully yielded structured itinerary")
+            else:
+                logger.warning("Failed to parse itinerary from agent response")
+                yield {
+                    "type": "warning",
+                    "message": "Could not parse structured itinerary from response",
+                    "raw_text": full_response,
+                }
 
         except Exception as e:
             logger.error(f"Error during trip planning: {e}", exc_info=True)
@@ -167,7 +207,7 @@ class TravelPlannerAgent:
 
         prompt_parts.append(
             "\nPlease help me plan this trip by:\n"
-            "1. Finding suitable flights (if origin is provided)\n"
+            "1. Finding suitable flights\n"
             "2. Searching for accommodations within budget\n"
             "3. Suggesting activities and attractions\n"
             "4. Recommending restaurants for different meals\n"
@@ -282,7 +322,7 @@ class TravelPlannerAgent:
                                         result_content += str(result_item)
                             else:
                                 result_content = str(content_block.content)
-                        
+
                         message_dict = {
                             "type": "tool_result",
                             "tool_use_id": content_block.tool_use_id if hasattr(content_block, "tool_use_id") else None,
@@ -302,12 +342,12 @@ class TravelPlannerAgent:
                 # Extract subtype and data if available
                 subtype = None
                 data = None
-                
+
                 if hasattr(sdk_message, "subtype"):
                     subtype = sdk_message.subtype
                 if hasattr(sdk_message, "data"):
                     data = sdk_message.data
-                
+
                 message_dict = {
                     "type": "system",
                     "subtype": subtype,
@@ -323,3 +363,65 @@ class TravelPlannerAgent:
 
         logger.debug(f"Converted message: {message_dict}")
         return message_dict
+
+    def _parse_itinerary_response(self, accumulated_text: str) -> ItineraryOutput | None:
+        """
+        Parse accumulated text response to extract structured JSON itinerary.
+
+        Looks for JSON within markdown code blocks or raw JSON in the response.
+        Validates against ItineraryOutput Pydantic model.
+
+        Args:
+            accumulated_text: Full text response from the agent
+
+        Returns:
+            ItineraryOutput object if parsing succeeds, None otherwise
+
+        Example:
+            >>> text = "Here is your itinerary:\n```json\n{...}\n```"
+            >>> itinerary = agent._parse_itinerary_response(text)
+        """
+        logger.info("Attempting to parse itinerary from accumulated response")
+
+        # Try to extract JSON from markdown code block first
+        json_match = re.search(
+            r"```json\s*\n(.*?)\n```", accumulated_text, re.DOTALL | re.IGNORECASE
+        )
+
+        json_str = None
+        if json_match:
+            json_str = json_match.group(1).strip()
+            logger.debug("Found JSON in markdown code block")
+        else:
+            # Try to find raw JSON object
+            json_match = re.search(r"\{[\s\S]*\}", accumulated_text)
+            if json_match:
+                json_str = json_match.group(0).strip()
+                logger.debug("Found raw JSON object")
+
+        if not json_str:
+            logger.warning("No JSON found in response text")
+            return None
+
+        try:
+            # Parse JSON string to dict
+            data = json.loads(json_str)
+            logger.debug(f"Successfully parsed JSON with keys: {data.keys()}")
+
+            # Validate and convert to ItineraryOutput model
+            itinerary = ItineraryOutput(**data)
+            logger.info(
+                f"Successfully validated itinerary: "
+                f"{len(itinerary.itinerary)} days of activities"
+            )
+            return itinerary
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing failed: {e}", exc_info=True)
+            return None
+        except ValidationError as e:
+            logger.error(f"Pydantic validation failed: {e}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error parsing itinerary: {e}", exc_info=True)
+            return None

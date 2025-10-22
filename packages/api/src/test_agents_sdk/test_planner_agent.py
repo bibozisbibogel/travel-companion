@@ -176,11 +176,63 @@ async def test_plan_trip(enable_text_streaming: bool = True):
                     travel_tools = [t for t in tools if t.startswith('mcp__travel__')]
                     print(f"    Travel Tools: {travel_tools}")
 
+            elif message["type"] == "itinerary":
+                print(f"\n📋 STRUCTURED ITINERARY RECEIVED")
+                print("=" * 70)
+                itinerary = message["data"]
+                print(
+                    f"Destination: {itinerary.trip.destination.city}, "
+                    f"{itinerary.trip.destination.country}"
+                )
+                print(
+                    f"Dates: {itinerary.trip.dates.start} to {itinerary.trip.dates.end}"
+                )
+                print(f"Duration: {itinerary.trip.dates.duration_days} days")
+                print(f"Travelers: {itinerary.trip.travelers.count}")
+                print(
+                    f"Budget: {itinerary.trip.budget.total} "
+                    f"{itinerary.trip.budget.currency}"
+                )
+                print(
+                    f"Spent: {itinerary.trip.budget.spent} "
+                    f"{itinerary.trip.budget.currency}"
+                )
+                print(
+                    f"Remaining: {itinerary.trip.budget.remaining} "
+                    f"{itinerary.trip.budget.currency}"
+                )
+                print(f"\n✈️  Flights: {itinerary.flights.total_cost}")
+                print(
+                    f"🏨 Accommodation: {itinerary.accommodation.name} - "
+                    f"{itinerary.accommodation.total_cost} for "
+                    f"{itinerary.accommodation.nights} nights"
+                )
+                print(f"\n📅 Daily Itinerary ({len(itinerary.itinerary)} days):")
+                for day in itinerary.itinerary:
+                    print(f"  Day {day.day} ({day.date}, {day.day_of_week}): {day.title}")
+                    print(f"    Activities: {len(day.activities)}")
+                    print(
+                        f"    Daily Cost: {day.daily_cost.min}-{day.daily_cost.max} "
+                        f"{day.daily_cost.currency}"
+                    )
+                print("=" * 70)
+
+                # Save JSON to file
+                import json
+
+                output_path = "itinerary_output.json"
+                with open(output_path, "w") as f:
+                    json.dump(message["raw_json"], f, indent=2, default=str)
+                print(f"\n💾 Saved structured JSON to: {output_path}")
+
             elif message["type"] == "complete":
                 print(f"\n✅ Planning Complete (after {message_count} messages)")
 
             elif message["type"] == "error":
                 print(f"\n❌ Error: {message['error']}")
+
+            elif message["type"] == "warning":
+                print(f"\n⚠️  Warning: {message.get('message', 'Unknown warning')}")
 
             else:
                 print(f"\n💬 Unknown message #{message_count}: {message}")
