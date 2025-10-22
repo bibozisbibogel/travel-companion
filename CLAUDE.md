@@ -28,7 +28,7 @@ Avoid building functionality on speculation. Implement features only when they a
 - **Classes should be under 100 lines** and represent a single concept or entity.
 - **Organize code into clearly separated modules**, grouped by feature or responsibility.
 - **Line lenght should be max 100 characters** ruff rule in pyproject.toml
-- **Use venv_linux** (the virtual environment) whenever executing Python commands, including for unit tests.
+- **Use `uv run file.py`** whenever executing Python commands, including for unit tests.
 
 ### Project Architecture
 
