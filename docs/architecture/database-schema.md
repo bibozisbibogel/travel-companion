@@ -1,7 +1,29 @@
 # Database Schema
 
+> **Note**: For complete setup instructions, see [DATABASE_SETUP.md](../../packages/api/DATABASE_SETUP.md)
+>
+> For quick setup, see [QUICK_SETUP.md](../../packages/api/QUICK_SETUP.md)
+
+## Overview
+
+The Travel Companion database uses PostgreSQL (via Supabase) with the following main components:
+
+- **Users & Authentication** - User accounts and authentication
+- **Trip Planning** - Trips, itineraries, and planning workflow
+- **Search Results** - Flights, hotels, activities discovered during planning
+- **Row Level Security (RLS)** - User data isolation and security
+
+## Setup Files
+
+- **Users Schema**: `packages/api/src/travel_companion/core/database_setup.sql`
+- **Trips Schema**: `packages/api/src/travel_companion/core/trips_schema.sql`
+- **Setup Scripts**: `packages/api/scripts/`
+
+## Core Tables
+
+### Users and Authentication
+
 ```sql
--- Users and Authentication
 CREATE TABLE users (
     user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -12,24 +34,68 @@ CREATE TABLE users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+```
 
--- Trip Planning Sessions
+### Trip Planning
+
+```sql
+-- Trip status enum
+CREATE TYPE trip_status AS ENUM ('draft', 'planning', 'confirmed', 'completed', 'cancelled');
+
+-- Main trips table
 CREATE TABLE trips (
     trip_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
     destination VARCHAR(255) NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    total_budget DECIMAL(10,2),
+    total_budget NUMERIC(10,2) NOT NULL,
     traveler_count INTEGER DEFAULT 1,
-    status trip_status DEFAULT 'planning',
+    status trip_status DEFAULT 'draft',
     preferences JSONB DEFAULT '{}',
     itinerary_data JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+```
 
-CREATE TYPE trip_status AS ENUM ('planning', 'completed', 'booked', 'cancelled');
+### JSONB Field Structures
+
+#### trips.preferences
+```json
+{
+  "travel_class": "economy",
+  "accommodation_type": "hotel",
+  "currency": "USD",
+  "destination_details": {
+    "city": "Paris",
+    "country": "France",
+    "country_code": "FR",
+    "airport_code": "CDG",
+    "latitude": 48.8566,
+    "longitude": 2.3522
+  }
+}
+```
+
+#### trips.itinerary_data
+Complete `ItineraryOutput` structure from TravelPlannerAgent:
+```json
+{
+  "trip": {
+    "destination": {"city": "Paris", "country": "France"},
+    "dates": {"start": "2024-06-01", "end": "2024-06-07", "duration_days": 6},
+    "travelers": {"count": 2, "type": "adults"},
+    "budget": {"total": 2000, "currency": "EUR"}
+  },
+  "flights": {...},
+  "accommodation": {...},
+  "itinerary": [...],
+  "budget_breakdown": {...}
+}
+```
 
 -- Flight Options (normalized for comparison)
 CREATE TABLE flight_options (

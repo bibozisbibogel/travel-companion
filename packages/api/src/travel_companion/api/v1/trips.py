@@ -1,25 +1,22 @@
 """Trip planning API endpoints."""
 
-from datetime import date
-from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from travel_companion.agents_sdk.travel_planner_agent import TravelPlannerAgent
 from travel_companion.api.deps import get_current_user
+from travel_companion.core.database import DatabaseManager, get_database
 from travel_companion.models.base import PaginatedResponse, PaginationMeta, SuccessResponse
 from travel_companion.models.trip import (
-    TravelClass,
     TripCreate,
-    TripDestination,
     TripPlanRequest,
-    TripRequirements,
     TripResponse,
     TripStatus,
     TripUpdate,
 )
 from travel_companion.models.user import User
+from travel_companion.services.trip_service import TripService
 from travel_companion.utils.logging import get_client_ip, get_user_agent
 
 router = APIRouter()
@@ -36,6 +33,7 @@ async def generate_trip_plan(
     trip_request: TripPlanRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_database),
 ) -> SuccessResponse[TripResponse]:
     """
     Generate a travel plan using Claude Agent SDK.
@@ -43,8 +41,8 @@ async def generate_trip_plan(
     This endpoint:
     - Validates trip requirements and destination
     - Uses TravelPlannerAgent with Claude Agent SDK for trip planning
+    - Saves the generated plan to database
     - Returns a comprehensive travel plan with flights, hotels, and activities
-    - Saves the plan as a draft trip for the authenticated user
 
     Required authentication via JWT token.
     """
@@ -64,21 +62,20 @@ async def generate_trip_plan(
                 itinerary_data = message["data"]
                 break
 
-        # Create trip response with agent results
-        trip_response = TripResponse(
-            trip_id=UUID("00000000-0000-4000-8000-000000000001"),
+        # Save trip to database with generated plan
+        trip_service = TripService(db.client)
+        saved_trip = await trip_service.create_trip(
             user_id=current_user.user_id,
             name=f"Trip to {trip_request.destination.city}",
             description=f"AI-generated travel plan for {trip_request.destination.city}",
             destination=trip_request.destination,
             requirements=trip_request.requirements,
-            plan=itinerary_data if itinerary_data else None,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at,
+            plan=itinerary_data,
+            status=TripStatus.DRAFT,
         )
 
         return SuccessResponse[TripResponse](
-            data=trip_response, message="Trip plan generated successfully"
+            data=saved_trip, message="Trip plan generated and saved successfully"
         )
 
     except TimeoutError as e:
@@ -113,6 +110,7 @@ async def create_trip(
     trip_data: TripCreate,
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_database),
 ) -> SuccessResponse[TripResponse]:
     """
     Create a new trip for the authenticated user.
@@ -128,24 +126,19 @@ async def create_trip(
     get_user_agent(request)
 
     try:
-        # TODO: Implement database trip creation
-        # This will be implemented when trip service is ready
-
-        # For now, return a placeholder response to satisfy AC1 requirement
-        trip_response = TripResponse(
-            trip_id=UUID("00000000-0000-4000-8000-000000000002"),
+        trip_service = TripService(db.client)
+        saved_trip = await trip_service.create_trip(
             user_id=current_user.user_id,
             name=trip_data.name,
             description=trip_data.description,
             destination=trip_data.destination,
             requirements=trip_data.requirements,
             plan=None,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at,
+            status=TripStatus.DRAFT,
         )
 
         return SuccessResponse[TripResponse](
-            data=trip_response, message="Trip created successfully"
+            data=saved_trip, message="Trip created successfully"
         )
 
     except Exception as e:
@@ -166,6 +159,7 @@ async def list_user_trips(
     page: int = 1,
     per_page: int = 20,
     current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_database),
 ) -> PaginatedResponse[list[TripResponse]]:
     """
     Get all trips for the authenticated user with pagination.
@@ -196,21 +190,24 @@ async def list_user_trips(
         )
 
     try:
-        # TODO: Implement database trip listing with pagination
-        # This will be implemented when trip service is ready
+        trip_service = TripService(db.client)
+        trips, total_count = await trip_service.list_user_trips(
+            user_id=current_user.user_id, page=page, per_page=per_page
+        )
 
-        # For now, return empty list to satisfy AC1 requirement
+        # Calculate pagination metadata
+        total_pages = (total_count + per_page - 1) // per_page
         pagination_meta = PaginationMeta(
             page=page,
             per_page=per_page,
-            total_items=0,
-            total_pages=0,
-            has_next=False,
-            has_prev=False,
+            total_items=total_count,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1,
         )
 
         return PaginatedResponse[list[TripResponse]](
-            data=[], pagination=pagination_meta, message="Trips retrieved successfully"
+            data=trips, pagination=pagination_meta, message="Trips retrieved successfully"
         )
 
     except Exception as e:
@@ -230,6 +227,7 @@ async def get_trip(
     trip_id: UUID,
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_database),
 ) -> SuccessResponse[TripResponse]:
     """
     Get detailed information about a specific trip.
@@ -241,46 +239,16 @@ async def get_trip(
     get_user_agent(request)
 
     try:
-        # TODO: Implement database trip retrieval by ID
-        # This will be implemented when trip service is ready
+        trip_service = TripService(db.client)
+        trip = await trip_service.get_trip_by_id(trip_id=trip_id, user_id=current_user.user_id)
 
-        # For now, return a placeholder response to satisfy AC1 requirement
-        if str(trip_id) == "00000000-0000-4000-8000-000000000404":
+        if not trip:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
             )
 
-        trip_response = TripResponse(
-            trip_id=trip_id,
-            user_id=current_user.user_id,
-            name="Sample Trip",
-            description="Sample trip description",
-            destination=TripDestination(
-                city="Paris",
-                country="France",
-                country_code="FR",
-                airport_code="CDG",
-                latitude=None,
-                longitude=None,
-            ),
-            requirements=TripRequirements(
-                budget=Decimal("2000.00"),
-                currency="EUR",
-                start_date=date(2024, 6, 1),
-                end_date=date(2024, 6, 7),
-                travelers=2,
-                travel_class=TravelClass.ECONOMY,
-                accommodation_type=None,
-            ),
-            plan=None,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at,
-        )
-
-        return SuccessResponse[TripResponse](
-            data=trip_response, message="Trip retrieved successfully"
-        )
+        return SuccessResponse[TripResponse](data=trip, message="Trip retrieved successfully")
 
     except HTTPException:
         raise
@@ -302,6 +270,7 @@ async def update_trip(
     trip_update: TripUpdate,
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_database),
 ) -> SuccessResponse[TripResponse]:
     """
     Update an existing trip.
@@ -314,46 +283,19 @@ async def update_trip(
     get_user_agent(request)
 
     try:
-        # TODO: Implement database trip update
-        # This will be implemented when trip service is ready
+        trip_service = TripService(db.client)
+        updated_trip = await trip_service.update_trip(
+            trip_id=trip_id, user_id=current_user.user_id, update_data=trip_update
+        )
 
-        # For now, return a placeholder response to satisfy AC1 requirement
-        if str(trip_id) == "00000000-0000-4000-8000-000000000404":
+        if not updated_trip:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
             )
 
-        trip_response = TripResponse(
-            trip_id=trip_id,
-            user_id=current_user.user_id,
-            name=trip_update.name or "Updated Trip",
-            description=trip_update.description or "Updated description",
-            destination=TripDestination(
-                city="Paris",
-                country="France",
-                country_code="FR",
-                airport_code="CDG",
-                latitude=None,
-                longitude=None,
-            ),
-            requirements=TripRequirements(
-                budget=Decimal("2500.00"),
-                currency="EUR",
-                start_date=date(2024, 6, 1),
-                end_date=date(2024, 6, 7),
-                travelers=2,
-                travel_class=TravelClass.ECONOMY,
-                accommodation_type=None,
-            ),
-            status=trip_update.status or TripStatus.DRAFT,
-            plan=None,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at,
-        )
-
         return SuccessResponse[TripResponse](
-            data=trip_response, message="Trip updated successfully"
+            data=updated_trip, message="Trip updated successfully"
         )
 
     except HTTPException:
@@ -375,6 +317,7 @@ async def delete_trip(
     trip_id: UUID,
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: DatabaseManager = Depends(get_database),
 ) -> SuccessResponse[dict[str, str]]:
     """
     Delete an existing trip.
@@ -387,11 +330,10 @@ async def delete_trip(
     get_user_agent(request)
 
     try:
-        # TODO: Implement database trip deletion
-        # This will be implemented when trip service is ready
+        trip_service = TripService(db.client)
+        deleted = await trip_service.delete_trip(trip_id=trip_id, user_id=current_user.user_id)
 
-        # For now, return a placeholder response to satisfy AC1 requirement
-        if str(trip_id) == "00000000-0000-4000-8000-000000000404":
+        if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
