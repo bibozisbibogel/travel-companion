@@ -1,0 +1,1537 @@
+{
+  "trip": {
+    "destination": {
+      "city": "Rome",
+      "country": "Italy"
+    },
+    "dates": {
+      "start": "2025-10-18",
+      "end": "2025-10-25",
+      "duration_days": 7
+    },
+    "travelers": {
+      "count": 2,
+      "type": "adults"
+    },
+    "budget": {
+      "total": "3000.00",
+      "currency": "EUR",
+      "spent": "2456.90",
+      "remaining": "543.10"
+    }
+  },
+  "flights": {
+    "outbound": {
+      "airline": "Air Canada",
+      "flight_number": "AC8899",
+      "route": {
+        "from_airport": "JFK",
+        "to_airport": "FCO"
+      },
+      "departure": {
+        "time": "09:00",
+        "timezone": "America/New_York"
+      },
+      "arrival": {
+        "time": "09:15",
+        "timezone": "Europe/Rome"
+      },
+      "duration_minutes": 1095,
+      "stops": 1,
+      "price_per_person": "408.45",
+      "total_price": "816.90"
+    },
+    "return_flight": {
+      "airline": "Air Canada",
+      "flight_number": "AC8900",
+      "route": {
+        "from_airport": "FCO",
+        "to_airport": "JFK"
+      },
+      "departure": {
+        "time": "11:30",
+        "timezone": "Europe/Rome"
+      },
+      "arrival": {
+        "time": "15:45",
+        "timezone": "America/New_York"
+      },
+      "duration_minutes": 615,
+      "stops": 1,
+      "price_per_person": "408.45",
+      "total_price": "816.90"
+    },
+    "total_cost": "1633.80"
+  },
+  "accommodation": {
+    "name": "Hotel Artemide",
+    "rating": 4.8,
+    "stars": 4,
+    "address": {
+      "street": "Via Nazionale, 22",
+      "postal_code": "00184",
+      "city": "Roma",
+      "region": "RM",
+      "country": "Italy"
+    },
+    "amenities": [
+      "Air Conditioning",
+      "Daily Housekeeping",
+      "Central Location",
+      "Near Termini Station"
+    ],
+    "price_per_night": "117.00",
+    "nights": 7,
+    "total_cost": "819.00",
+    "location_notes": "Centrally located near Via Nazionale, walking distance to major attractions"
+  },
+  "itinerary": [
+    {
+      "day": 1,
+      "date": "2025-10-18",
+      "day_of_week": "Saturday",
+      "title": "Arrival in Rome",
+      "activities": [
+        {
+          "time_start": "09:15",
+          "time_end": null,
+          "category": "transportation",
+          "title": "Arrival at Fiumicino Airport (FCO)",
+          "description": "Land at Rome Fiumicino Airport after overnight flight",
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": 30,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "10:00",
+          "time_end": "11:30",
+          "category": "transportation",
+          "title": "Airport Transfer to Hotel",
+          "description": "Take Leonardo Express train from airport to Termini Station (32 minutes), then walk to hotel",
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": 90,
+          "cost_per_person": "14.00",
+          "total_cost": "28.00",
+          "booking_required": false,
+          "booking_notes": "Leonardo Express tickets can be purchased at airport or online",
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "12:00",
+          "time_end": "12:30",
+          "category": "accommodation",
+          "title": "Hotel Check-in at Hotel Artemide",
+          "description": null,
+          "location": "Via Nazionale, 22",
+          "visit_type": null,
+          "duration_minutes": 30,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "13:00",
+          "time_end": "14:30",
+          "category": "dining",
+          "title": "Lunch in Monti District",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Local Trattoria",
+            "cuisine": "Italian",
+            "location": "Monti neighborhood",
+            "style": "casual"
+          },
+          "recommended_dishes": [
+            "Cacio e Pepe",
+            "Carbonara",
+            "Amatriciana"
+          ],
+          "cost_estimate_min": "25.00",
+          "cost_estimate_max": "40.00",
+          "cost": null
+        },
+        {
+          "time_start": "15:00",
+          "time_end": "18:00",
+          "category": "exploration",
+          "title": "Explore Monti Neighborhood",
+          "description": "Stroll through charming streets, browse boutiques and artisan shops, visit local cafes",
+          "location": "Monti District",
+          "visit_type": "self-guided",
+          "duration_minutes": 180,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "19:30",
+          "time_end": "21:30",
+          "category": "dining",
+          "title": "Welcome Dinner",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Cencio la Parolaccia",
+            "cuisine": "Traditional Italian",
+            "location": "Trastevere",
+            "style": "traditional trattoria"
+          },
+          "recommended_dishes": [
+            "Roman-style saltimbocca",
+            "Fresh pasta",
+            "Tiramisu"
+          ],
+          "cost_estimate_min": "35.00",
+          "cost_estimate_max": "50.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "88.00",
+        "max": "118.00",
+        "currency": "EUR",
+        "breakdown": "Transport \u20ac28 + Lunch \u20ac25-40 + Dinner \u20ac35-50"
+      }
+    },
+    {
+      "day": 2,
+      "date": "2025-10-19",
+      "day_of_week": "Sunday",
+      "title": "Ancient Rome - Colosseum & Roman Forum",
+      "activities": [
+        {
+          "time_start": "08:00",
+          "time_end": "09:00",
+          "category": "dining",
+          "title": "Breakfast at Hotel",
+          "description": "Continental breakfast with coffee, pastries, and fruit",
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "09:30",
+          "time_end": "12:30",
+          "category": "attraction",
+          "title": "Colosseum Tour",
+          "description": "Explore the iconic ancient amphitheater, learn about gladiatorial combat and Roman entertainment",
+          "location": "Piazza del Colosseo, 1",
+          "visit_type": "guided tour recommended",
+          "duration_minutes": 180,
+          "cost_per_person": "18.00",
+          "total_cost": "36.00",
+          "booking_required": true,
+          "booking_notes": "Book tickets online in advance to skip the line. Entry includes Colosseum, Roman Forum, and Palatine Hill",
+          "highlights": [
+            "Arena floor",
+            "Underground chambers",
+            "Upper levels with panoramic views",
+            "Ancient architecture"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "13:00",
+          "time_end": "14:30",
+          "category": "dining",
+          "title": "Lunch near Colosseum",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Local Roman Restaurant",
+            "cuisine": "Roman",
+            "location": "Near Colosseum",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "25.00",
+          "cost_estimate_max": "40.00",
+          "cost": null
+        },
+        {
+          "time_start": "15:00",
+          "time_end": "18:00",
+          "category": "attraction",
+          "title": "Roman Forum and Palatine Hill",
+          "description": "Walk through ancient Rome's political and social center, explore imperial palaces on Palatine Hill",
+          "location": "Via della Salara Vecchia",
+          "visit_type": "self-guided",
+          "duration_minutes": 180,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Temple of Saturn",
+            "Arch of Titus",
+            "House of Augustus",
+            "Panoramic views of Forum"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "19:30",
+          "time_end": "21:30",
+          "category": "dining",
+          "title": "Dinner in Centro Storico",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Pizzeria ai Marmi",
+            "cuisine": "Pizza",
+            "location": "Trastevere",
+            "style": null
+          },
+          "recommended_dishes": [
+            "Margherita pizza",
+            "Suppl\u00ec (fried rice balls)",
+            "Local wine"
+          ],
+          "cost_estimate_min": "30.00",
+          "cost_estimate_max": "45.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "91.00",
+        "max": "121.00",
+        "currency": "EUR",
+        "breakdown": "Colosseum tickets \u20ac36 + Lunch \u20ac25-40 + Dinner \u20ac30-45"
+      }
+    },
+    {
+      "day": 3,
+      "date": "2025-10-20",
+      "day_of_week": "Monday",
+      "title": "Renaissance & Baroque Rome",
+      "activities": [
+        {
+          "time_start": "08:00",
+          "time_end": "09:00",
+          "category": "dining",
+          "title": "Breakfast at Hotel",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "09:30",
+          "time_end": "11:00",
+          "category": "attraction",
+          "title": "Pantheon Visit",
+          "description": "Marvel at the ancient Roman temple with the world's largest unreinforced concrete dome",
+          "location": "Piazza della Rotonda",
+          "visit_type": "self-guided",
+          "duration_minutes": 90,
+          "cost_per_person": "5.00",
+          "total_cost": "10.00",
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Oculus opening",
+            "Ancient Roman architecture",
+            "Raphael's tomb",
+            "Perfect proportions"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "11:30",
+          "time_end": "12:30",
+          "category": "attraction",
+          "title": "Piazza Navona",
+          "description": "Beautiful Baroque square with Bernini's Fountain of Four Rivers",
+          "location": "Piazza Navona",
+          "visit_type": "self-guided",
+          "duration_minutes": 60,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Fountain of Four Rivers",
+            "Sant'Agnese in Agone church",
+            "Street artists and cafes"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "13:00",
+          "time_end": "14:30",
+          "category": "dining",
+          "title": "Lunch near Piazza Navona",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Traditional Roman Osteria",
+            "cuisine": "Roman",
+            "location": "Centro Storico",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "25.00",
+          "cost_estimate_max": "40.00",
+          "cost": null
+        },
+        {
+          "time_start": "15:00",
+          "time_end": "16:00",
+          "category": "attraction",
+          "title": "Trevi Fountain",
+          "description": "Visit Rome's most famous fountain, toss a coin to ensure your return to Rome",
+          "location": "Piazza di Trevi",
+          "visit_type": "self-guided",
+          "duration_minutes": 60,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Baroque masterpiece",
+            "Neptune statue",
+            "Coin tossing tradition"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "16:30",
+          "time_end": "18:30",
+          "category": "attraction",
+          "title": "Spanish Steps and Piazza di Spagna",
+          "description": "Climb the famous steps and explore the elegant shopping district",
+          "location": "Piazza di Spagna",
+          "visit_type": "self-guided",
+          "duration_minutes": 120,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Trinit\u00e0 dei Monti church",
+            "Barcaccia fountain",
+            "Via Condotti shopping",
+            "Keats-Shelley House"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "19:30",
+          "time_end": "21:30",
+          "category": "dining",
+          "title": "Dinner in Trastevere",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Cencio la Parolaccia",
+            "cuisine": "Traditional Italian",
+            "location": "Trastevere",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "35.00",
+          "cost_estimate_max": "50.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "70.00",
+        "max": "100.00",
+        "currency": "EUR",
+        "breakdown": "Pantheon \u20ac10 + Lunch \u20ac25-40 + Dinner \u20ac35-50"
+      }
+    },
+    {
+      "day": 4,
+      "date": "2025-10-21",
+      "day_of_week": "Tuesday",
+      "title": "Vatican City",
+      "activities": [
+        {
+          "time_start": "07:30",
+          "time_end": "08:30",
+          "category": "dining",
+          "title": "Early Breakfast at Hotel",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "09:00",
+          "time_end": "13:00",
+          "category": "attraction",
+          "title": "Vatican Museums and Sistine Chapel",
+          "description": "Explore one of the world's greatest art collections, culminating in Michelangelo's Sistine Chapel ceiling",
+          "location": "Viale Vaticano",
+          "visit_type": "guided tour recommended",
+          "duration_minutes": 240,
+          "cost_per_person": "20.00",
+          "total_cost": "40.00",
+          "booking_required": true,
+          "booking_notes": "Book tickets online weeks in advance. Early morning visit recommended to avoid crowds",
+          "highlights": [
+            "Sistine Chapel ceiling",
+            "Raphael Rooms",
+            "Gallery of Maps",
+            "Egyptian and Classical antiquities",
+            "Modern religious art"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "13:30",
+          "time_end": "15:00",
+          "category": "dining",
+          "title": "Lunch near Vatican",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Local Restaurant",
+            "cuisine": "Italian",
+            "location": "Prati neighborhood",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "25.00",
+          "cost_estimate_max": "40.00",
+          "cost": null
+        },
+        {
+          "time_start": "15:30",
+          "time_end": "18:00",
+          "category": "attraction",
+          "title": "St. Peter's Basilica",
+          "description": "Visit the world's largest church, climb the dome for spectacular views",
+          "location": "Piazza San Pietro",
+          "visit_type": "self-guided",
+          "duration_minutes": 150,
+          "cost_per_person": "10.00",
+          "total_cost": "20.00",
+          "booking_required": false,
+          "booking_notes": "Dome climb costs extra but is highly recommended",
+          "highlights": [
+            "Michelangelo's Piet\u00e0",
+            "Bernini's Baldachin",
+            "Dome climb with panoramic views",
+            "St. Peter's tomb"
+          ],
+          "optional_activities": [
+            {
+              "title": "Dome Climb",
+              "cost_per_person": "10.00",
+              "total_cost": "20.00"
+            }
+          ],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "18:30",
+          "time_end": "19:30",
+          "category": "attraction",
+          "title": "St. Peter's Square",
+          "description": "Admire Bernini's colonnade and enjoy the evening atmosphere",
+          "location": "Piazza San Pietro",
+          "visit_type": "self-guided",
+          "duration_minutes": 60,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "20:00",
+          "time_end": "22:00",
+          "category": "dining",
+          "title": "Dinner in Prati",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Cicciotto O'Milionario",
+            "cuisine": "Italian/Pizza",
+            "location": "Prati",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "30.00",
+          "cost_estimate_max": "45.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "115.00",
+        "max": "145.00",
+        "currency": "EUR",
+        "breakdown": "Vatican Museums \u20ac40 + St. Peter's \u20ac20 + Lunch \u20ac25-40 + Dinner \u20ac30-45"
+      }
+    },
+    {
+      "day": 5,
+      "date": "2025-10-22",
+      "day_of_week": "Wednesday",
+      "title": "Art & Gardens",
+      "activities": [
+        {
+          "time_start": "08:00",
+          "time_end": "09:00",
+          "category": "dining",
+          "title": "Breakfast at Hotel",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "09:30",
+          "time_end": "12:30",
+          "category": "attraction",
+          "title": "Galleria Borghese",
+          "description": "Visit one of Rome's finest art museums with works by Bernini, Caravaggio, and Raphael",
+          "location": "Piazzale Scipione Borghese, 5",
+          "visit_type": "guided tour",
+          "duration_minutes": 180,
+          "cost_per_person": "15.00",
+          "total_cost": "30.00",
+          "booking_required": true,
+          "booking_notes": "Must book well in advance, timed entry required",
+          "highlights": [
+            "Bernini sculptures",
+            "Caravaggio paintings",
+            "Raphael's works",
+            "Beautiful villa setting"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "13:00",
+          "time_end": "14:30",
+          "category": "dining",
+          "title": "Lunch near Villa Borghese",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Caf\u00e9 in Villa Borghese",
+            "cuisine": "Italian",
+            "location": "Villa Borghese Gardens",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "20.00",
+          "cost_estimate_max": "35.00",
+          "cost": null
+        },
+        {
+          "time_start": "15:00",
+          "time_end": "17:00",
+          "category": "exploration",
+          "title": "Villa Borghese Gardens",
+          "description": "Stroll through Rome's beautiful public park",
+          "location": "Villa Borghese",
+          "visit_type": "self-guided",
+          "duration_minutes": 120,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Lake with boat rentals",
+            "Pincio Terrace views",
+            "Tree-lined paths"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "17:30",
+          "time_end": "19:00",
+          "category": "attraction",
+          "title": "Piazza del Popolo",
+          "description": "Visit the grand square at the northern entrance to the historic center",
+          "location": "Piazza del Popolo",
+          "visit_type": "self-guided",
+          "duration_minutes": 90,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Twin churches",
+            "Egyptian obelisk",
+            "Climb Pincio Hill for sunset views"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "19:30",
+          "time_end": "21:30",
+          "category": "dining",
+          "title": "Dinner in Campo de' Fiori",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Local Trattoria",
+            "cuisine": "Roman",
+            "location": "Campo de' Fiori area",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "35.00",
+          "cost_estimate_max": "50.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "85.00",
+        "max": "115.00",
+        "currency": "EUR",
+        "breakdown": "Galleria Borghese \u20ac30 + Lunch \u20ac20-35 + Dinner \u20ac35-50"
+      }
+    },
+    {
+      "day": 6,
+      "date": "2025-10-23",
+      "day_of_week": "Thursday",
+      "title": "Trastevere & Jewish Quarter",
+      "activities": [
+        {
+          "time_start": "08:30",
+          "time_end": "09:30",
+          "category": "dining",
+          "title": "Breakfast at Hotel",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "10:00",
+          "time_end": "12:00",
+          "category": "attraction",
+          "title": "Capitoline Museums",
+          "description": "Explore ancient Roman sculptures and Renaissance art in the world's oldest public museum",
+          "location": "Piazza del Campidoglio, 1",
+          "visit_type": "self-guided",
+          "duration_minutes": 120,
+          "cost_per_person": "13.00",
+          "total_cost": "26.00",
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Capitoline Wolf statue",
+            "Marcus Aurelius statue",
+            "Caravaggio paintings",
+            "Ancient Roman artifacts"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "12:30",
+          "time_end": "14:00",
+          "category": "dining",
+          "title": "Lunch in Jewish Ghetto",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Traditional Jewish-Roman Restaurant",
+            "cuisine": "Jewish-Roman",
+            "location": "Jewish Ghetto",
+            "style": null
+          },
+          "recommended_dishes": [
+            "Carciofi alla giudia (Jewish-style artichokes)",
+            "Fiori di zucca fritti"
+          ],
+          "cost_estimate_min": "25.00",
+          "cost_estimate_max": "40.00",
+          "cost": null
+        },
+        {
+          "time_start": "14:30",
+          "time_end": "16:30",
+          "category": "exploration",
+          "title": "Jewish Ghetto Walking Tour",
+          "description": "Explore the historic Jewish quarter with its rich history and culture",
+          "location": "Jewish Ghetto",
+          "visit_type": "self-guided",
+          "duration_minutes": 120,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Great Synagogue",
+            "Portico d'Ottavia",
+            "Turtle Fountain",
+            "Historic streets"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "17:00",
+          "time_end": "19:00",
+          "category": "exploration",
+          "title": "Trastevere Neighborhood",
+          "description": "Wander through charming cobblestone streets, visit artisan workshops",
+          "location": "Trastevere",
+          "visit_type": "self-guided",
+          "duration_minutes": 120,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Santa Maria in Trastevere church",
+            "Narrow medieval streets",
+            "Local artisan shops"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "19:30",
+          "time_end": "21:30",
+          "category": "dining",
+          "title": "Dinner in Trastevere",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Pizzeria ai Marmi",
+            "cuisine": "Pizza",
+            "location": "Trastevere",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "30.00",
+          "cost_estimate_max": "45.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "81.00",
+        "max": "111.00",
+        "currency": "EUR",
+        "breakdown": "Capitoline Museums \u20ac26 + Lunch \u20ac25-40 + Dinner \u20ac30-45"
+      }
+    },
+    {
+      "day": 7,
+      "date": "2025-10-24",
+      "day_of_week": "Friday",
+      "title": "Aventine Hill & Appian Way",
+      "activities": [
+        {
+          "time_start": "08:00",
+          "time_end": "09:00",
+          "category": "dining",
+          "title": "Breakfast at Hotel",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "09:30",
+          "time_end": "11:30",
+          "category": "attraction",
+          "title": "Aventine Hill & Orange Garden",
+          "description": "Visit the peaceful Orange Garden with stunning views, peek through the famous keyhole",
+          "location": "Piazza Pietro D'Illiria",
+          "visit_type": "self-guided",
+          "duration_minutes": 120,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [
+            "Giardino degli Aranci",
+            "Knights of Malta keyhole",
+            "Panoramic city views",
+            "Santa Sabina basilica"
+          ],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "12:00",
+          "time_end": "13:30",
+          "category": "dining",
+          "title": "Lunch in Testaccio",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "lunch",
+          "venue": {
+            "name": "Traditional Roman Restaurant",
+            "cuisine": "Roman",
+            "location": "Testaccio neighborhood",
+            "style": null
+          },
+          "recommended_dishes": [
+            "Coda alla vaccinara",
+            "Trippa alla romana"
+          ],
+          "cost_estimate_min": "25.00",
+          "cost_estimate_max": "40.00",
+          "cost": null
+        },
+        {
+          "time_start": "14:00",
+          "time_end": "17:00",
+          "category": "attraction",
+          "title": "Appian Way (Via Appia Antica)",
+          "description": "Walk or bike along ancient Rome's most famous road",
+          "location": "Via Appia Antica",
+          "visit_type": "self-guided",
+          "duration_minutes": 180,
+          "cost_per_person": "10.00",
+          "total_cost": "20.00",
+          "booking_required": false,
+          "booking_notes": "Optional bike rental",
+          "highlights": [
+            "Ancient Roman road",
+            "Catacombs",
+            "Tomb of Cecilia Metella",
+            "Rural countryside"
+          ],
+          "optional_activities": [
+            {
+              "title": "Catacomb Tour",
+              "cost_per_person": "10.00",
+              "total_cost": null
+            }
+          ],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "18:00",
+          "time_end": "19:30",
+          "category": "exploration",
+          "title": "Last-minute Shopping & Strolling",
+          "description": "Pick up souvenirs, enjoy final gelato",
+          "location": "Centro Storico",
+          "visit_type": "self-guided",
+          "duration_minutes": 90,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": "15.00",
+          "cost_estimate_max": "30.00",
+          "cost": null
+        },
+        {
+          "time_start": "20:00",
+          "time_end": "22:30",
+          "category": "dining",
+          "title": "Farewell Dinner",
+          "description": "Celebrate your final evening in Rome with a special meal",
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "dinner",
+          "venue": {
+            "name": "Cencio la Parolaccia",
+            "cuisine": "Traditional Italian",
+            "location": "Trastevere",
+            "style": null
+          },
+          "recommended_dishes": [],
+          "cost_estimate_min": "40.00",
+          "cost_estimate_max": "60.00",
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "100.00",
+        "max": "150.00",
+        "currency": "EUR",
+        "breakdown": "Via Appia bike rental \u20ac20 + Lunch \u20ac25-40 + Shopping \u20ac15-30 + Dinner \u20ac40-60"
+      }
+    },
+    {
+      "day": 8,
+      "date": "2025-10-25",
+      "day_of_week": "Saturday",
+      "title": "Departure Day",
+      "activities": [
+        {
+          "time_start": "07:00",
+          "time_end": "08:00",
+          "category": "dining",
+          "title": "Early Breakfast at Hotel",
+          "description": null,
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": "breakfast",
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "08:30",
+          "time_end": "09:00",
+          "category": "accommodation",
+          "title": "Hotel Check-out",
+          "description": null,
+          "location": "Hotel Artemide",
+          "visit_type": null,
+          "duration_minutes": 30,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "09:00",
+          "time_end": "10:30",
+          "category": "transportation",
+          "title": "Transfer to Fiumicino Airport",
+          "description": "Take Leonardo Express from Termini to airport",
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": 90,
+          "cost_per_person": "14.00",
+          "total_cost": "28.00",
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        },
+        {
+          "time_start": "11:30",
+          "time_end": null,
+          "category": "transportation",
+          "title": "Departure Flight",
+          "description": "Flight AC8900 to New York JFK",
+          "location": null,
+          "visit_type": null,
+          "duration_minutes": null,
+          "cost_per_person": null,
+          "total_cost": null,
+          "booking_required": false,
+          "booking_notes": null,
+          "highlights": [],
+          "optional_activities": [],
+          "meal_type": null,
+          "venue": null,
+          "recommended_dishes": [],
+          "cost_estimate_min": null,
+          "cost_estimate_max": null,
+          "cost": null
+        }
+      ],
+      "daily_cost": {
+        "min": "28.00",
+        "max": "28.00",
+        "currency": "EUR",
+        "breakdown": "Airport transfer \u20ac28"
+      }
+    }
+  ],
+  "budget_breakdown": {
+    "flights": "1633.80",
+    "accommodation": "819.00",
+    "activities": {
+      "min": "192.00",
+      "max": "192.00"
+    },
+    "meals": {
+      "min": "370.00",
+      "max": "540.00"
+    },
+    "transportation": {
+      "min": "76.00",
+      "max": "76.00"
+    },
+    "extras": {
+      "description": "Shopping and miscellaneous",
+      "min": "15.00",
+      "max": "30.00"
+    },
+    "total": {
+      "min": "2286.80",
+      "max": "2471.80"
+    },
+    "buffer": {
+      "description": "Remaining budget for additional expenses",
+      "min": "528.20",
+      "max": "713.20"
+    }
+  },
+  "travel_tips": {
+    "transportation": {
+      "from_airport": {
+        "option": "Leonardo Express",
+        "cost": "\u20ac14 per person",
+        "duration": "32 minutes",
+        "note": "Direct train from FCO to Termini Station"
+      },
+      "metro_pass": {
+        "option": "Roma 72h Pass",
+        "cost": "\u20ac18",
+        "coverage": "Unlimited public transport for 72 hours"
+      },
+      "notes": [
+        "Rome's historic center is very walkable",
+        "Metro has limited coverage but useful for longer distances",
+        "Taxis are metered - insist on using the meter"
+      ]
+    },
+    "booking_essentials": {
+      "advance_booking_required": [
+        "Galleria Borghese (book 2-3 weeks ahead)",
+        "Vatican Museums (book 1-2 weeks ahead)",
+        "Colosseum with underground tour"
+      ],
+      "booking_window": "Book major attractions 2-3 weeks in advance, especially Vatican Museums and Galleria Borghese which have limited timed entries"
+    },
+    "money": {
+      "payment": "Credit cards widely accepted, but carry cash for smaller establishments",
+      "cash_recommended": {
+        "amount": "\u20ac100-150",
+        "uses": "Markets, small cafes, street food, churches (small donations)"
+      },
+      "tipping": "Service charge usually included; round up or leave 5-10% for excellent service"
+    },
+    "best_practices": [
+      {
+        "category": "Sightseeing",
+        "rule": null,
+        "note": "October has pleasant weather and fewer tourists than summer",
+        "tip": "Visit popular sites early morning or late afternoon to avoid crowds"
+      },
+      {
+        "category": "Dress Code",
+        "rule": "Shoulders and knees must be covered for churches",
+        "note": null,
+        "tip": "Carry a light scarf or shawl"
+      },
+      {
+        "category": "Dining",
+        "rule": null,
+        "note": "Many restaurants close between lunch and dinner",
+        "tip": "Lunch is typically 12:30-15:00, dinner after 19:30"
+      },
+      {
+        "category": "Water",
+        "rule": null,
+        "note": null,
+        "tip": "Tap water is safe and free fountains (nasoni) throughout the city"
+      },
+      "Validate metro/bus tickets before boarding to avoid fines",
+      "Learn basic Italian phrases - locals appreciate the effort"
+    ],
+    "safety": [
+      "Watch for pickpockets in crowded areas (Termini, Colosseum, Vatican)",
+      "Keep valuables secure and bags zipped",
+      "Be cautious of unofficial tour guides and taxi scams",
+      "Stay aware in public transport"
+    ],
+    "food_tips": {
+      "breakfast": "Italians have light breakfast - cappuccino and cornetto. Hotels offer continental spread",
+      "aperitivo": "Happy hour tradition (18:00-21:00) - buy a drink, get free snacks",
+      "local_specialties": [
+        "Cacio e pepe (cheese and pepper pasta)",
+        "Carbonara (guanciale, egg, pecorino)",
+        "Amatriciana (tomato, guanciale, pecorino)",
+        "Saltimbocca alla romana (veal with prosciutto)",
+        "Carciofi alla giudia (Jewish-style fried artichokes)",
+        "Suppl\u00ec (fried rice balls)",
+        "Maritozzo (sweet bun with whipped cream)"
+      ]
+    },
+    "useful_phrases": [
+      {
+        "italian": "Buongiorno",
+        "english": "Good morning/Good day"
+      },
+      {
+        "italian": "Buonasera",
+        "english": "Good evening"
+      },
+      {
+        "italian": "Per favore",
+        "english": "Please"
+      },
+      {
+        "italian": "Grazie",
+        "english": "Thank you"
+      },
+      {
+        "italian": "Quanto costa?",
+        "english": "How much does it cost?"
+      },
+      {
+        "italian": "Il conto, per favore",
+        "english": "The bill, please"
+      },
+      {
+        "italian": "Parla inglese?",
+        "english": "Do you speak English?"
+      },
+      {
+        "italian": "Dov'\u00e8...?",
+        "english": "Where is...?"
+      }
+    ]
+  }
+}
