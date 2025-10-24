@@ -214,6 +214,11 @@ export class ApiClient {
     this.setToken(null);
   }
 
+  // User profile methods
+  async getCurrentUser(): Promise<any> {
+    return this.get<any>('/api/v1/users/me');
+  }
+
   // Travel planning methods
   async planTrip(tripRequest: ITripRequest): Promise<ITripPlanResponse> {
     return this.post<ITripPlanResponse>('/api/v1/trips/plan', tripRequest);

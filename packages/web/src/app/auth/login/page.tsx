@@ -2,17 +2,17 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { loginSchema, type LoginFormData } from '../../../lib/validation'
-import { apiClient, ApiError } from '../../../lib/api'
+import { useAuth } from '../../../contexts/AuthContext'
+import { ApiError } from '../../../lib/api'
 import { CenteredLayout } from '../../../components/layouts'
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
-  const router = useRouter()
+  const { login } = useAuth()
 
   const {
     register,
@@ -28,19 +28,7 @@ export default function LoginPage() {
       setIsLoading(true)
       setApiError(null)
 
-      const response = await apiClient.login(data)
-
-      if (response.access_token) {
-        // Store the authentication token
-        apiClient.setToken(response.access_token)
-        
-        // Redirect to home page or dashboard
-        router.push('/')
-      } else if (response.detail?.message) {
-        setApiError(response.detail.message)
-      } else {
-        setApiError(response.message || 'Login failed. Please try again.')
-      }
+      await login(data)
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.status === 401) {

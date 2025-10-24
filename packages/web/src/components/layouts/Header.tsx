@@ -3,19 +3,20 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-interface IUser {
-  id: string
-  email: string
-  name?: string
-}
+import { useAuth } from '../../contexts/AuthContext'
 
 interface IHeaderProps {
-  user?: IUser | null
+  // Props are now optional - Header will use AuthContext if not provided
+  user?: { id: string; email: string; name?: string } | null
   onLogout?: () => void
 }
 
-export default function Header({ user, onLogout }: IHeaderProps) {
+export default function Header({ user: propUser, onLogout: propOnLogout }: IHeaderProps = {}) {
+  const { user: contextUser, logout: contextLogout, isAuthenticated } = useAuth()
+
+  // Use props if provided (for testing), otherwise use context
+  const user = propUser !== undefined ? propUser : contextUser
+  const onLogout = propOnLogout || contextLogout
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const mobileMenuRef = useRef<HTMLDivElement>(null)
