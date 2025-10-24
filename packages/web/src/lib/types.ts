@@ -231,3 +231,130 @@ export interface ICompleteItinerary {
     tips: string[];
   };
 }
+
+// Enhanced Itinerary Timeline Types (Story 3.2)
+export type ActivityCategory =
+  | 'adventure'
+  | 'cultural'
+  | 'relaxation'
+  | 'dining'
+  | 'nightlife'
+  | 'shopping'
+  | 'transportation'
+  | 'sightseeing'
+  | 'entertainment';
+
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
+
+export interface IItineraryActivity {
+  time_start: string;
+  time_end: string | null;
+  category: ActivityCategory;
+  title: string;
+  description: string;
+  duration_minutes?: number;
+  location?: string;
+  price?: string;
+  booking_info?: string;
+}
+
+export interface IMealRecommendation {
+  restaurant_name: string;
+  cuisine_type: string;
+  meal_type: MealType;
+  time: string;
+  price_range: string;
+  rating?: number;
+  location?: string;
+  description?: string;
+}
+
+export interface IAccommodationInfo {
+  name: string;
+  rating: number;
+  stars: number;
+  address: {
+    street: string;
+    postal_code: string;
+    city: string;
+    region: string;
+    country: string;
+  };
+  amenities: string[];
+  price_per_night: string;
+  nights: number;
+  total_cost: string;
+  location_notes?: string;
+  check_in?: string;
+  check_out?: string;
+}
+
+export interface IDailyItinerary {
+  day: number;
+  date: string;
+  day_of_week: string;
+  title: string;
+  activities: IItineraryActivity[];
+  meals?: IMealRecommendation[];
+  accommodation?: IAccommodationInfo;
+  daily_cost?: {
+    activities: string;
+    meals: string;
+    accommodation: string;
+    total: string;
+  };
+}
+
+export interface IFlightDetails {
+  airline: string;
+  flight_number: string;
+  route: {
+    from_airport: string;
+    to_airport: string;
+  };
+  departure: {
+    time: string;
+    timezone: string;
+  };
+  arrival: {
+    time: string;
+    timezone: string;
+  };
+  duration_minutes: number;
+  stops: number;
+  price_per_person: string;
+  total_price: string;
+}
+
+export interface IFullTripItinerary {
+  trip: {
+    destination: {
+      city: string;
+      country: string;
+    };
+    dates: {
+      start: string;
+      end: string;
+      duration_days: number;
+    };
+    travelers: {
+      count: number;
+      type: string;
+    };
+    budget: {
+      total: string;
+      currency: string;
+      spent: string;
+      remaining: string;
+    };
+  };
+  flights: {
+    outbound: IFlightDetails;
+    return_flight: IFlightDetails;
+    total_cost: string;
+  };
+  accommodation: IAccommodationInfo;
+  itinerary: IDailyItinerary[];
+}

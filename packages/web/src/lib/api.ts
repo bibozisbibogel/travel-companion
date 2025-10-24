@@ -239,6 +239,11 @@ export class ApiClient {
   async getPopularDestinations(): Promise<IDestination[]> {
     return this.get<IDestination[]>('/api/v1/destinations/popular');
   }
+
+  // Itinerary methods
+  async getItinerary(tripId: string): Promise<any> {
+    return this.get<any>(`/api/v1/trips/${tripId}/itinerary`);
+  }
 }
 
 // Custom API Error class for better error handling

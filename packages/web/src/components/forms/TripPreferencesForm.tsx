@@ -110,7 +110,7 @@ export default function TripPreferencesForm({
       console.log('Trip planning response:', response)
 
       // Extract trip ID from response - handle different response structures
-      const tripId = response?.trip_id || response?.data?.trip_id || response?.data?.tripId || response?.id
+      const tripId = (response as any)?.trip_id || response?.data?.tripId || (response as any)?.id
 
       if (tripId) {
         clearDraft()
@@ -228,7 +228,7 @@ export default function TripPreferencesForm({
                     field.onChange(value)
                     setSelectedOrigin(destination || null)
                   }}
-                  error={errors.origin?.message}
+                  error={errors.origin?.message || ""}
                   placeholder="Where are you traveling from?"
                 />
               )}
@@ -249,7 +249,7 @@ export default function TripPreferencesForm({
                     field.onChange(value)
                     setSelectedDestination(destination || null)
                   }}
-                  error={errors.destination?.message}
+                  error={errors.destination?.message || ""}
                   placeholder="Where would you like to travel?"
                 />
               )}
@@ -272,7 +272,7 @@ export default function TripPreferencesForm({
                 label="Start Date"
                 value={field.value || ''}
                 onChange={field.onChange}
-                error={errors.startDate?.message}
+                error={errors.startDate?.message || ""}
               />
             )}
           />
@@ -286,8 +286,8 @@ export default function TripPreferencesForm({
                 label="End Date"
                 value={field.value || ''}
                 onChange={field.onChange}
-                error={errors.endDate?.message}
-                minDate={startDate || undefined}
+                error={errors.endDate?.message || ""}
+                {...(startDate && { minDate: startDate })}
               />
             )}
           />
@@ -420,7 +420,7 @@ export default function TripPreferencesForm({
             <PreferencesSelector
               value={field.value || []}
               onChange={field.onChange}
-              error={errors.preferences?.message}
+              error={errors.preferences?.message || ""}
             />
           )}
         />
@@ -440,7 +440,7 @@ export default function TripPreferencesForm({
               options={DIETARY_RESTRICTIONS}
               value={field.value || []}
               onChange={field.onChange}
-              error={errors.dietaryRestrictions?.message}
+              error={errors.dietaryRestrictions?.message || ""}
               columns={4}
             />
           )}
@@ -461,7 +461,7 @@ export default function TripPreferencesForm({
               options={ACCOMMODATION_TYPES}
               value={field.value || []}
               onChange={field.onChange}
-              error={errors.accommodationTypes?.message}
+              error={errors.accommodationTypes?.message || ""}
               columns={4}
             />
           )}
@@ -482,7 +482,7 @@ export default function TripPreferencesForm({
               options={CUISINE_PREFERENCES}
               value={field.value || []}
               onChange={field.onChange}
-              error={errors.cuisinePreferences?.message}
+              error={errors.cuisinePreferences?.message || ""}
               columns={4}
             />
           )}
