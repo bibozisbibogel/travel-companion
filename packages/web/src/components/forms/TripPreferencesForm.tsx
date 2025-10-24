@@ -101,18 +101,27 @@ export default function TripPreferencesForm({
 
       // Transform frontend data to backend format
       const backendRequest = transformTripRequestForBackend(data)
+      console.log('Sending trip request:', JSON.stringify(backendRequest, null, 2))
 
+      const startTime = Date.now()
       const response = await apiClient.planTrip(backendRequest as any)
+      const endTime = Date.now()
+      console.log(`Trip planning request took ${(endTime - startTime) / 1000} seconds`)
+      console.log('Trip planning response:', response)
 
-      if (response.success && response.data) {
+      // Extract trip ID from response - handle different response structures
+      const tripId = response?.trip_id || response?.data?.trip_id || response?.data?.tripId || response?.id
+
+      if (tripId) {
         clearDraft()
         if (onSuccess) {
-          onSuccess(response.data.tripId)
+          onSuccess(tripId)
         } else {
-          router.push(`/trips/${response.data.tripId}`)
+          router.push(`/trips/${tripId}`)
         }
       } else {
-        setApiError(response.message || 'Failed to create trip plan. Please try again.')
+        console.error('No trip ID in response:', response)
+        setApiError('Trip created but unable to navigate. Please check your trips list.')
       }
     } catch (error) {
       console.error('Trip submission error:', error)
@@ -122,16 +131,31 @@ export default function TripPreferencesForm({
           message: error.message,
           data: error.data
         })
-        if (error.status === 422 && error.data?.errors) {
-          console.error('Validation errors from backend:', error.data.errors)
-          Object.entries(error.data.errors).forEach(([field, messages]) => {
-            if (Array.isArray(messages) && messages.length > 0) {
-              setError(field as keyof TravelRequestFormData, {
-                type: 'server',
-                message: messages[0],
-              })
-            }
-          })
+        if (error.status === 422) {
+          // Check both error formats
+          const validationErrors = error.data?.data?.errors || error.data?.errors
+          console.error('Validation errors from backend:', validationErrors)
+
+          if (Array.isArray(validationErrors)) {
+            // New format: array of error objects
+            validationErrors.forEach((err: any) => {
+              console.error(`Field: ${err.field}, Message: ${err.message}`)
+            })
+            setApiError('Please check the form fields and try again.')
+          } else if (validationErrors && typeof validationErrors === 'object') {
+            // Old format: object with field names as keys
+            Object.entries(validationErrors).forEach(([field, messages]) => {
+              if (Array.isArray(messages) && messages.length > 0) {
+                console.error(`Field: ${field}, Message: ${messages[0]}`)
+                setError(field as keyof TravelRequestFormData, {
+                  type: 'server',
+                  message: messages[0],
+                })
+              }
+            })
+          } else {
+            setApiError(error.message || 'Validation failed. Please check your input.')
+          }
         } else {
           setApiError(error.message || 'An error occurred while planning your trip.')
         }

@@ -148,12 +148,10 @@ export function transformTripRequestForBackend(
     preferences.origin = formData.origin
   }
 
-  // Add traveler breakdown to preferences
-  preferences.traveler_breakdown = {
-    adults: formData.travelers.adults,
-    children: formData.travelers.children,
-    infants: formData.travelers.infants,
-  }
+  // Add traveler breakdown to preferences as separate fields
+  preferences.adults = formData.travelers.adults
+  preferences.children = formData.travelers.children
+  preferences.infants = formData.travelers.infants
 
   // Map accommodation type to backend enum
   const mappedAccommodation = formData.accommodationTypes?.[0]

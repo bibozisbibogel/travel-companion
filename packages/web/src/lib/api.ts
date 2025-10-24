@@ -221,7 +221,15 @@ export class ApiClient {
 
   // Travel planning methods
   async planTrip(tripRequest: ITripRequest): Promise<ITripPlanResponse> {
-    return this.post<ITripPlanResponse>('/api/v1/trips/plan', tripRequest);
+    // Trip planning can take longer, so use extended timeout and no retries
+    return this.post<ITripPlanResponse>('/api/v1/trips/plan', tripRequest, {
+      timeout: 180000, // 3 minutes (backend takes 2-2.5 minutes)
+      retryConfig: {
+        attempts: 1, // No retries for trip planning
+        delay: 0,
+        retryOn: []
+      }
+    });
   }
 
   async searchDestinations(query: string): Promise<IDestination[]> {
