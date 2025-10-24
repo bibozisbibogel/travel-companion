@@ -64,9 +64,7 @@ class TravelPlannerAgent:
 
         logger.info("TravelPlannerAgent initialized with claude_agent_sdk")
 
-    async def plan_trip(
-        self, trip_request: TripPlanRequest
-    ) -> AsyncIterator[dict[str, Any]]:
+    async def plan_trip(self, trip_request: TripPlanRequest) -> AsyncIterator[dict[str, Any]]:
         """
         Plan a complete trip based on user requirements.
 
@@ -181,7 +179,9 @@ class TravelPlannerAgent:
         prompt_parts.append(f"Duration: {nights} nights")
 
         if trip_request.requirements.budget:
-            prompt_parts.append(f"Total budget: {trip_request.requirements.budget} {trip_request.requirements.currency}")
+            prompt_parts.append(
+                f"Total budget: {trip_request.requirements.budget} {trip_request.requirements.currency}"
+            )
 
         if trip_request.preferences and trip_request.preferences.get("origin"):
             prompt_parts.append(f"Traveling from: {trip_request.preferences['origin']}")
@@ -194,14 +194,10 @@ class TravelPlannerAgent:
                 )
             activity_types = trip_request.preferences.get("activity_types")
             if activity_types and isinstance(activity_types, list):
-                prefs.append(
-                    f"Interested in: {', '.join(activity_types)}"
-                )
+                prefs.append(f"Interested in: {', '.join(activity_types)}")
             cuisine_preferences = trip_request.preferences.get("cuisine_preferences")
             if cuisine_preferences and isinstance(cuisine_preferences, list):
-                prefs.append(
-                    f"Cuisine preferences: {', '.join(cuisine_preferences)}"
-                )
+                prefs.append(f"Cuisine preferences: {', '.join(cuisine_preferences)}")
             if prefs:
                 prompt_parts.append("\n".join(prefs))
 
@@ -278,10 +274,7 @@ class TravelPlannerAgent:
 
         logger.debug(f"Converting SDK message: {type(sdk_message).__name__}")
 
-        message_dict = {
-            "type": "unknown",
-            "content": str(sdk_message)
-        }
+        message_dict = {"type": "unknown", "content": str(sdk_message)}
 
         try:
             # Check if it's a text message (AssistantMessage, UserMessage, etc.)
@@ -295,14 +288,18 @@ class TravelPlannerAgent:
                     if block_type == "TextBlock":
                         message_dict = {
                             "type": "text",
-                            "content": content_block.text if hasattr(content_block, "text") else str(content_block),
+                            "content": content_block.text
+                            if hasattr(content_block, "text")
+                            else str(content_block),
                         }
 
                     # Handle ToolUseBlock
                     elif block_type == "ToolUseBlock":
                         message_dict = {
                             "type": "tool_use",
-                            "tool": content_block.name if hasattr(content_block, "name") else "unknown",
+                            "tool": content_block.name
+                            if hasattr(content_block, "name")
+                            else "unknown",
                             "input": content_block.input if hasattr(content_block, "input") else {},
                         }
 
@@ -325,9 +322,13 @@ class TravelPlannerAgent:
 
                         message_dict = {
                             "type": "tool_result",
-                            "tool_use_id": content_block.tool_use_id if hasattr(content_block, "tool_use_id") else None,
+                            "tool_use_id": content_block.tool_use_id
+                            if hasattr(content_block, "tool_use_id")
+                            else None,
                             "content": result_content,
-                            "is_error": content_block.is_error if hasattr(content_block, "is_error") else None,
+                            "is_error": content_block.is_error
+                            if hasattr(content_block, "is_error")
+                            else None,
                         }
 
             # Handle ResultMessage (final completion)
@@ -411,8 +412,7 @@ class TravelPlannerAgent:
             # Validate and convert to ItineraryOutput model
             itinerary = ItineraryOutput(**data)
             logger.info(
-                f"Successfully validated itinerary: "
-                f"{len(itinerary.itinerary)} days of activities"
+                f"Successfully validated itinerary: {len(itinerary.itinerary)} days of activities"
             )
             return itinerary
 

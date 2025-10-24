@@ -37,7 +37,7 @@ async def stream_text_output(text: str, delay: float = 0.01) -> None:
         delay: Delay between characters in seconds
     """
     for char in text:
-        print(char, end='', flush=True)
+        print(char, end="", flush=True)
         await asyncio.sleep(delay)
     print()  # New line at the end
 
@@ -156,7 +156,7 @@ async def test_plan_trip(
         country_code="IT",
         airport_code="FCO",
         latitude=41.9028,  # Rome's latitude
-        longitude=12.4964  # Rome's longitude
+        longitude=12.4964,  # Rome's longitude
     )
 
     # Create trip requirements
@@ -193,19 +193,13 @@ async def test_plan_trip(
     )
 
     print("Planning trip with the following parameters:")
-    print(
-        f"  📍 Destination: {trip_request.destination.city}, "
-        f"{trip_request.destination.country}"
-    )
+    print(f"  📍 Destination: {trip_request.destination.city}, {trip_request.destination.country}")
     print(
         f"  📅 Dates: {trip_request.requirements.start_date} to "
         f"{trip_request.requirements.end_date}"
     )
     print(f"  👥 Travelers: {trip_request.requirements.travelers}")
-    print(
-        f"  💰 Budget: ${trip_request.requirements.budget} "
-        f"{trip_request.requirements.currency}"
-    )
+    print(f"  💰 Budget: ${trip_request.requirements.budget} {trip_request.requirements.currency}")
     print(f"  🎯 Preferences: {trip_request.preferences}")
     print("\n" + "-" * 70 + "\n")
 
@@ -237,21 +231,21 @@ async def test_plan_trip(
                 print(f"    Is Error: {message.get('is_error', False)}")
                 print("    Content:")
                 print("-" * 40)
-                content = message.get('content', 'No content')
+                content = message.get("content", "No content")
                 print(content[:1000] + "..." if len(content) > 1000 else content)
                 print("-" * 40)
 
             elif message["type"] == "system":
                 print(f"\n🔧 System Message #{message_count}:")
-                subtype = message.get('subtype', 'unknown')
+                subtype = message.get("subtype", "unknown")
                 print(f"    Subtype: {subtype}")
-                if subtype == 'init':
-                    data = message.get('data', {})
+                if subtype == "init":
+                    data = message.get("data", {})
                     print(f"    Session ID: {data.get('session_id', 'N/A')}")
                     print(f"    Model: {data.get('model', 'N/A')}")
                     print(f"    MCP Servers: {data.get('mcp_servers', [])}")
-                    tools = data.get('tools', [])
-                    travel_tools = [t for t in tools if t.startswith('mcp__travel__')]
+                    tools = data.get("tools", [])
+                    travel_tools = [t for t in tools if t.startswith("mcp__travel__")]
                     print(f"    Travel Tools: {travel_tools}")
 
             elif message["type"] == "itinerary":
@@ -262,22 +256,13 @@ async def test_plan_trip(
                     f"Destination: {itinerary.trip.destination.city}, "
                     f"{itinerary.trip.destination.country}"
                 )
-                print(
-                    f"Dates: {itinerary.trip.dates.start} to {itinerary.trip.dates.end}"
-                )
+                print(f"Dates: {itinerary.trip.dates.start} to {itinerary.trip.dates.end}")
                 print(f"Duration: {itinerary.trip.dates.duration_days} days")
                 print(f"Travelers: {itinerary.trip.travelers.count}")
+                print(f"Budget: {itinerary.trip.budget.total} {itinerary.trip.budget.currency}")
+                print(f"Spent: {itinerary.trip.budget.spent} {itinerary.trip.budget.currency}")
                 print(
-                    f"Budget: {itinerary.trip.budget.total} "
-                    f"{itinerary.trip.budget.currency}"
-                )
-                print(
-                    f"Spent: {itinerary.trip.budget.spent} "
-                    f"{itinerary.trip.budget.currency}"
-                )
-                print(
-                    f"Remaining: {itinerary.trip.budget.remaining} "
-                    f"{itinerary.trip.budget.currency}"
+                    f"Remaining: {itinerary.trip.budget.remaining} {itinerary.trip.budget.currency}"
                 )
                 print(f"\n✈️  Flights: {itinerary.flights.total_cost}")
                 print(
@@ -310,13 +295,9 @@ async def test_plan_trip(
                     if saved_trip:
                         print("\n🎉 Trip successfully saved to Supabase!")
                         print("   You can view it in the Supabase dashboard")
-                        print(
-                            f"   or retrieve it via API using trip_id: {saved_trip.trip_id}"
-                        )
+                        print(f"   or retrieve it via API using trip_id: {saved_trip.trip_id}")
                 else:
-                    print(
-                        "\n⏭️  Database save skipped (use --save-to-db flag to enable)"
-                    )
+                    print("\n⏭️  Database save skipped (use --save-to-db flag to enable)")
 
             elif message["type"] == "complete":
                 print(f"\n✅ Planning Complete (after {message_count} messages)")
@@ -390,21 +371,21 @@ async def test_query_agent(enable_text_streaming: bool = True):
                 print(f"    Is Error: {message.get('is_error', False)}")
                 print("    Content:")
                 print("-" * 40)
-                content = message.get('content', 'No content')
+                content = message.get("content", "No content")
                 print(content[:1000] + "..." if len(content) > 1000 else content)
                 print("-" * 40)
 
             elif message["type"] == "system":
                 print(f"\n🔧 System Message #{message_count}:")
-                subtype = message.get('subtype', 'unknown')
+                subtype = message.get("subtype", "unknown")
                 print(f"    Subtype: {subtype}")
-                if subtype == 'init':
-                    data = message.get('data', {})
+                if subtype == "init":
+                    data = message.get("data", {})
                     print(f"    Session ID: {data.get('session_id', 'N/A')}")
                     print(f"    Model: {data.get('model', 'N/A')}")
                     print(f"    MCP Servers: {data.get('mcp_servers', [])}")
-                    tools = data.get('tools', [])
-                    travel_tools = [t for t in tools if t.startswith('mcp__travel__')]
+                    tools = data.get("tools", [])
+                    travel_tools = [t for t in tools if t.startswith("mcp__travel__")]
                     print(f"    Travel Tools: {travel_tools}")
 
             elif message["type"] == "complete":
@@ -466,7 +447,9 @@ if __name__ == "__main__":
         print("  python test_planner_agent.py --save-to-db")
         print()
         print("  # Run with specific user ID and save to database:")
-        print("  python test_planner_agent.py --save-to-db --user-id=123e4567-e89b-12d3-a456-426614174000")
+        print(
+            "  python test_planner_agent.py --save-to-db --user-id=123e4567-e89b-12d3-a456-426614174000"
+        )
         print()
         print("  # Run without streaming, save to database:")
         print("  python test_planner_agent.py --no-streaming --save-to-db")

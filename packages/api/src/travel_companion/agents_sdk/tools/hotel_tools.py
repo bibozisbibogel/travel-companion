@@ -63,7 +63,7 @@ HOTEL_SEARCH_SCHEMA = {
     "Search for hotels at a specific location. Returns available hotel options "
     "with pricing, ratings, amenities, and location information. Supports filtering "
     "by budget, number of guests, rooms, and maximum results.",
-    HOTEL_SEARCH_SCHEMA
+    HOTEL_SEARCH_SCHEMA,
 )
 async def search_hotels(arguments: dict[str, Any]) -> dict[str, Any]:
     """
@@ -194,9 +194,7 @@ async def search_hotels(arguments: dict[str, Any]) -> dict[str, Any]:
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(
-                        {"error": str(e), "status": "error", "hotels": []}
-                    ),
+                    "text": json.dumps({"error": str(e), "status": "error", "hotels": []}),
                 }
             ],
             "isError": True,

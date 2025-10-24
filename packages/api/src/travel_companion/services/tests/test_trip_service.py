@@ -170,9 +170,7 @@ class TestTripServiceCreate:
         plan = ItineraryOutput(
             trip=TripInfo(
                 destination=Destination(city="Paris", country="France"),
-                dates=DateRange(
-                    start=date(2024, 6, 1), end=date(2024, 6, 7), duration_days=6
-                ),
+                dates=DateRange(start=date(2024, 6, 1), end=date(2024, 6, 7), duration_days=7),
                 travelers=TravelerInfo(count=2),
                 budget=BudgetInfo(
                     total=Decimal("2000.00"),
@@ -347,7 +345,9 @@ class TestTripServiceList:
 
         mock_supabase_client.table.return_value = mock_table
 
-        trips, total_count = await trip_service.list_user_trips(user_id=user_id, page=1, per_page=20)
+        trips, total_count = await trip_service.list_user_trips(
+            user_id=user_id, page=1, per_page=20
+        )
 
         assert total_count == 1
         assert len(trips) == 1

@@ -374,7 +374,9 @@ class FlightAgent(BaseAgent[FlightSearchResponse]):
                     airline=carrier_code,
                     flight_number=flight_number,
                     origin=first_segment.get("departure", {}).get("iataCode", request.origin),
-                    destination=last_segment.get("arrival", {}).get("iataCode", request.destination),
+                    destination=last_segment.get("arrival", {}).get(
+                        "iataCode", request.destination
+                    ),
                     departure_time=departure_time,
                     arrival_time=arrival_time,
                     duration_minutes=duration_minutes,

@@ -263,15 +263,14 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             else:
                 # Standalone mode - all workflow fields are None
                 self.logger.info(
-                    f"Processing itinerary for {trip_request.destination.city} "
-                    f"(standalone mode)"
+                    f"Processing itinerary for {trip_request.destination.city} (standalone mode)"
                 )
 
                 # Coordinate with all agents concurrently
                 agent_results = await self._coordinate_agents(trip_request)
 
             # Common processing for both modes
-            
+
             # Generate daily schedule and optimize
             daily_itinerary = await self._generate_daily_schedule(trip_request, agent_results)
 
@@ -873,13 +872,12 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             return {key: self._make_serializable(value) for key, value in data.items()}
         elif isinstance(data, list):
             return [self._make_serializable(item) for item in data]
-        elif isinstance(data, (datetime, date)):
+        elif isinstance(data, datetime | date):
             return data.isoformat()
         elif isinstance(data, Decimal):
             return str(data)
         else:
             return data
-
 
     async def _agent_cache_key(self, request: Any) -> str:
         """Generate cache key for agent request."""
@@ -1111,7 +1109,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             )
 
             # Call _coordinate_agents ONLY for missing agents (with caching and fallback)
-            missing_results = await self._coordinate_agents(trip_request, agents_to_fetch=missing_agents)
+            missing_results = await self._coordinate_agents(
+                trip_request, agents_to_fetch=missing_agents
+            )
 
             # Merge missing results with pre-fetched results
             for agent_name in missing_agents:
@@ -1526,9 +1526,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     trip_request.requirements.end_date - trip_request.requirements.start_date
                 ).days + 1
                 is_checkin_day = (
-                    (day_number == 1 and not self._is_travel_day(date, day_number, trip_request))
-                    or (day_number == 2 and day_number < total_days)
-                )
+                    day_number == 1 and not self._is_travel_day(date, day_number, trip_request)
+                ) or (day_number == 2 and day_number < total_days)
 
                 if is_checkin_day:
                     # Get hotel data safely
@@ -1636,12 +1635,6 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
             if activities_list:
                 # Distribute activities across non-travel days
-                # Calculate how many non-travel days we have
-                trip_duration = (
-                    trip_request.requirements.end_date - trip_request.requirements.start_date
-                ).days + 1
-
-                # Estimate non-travel days (usually trip_duration - 2 for arrival/departure)
                 # Schedule activities in morning (09:00) and afternoon (15:30) slots
                 # to avoid conflicts with lunch (14:00) and dinner (19:00)
 
@@ -1659,7 +1652,11 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 # Morning slots: 09:00-10:30 (90min) + 30min buffer → next at 11:00-12:30
                 # Afternoon slots: 15:30-17:00 (90min) + 30min buffer → can't fit another before dinner at 19:00
                 # Solution: Only schedule 3 activities per day (2 morning, 1 afternoon)
-                time_slots = [9, 11, 15.5]  # Hours as decimals (allows 30min buffer between activities)
+                time_slots = [
+                    9,
+                    11,
+                    15.5,
+                ]  # Hours as decimals (allows 30min buffer between activities)
 
                 for i, activity in enumerate(day_activities):
                     if i >= len(time_slots):
@@ -1799,8 +1796,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     )
                     # Extract cuisine type from categories (e.g., "catering.restaurant.italian" -> "Italian")
                     cuisine_str = (
-                        categories[0].split('.')[-1].title() if categories
-                        else "Restaurant"
+                        categories[0].split(".")[-1].title() if categories else "Restaurant"
                     )
 
                     # RestaurantOption doesn't have average_cost_per_person, use default
@@ -1827,7 +1823,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                             if hasattr(restaurant, "location")
                             else restaurant["location"]["longitude"],
                             booking_url=None,  # RestaurantOption doesn't have booking_url
-                            address=restaurant.formatted_address if hasattr(restaurant, "formatted_address") else None,
+                            address=restaurant.formatted_address
+                            if hasattr(restaurant, "formatted_address")
+                            else None,
                             booking_reference=None,
                             cancellation_policy=None,
                             special_instructions=None,
@@ -1876,7 +1874,9 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
 
                         if forecast_date == date:
                             # Handle different temperature field names
-                            high_temp = forecast.get("high_temp") or forecast.get("temperature_high")
+                            high_temp = forecast.get("high_temp") or forecast.get(
+                                "temperature_high"
+                            )
                             low_temp = forecast.get("low_temp") or forecast.get("temperature_low")
                             condition = forecast.get("condition", "Unknown")
 
@@ -1931,13 +1931,15 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         price = (
                             flight.price
                             if hasattr(flight, "price")
-                            else flight.get("price") if isinstance(flight, dict)
+                            else flight.get("price")
+                            if isinstance(flight, dict)
                             else Decimal("450.00")
                         )
                         flight_currency = (
                             getattr(flight, "currency", "USD")
                             if hasattr(flight, "currency")
-                            else flight.get("currency", "USD") if isinstance(flight, dict)
+                            else flight.get("currency", "USD")
+                            if isinstance(flight, dict)
                             else "USD"
                         )
 
@@ -1962,13 +1964,15 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         price_per_night = (
                             hotel.price_per_night
                             if hasattr(hotel, "price_per_night")
-                            else hotel.get("price_per_night") if isinstance(hotel, dict)
+                            else hotel.get("price_per_night")
+                            if isinstance(hotel, dict)
                             else Decimal("100.00")
                         )
                         hotel_currency = (
                             getattr(hotel, "currency", "USD")
                             if hasattr(hotel, "currency")
-                            else hotel.get("currency", "USD") if isinstance(hotel, dict)
+                            else hotel.get("currency", "USD")
+                            if isinstance(hotel, dict)
                             else "USD"
                         )
 
@@ -1992,14 +1996,16 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         price = (
                             activity.price
                             if hasattr(activity, "price")
-                            else activity.get("price") if isinstance(activity, dict)
+                            else activity.get("price")
+                            if isinstance(activity, dict)
                             else Decimal("25.00")
                         )
                         if price:
                             activity_currency = (
                                 getattr(activity, "currency", "USD")
                                 if hasattr(activity, "currency")
-                                else activity.get("currency", "USD") if isinstance(activity, dict)
+                                else activity.get("currency", "USD")
+                                if isinstance(activity, dict)
                                 else "USD"
                             )
                             cost_breakdown["activities"] += Decimal(str(price))
@@ -2021,7 +2027,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                     restaurants_list = restaurant_data["restaurants"]
 
                 if restaurants_list:
-                    for restaurant in restaurants_list:
+                    for _restaurant in restaurants_list:
                         # RestaurantOption doesn't have price_range, use default estimate
                         # In the future, could extract from categories or add field to model
                         estimated_cost_per_meal = Decimal("30.00")  # Default $30 per meal
@@ -2085,7 +2091,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         price_per_night = (
                             hotel.price_per_night
                             if hasattr(hotel, "price_per_night")
-                            else hotel.get("price_per_night") if isinstance(hotel, dict)
+                            else hotel.get("price_per_night")
+                            if isinstance(hotel, dict)
                             else Decimal("100.00")
                         )
                         cost_breakdown["hotels"] += Decimal(str(price_per_night)) * nights
@@ -2098,7 +2105,8 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                         price = (
                             activity.price
                             if hasattr(activity, "price")
-                            else activity.get("price") if isinstance(activity, dict)
+                            else activity.get("price")
+                            if isinstance(activity, dict)
                             else Decimal("25.00")
                         )
                         if price:
@@ -2111,7 +2119,7 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
             ):
                 restaurant_data = agent_results["restaurants"]["data"]
                 if "restaurants" in restaurant_data:
-                    for restaurant in restaurant_data["restaurants"]:
+                    for _restaurant in restaurant_data["restaurants"]:
                         # RestaurantOption doesn't have price_range, use default
                         estimated_cost_per_meal = Decimal("30.00")
                         cost_breakdown["restaurants"] += estimated_cost_per_meal

@@ -8,7 +8,9 @@ from typing import Any, Union
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from travel_companion.models.itinerary_output import ItineraryOutput
+
 
 class TripStatus(str, Enum):
     """Trip status enumeration."""

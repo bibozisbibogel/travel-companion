@@ -6,24 +6,12 @@ Run this after setting up the database schema.
 
 import asyncio
 import sys
-from datetime import date
-from decimal import Decimal
 from pathlib import Path
-from uuid import uuid4
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from travel_companion.core.database import get_database_manager
-from travel_companion.models.trip import (
-    AccommodationType,
-    TravelClass,
-    TripDestination,
-    TripRequirements,
-    TripStatus,
-)
-from travel_companion.services.trip_service import TripService
-from travel_companion.services.user_service import UserService
 
 
 async def test_database_connection():
@@ -102,7 +90,9 @@ async def test_database_connection():
     print("✅ All basic schema checks passed!")
     print()
     print("Next steps:")
-    print("  1. Run unit tests: uv run pytest src/travel_companion/services/tests/test_trip_service.py -v")
+    print(
+        "  1. Run unit tests: uv run pytest src/travel_companion/services/tests/test_trip_service.py -v"
+    )
     print("  2. Start the API server: uv run uvicorn travel_companion.main:app --reload")
     print("  3. Test via API docs: http://localhost:8000/docs")
     print()

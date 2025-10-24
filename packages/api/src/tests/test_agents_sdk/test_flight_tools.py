@@ -1,8 +1,8 @@
 """Tests for flight search tools in Claude Agent SDK."""
 
-import pytest
 from datetime import datetime, timedelta
-from decimal import Decimal
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -25,8 +25,8 @@ async def test_flight_search_tool_basic():
         "currency": "USD",
     }
 
-    # Execute tool
-    result = await search_flights(arguments)
+    # Execute tool - access the underlying function via handler attribute
+    result = await search_flights.handler(arguments)
 
     # Verify result structure
     assert "content" in result
@@ -56,7 +56,7 @@ async def test_flight_search_tool_missing_fields():
         "departure_date": "2025-06-01",
     }
 
-    result = await search_flights(arguments)
+    result = await search_flights.handler(arguments)
 
     # Should return error
     import json
@@ -77,7 +77,7 @@ async def test_flight_search_tool_invalid_date():
         "departure_date": "invalid-date",
     }
 
-    result = await search_flights(arguments)
+    result = await search_flights.handler(arguments)
 
     # Should return error about date format
     import json
@@ -101,7 +101,7 @@ async def test_flight_search_tool_with_defaults():
         "departure_date": tomorrow,
     }
 
-    result = await search_flights(arguments)
+    result = await search_flights.handler(arguments)
 
     # Should succeed with defaults
     import json

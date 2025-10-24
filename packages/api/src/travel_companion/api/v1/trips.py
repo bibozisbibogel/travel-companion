@@ -137,9 +137,7 @@ async def create_trip(
             status=TripStatus.DRAFT,
         )
 
-        return SuccessResponse[TripResponse](
-            data=saved_trip, message="Trip created successfully"
-        )
+        return SuccessResponse[TripResponse](data=saved_trip, message="Trip created successfully")
 
     except Exception as e:
         raise HTTPException(
@@ -294,9 +292,7 @@ async def update_trip(
                 detail={"message": "Trip not found", "error_code": "TRIP_NOT_FOUND"},
             )
 
-        return SuccessResponse[TripResponse](
-            data=updated_trip, message="Trip updated successfully"
-        )
+        return SuccessResponse[TripResponse](data=updated_trip, message="Trip updated successfully")
 
     except HTTPException:
         raise

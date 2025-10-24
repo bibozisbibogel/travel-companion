@@ -153,7 +153,9 @@ class OpenWeatherMapAPIClient:
             # Convert to our weather models
             forecast = self._convert_to_forecast(weather_data, request.location)
 
-            self.logger.info(f"Retrieved weather forecast for {request.location}. Forecast: {forecast}")
+            self.logger.info(
+                f"Retrieved weather forecast for {request.location}. Forecast: {forecast}"
+            )
             return forecast
 
         except Exception as e:
@@ -221,7 +223,7 @@ class OpenWeatherMapAPIClient:
                     response.raise_for_status()
 
                     data = response.json()
-                    # Convert Current Weather API response to OneCall format  
+                    # Convert Current Weather API response to OneCall format
                     converted_data = self._convert_current_weather_to_onecall(data, lat, lon)
                     return OpenWeatherMapResponse(**converted_data)
 
@@ -234,14 +236,16 @@ class OpenWeatherMapAPIClient:
         # This should not be reached, but mypy requires it
         raise RuntimeError("Failed to get weather data after all retries")
 
-    def _convert_current_weather_to_onecall(self, current_data: dict, lat: float, lon: float) -> dict:
+    def _convert_current_weather_to_onecall(
+        self, current_data: dict, lat: float, lon: float
+    ) -> dict:
         """Convert Current Weather API response to OneCall API format.
-        
+
         Args:
             current_data: Response from Current Weather API
-            lat: Latitude coordinate  
+            lat: Latitude coordinate
             lon: Longitude coordinate
-            
+
         Returns:
             Data in OneCall API format
         """
@@ -259,7 +263,7 @@ class OpenWeatherMapAPIClient:
                 "pressure": current_data["main"]["pressure"],
                 "humidity": current_data["main"]["humidity"],
                 "dew_point": 0,  # Not available in Current Weather API
-                "uvi": 0,  # Not available in Current Weather API  
+                "uvi": 0,  # Not available in Current Weather API
                 "clouds": current_data["clouds"]["all"],
                 "visibility": current_data.get("visibility", 10000),
                 "wind_speed": current_data["wind"]["speed"],
@@ -269,7 +273,7 @@ class OpenWeatherMapAPIClient:
                 "snow": current_data.get("snow"),
             },
             "hourly": [],  # Not available in Current Weather API
-            "daily": [],   # Not available in Current Weather API
+            "daily": [],  # Not available in Current Weather API
             "alerts": [],  # Not available in Current Weather API
         }
 

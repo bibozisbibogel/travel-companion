@@ -1,12 +1,50 @@
 """Tests for trip planning API endpoints."""
 
-from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
+from travel_companion.models.trip import TripResponse, TripStatus
 from travel_companion.models.user import User
-from travel_companion.workflows.orchestrator import TripPlanningWorkflow
+
+
+def create_mock_trip_response(
+    trip_id: UUID,
+    user_id: UUID,
+    name: str = "Test Trip",
+    description: str = "Test Description",
+    destination: dict | None = None,
+    requirements: dict | None = None,
+    status: TripStatus = TripStatus.DRAFT,
+) -> TripResponse:
+    """Helper to create a properly formatted TripResponse for testing."""
+    if destination is None:
+        destination = {"city": "Paris", "country": "France", "country_code": "FR"}
+
+    if requirements is None:
+        requirements = {
+            "budget": 2000.00,
+            "currency": "EUR",
+            "start_date": "2024-06-01",
+            "end_date": "2024-06-07",
+            "travelers": 2,
+            "travel_class": "economy",
+        }
+
+    return TripResponse(
+        trip_id=trip_id,
+        user_id=user_id,
+        name=name,
+        description=description,
+        destination=destination,
+        requirements=requirements,
+        status=status,
+        plan=None,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
 
 
 class TestTripPlanEndpoint:
@@ -31,24 +69,44 @@ class TestTripPlanEndpoint:
             },
         }
 
-        # Mock the workflow execution to prevent hanging
-        with patch.object(
-            TripPlanningWorkflow, "execute_trip_planning", new_callable=AsyncMock
-        ) as mock_execute:
-            mock_execute.return_value = {
-                "trip_id": str(uuid4()),
-                "itinerary_data": None,  # Set to None for testing (plan field can be None)
-            }
+        # Mock TravelPlannerAgent.plan_trip() to prevent actual API calls
+        with patch("travel_companion.api.v1.trips.TravelPlannerAgent") as mock_agent_class:
+            mock_agent = MagicMock()
+            mock_agent_class.return_value = mock_agent
 
-            response = authenticated_client.post("/api/v1/trips/plan", json=trip_request)
+            # Mock the async generator plan_trip method
+            async def mock_plan_trip(request):
+                yield {"type": "itinerary", "data": None}
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
-            assert data["message"] == "Trip plan generated successfully"
-            assert "data" in data
-            assert data["data"]["destination"]["city"] == "Paris"
-            assert data["data"]["user_id"] == str(sample_user.user_id)
+            mock_agent.plan_trip = mock_plan_trip
+
+            # Mock TripService.create_trip to prevent database calls
+            with patch("travel_companion.api.v1.trips.TripService") as mock_service_class:
+                mock_service = MagicMock()
+                mock_service_class.return_value = mock_service
+
+                # Mock the create_trip method to return a trip response
+                mock_trip = create_mock_trip_response(
+                    trip_id=uuid4(),
+                    user_id=sample_user.user_id,
+                    name="Trip to Paris",
+                    description="AI-generated travel plan for Paris",
+                    destination=trip_request["destination"],
+                    requirements=trip_request["requirements"],
+                    status=TripStatus.DRAFT,
+                )
+
+                mock_service.create_trip = AsyncMock(return_value=mock_trip)
+
+                response = authenticated_client.post("/api/v1/trips/plan", json=trip_request)
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+                assert data["message"] == "Trip plan generated and saved successfully"
+                assert "data" in data
+                assert data["data"]["destination"]["city"] == "Paris"
+                assert data["data"]["user_id"] == str(sample_user.user_id)
 
     def test_generate_trip_plan_unauthenticated(self, client: TestClient):
         """Test trip plan generation without authentication."""
@@ -129,14 +187,31 @@ class TestCreateTripEndpoint:
             },
         }
 
-        response = authenticated_client.post("/api/v1/trips/", json=trip_data)
+        # Mock TripService to prevent database calls
+        with patch("travel_companion.api.v1.trips.TripService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "Trip created successfully"
-        assert data["data"]["name"] == "Paris Adventure"
-        assert data["data"]["user_id"] == str(sample_user.user_id)
+            mock_trip = create_mock_trip_response(
+                trip_id=uuid4(),
+                user_id=sample_user.user_id,
+                name="Paris Adventure",
+                description="A wonderful trip to Paris",
+                destination=trip_data["destination"],
+                requirements=trip_data["requirements"],
+                status=TripStatus.DRAFT,
+            )
+
+            mock_service.create_trip = AsyncMock(return_value=mock_trip)
+
+            response = authenticated_client.post("/api/v1/trips/", json=trip_data)
+
+            assert response.status_code == 201
+            data = response.json()
+            assert data["success"] is True
+            assert data["message"] == "Trip created successfully"
+            assert data["data"]["name"] == "Paris Adventure"
+            assert data["data"]["user_id"] == str(sample_user.user_id)
 
     def test_create_trip_missing_required_fields(
         self, authenticated_client: TestClient, sample_user: User
@@ -217,13 +292,29 @@ class TestGetTripEndpoint:
         """Test successful trip retrieval."""
         trip_id = uuid4()
 
-        response = authenticated_client.get(f"/api/v1/trips/{trip_id}")
+        # Mock TripService to prevent database calls
+        with patch("travel_companion.api.v1.trips.TripService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["data"]["trip_id"] == str(trip_id)
-        assert data["data"]["user_id"] == str(sample_user.user_id)
+            mock_trip = create_mock_trip_response(
+                trip_id=trip_id,
+                user_id=sample_user.user_id,
+                name="Paris Adventure",
+                description="A wonderful trip to Paris",
+                destination={"city": "Paris", "country": "France", "country_code": "FR"},
+                status=TripStatus.DRAFT,
+            )
+
+            mock_service.get_trip_by_id = AsyncMock(return_value=mock_trip)
+
+            response = authenticated_client.get(f"/api/v1/trips/{trip_id}")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["data"]["trip_id"] == str(trip_id)
+            assert data["data"]["user_id"] == str(sample_user.user_id)
 
     def test_get_trip_not_found(self, authenticated_client: TestClient, sample_user: User):
         """Test trip retrieval for non-existent trip."""
@@ -261,24 +352,56 @@ class TestUpdateTripEndpoint:
             "status": "planning",
         }
 
-        response = authenticated_client.put(f"/api/v1/trips/{trip_id}", json=update_data)
+        # Mock TripService to prevent database calls
+        with patch("travel_companion.api.v1.trips.TripService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "Trip updated successfully"
-        assert data["data"]["name"] == "Updated Trip Name"
+            mock_trip = create_mock_trip_response(
+                trip_id=trip_id,
+                user_id=sample_user.user_id,
+                name="Updated Trip Name",
+                description="Updated description",
+                destination={"city": "Paris", "country": "France", "country_code": "FR"},
+                status=TripStatus.PLANNING,
+            )
+
+            mock_service.update_trip = AsyncMock(return_value=mock_trip)
+
+            response = authenticated_client.put(f"/api/v1/trips/{trip_id}", json=update_data)
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["message"] == "Trip updated successfully"
+            assert data["data"]["name"] == "Updated Trip Name"
 
     def test_update_trip_partial_update(self, authenticated_client: TestClient, sample_user: User):
         """Test partial trip update."""
         trip_id = uuid4()
         update_data = {"name": "Updated Name Only"}
 
-        response = authenticated_client.put(f"/api/v1/trips/{trip_id}", json=update_data)
+        # Mock TripService to prevent database calls
+        with patch("travel_companion.api.v1.trips.TripService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
+            mock_trip = create_mock_trip_response(
+                trip_id=trip_id,
+                user_id=sample_user.user_id,
+                name="Updated Name Only",
+                description="A wonderful trip to Paris",
+                destination={"city": "Paris", "country": "France", "country_code": "FR"},
+                status=TripStatus.DRAFT,
+            )
+
+            mock_service.update_trip = AsyncMock(return_value=mock_trip)
+
+            response = authenticated_client.put(f"/api/v1/trips/{trip_id}", json=update_data)
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
 
     def test_update_trip_not_found(self, authenticated_client: TestClient, sample_user: User):
         """Test trip update for non-existent trip."""
@@ -307,13 +430,21 @@ class TestDeleteTripEndpoint:
         """Test successful trip deletion."""
         trip_id = uuid4()
 
-        response = authenticated_client.delete(f"/api/v1/trips/{trip_id}")
+        # Mock TripService to prevent database calls
+        with patch("travel_companion.api.v1.trips.TripService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "Trip deleted successfully"
-        assert data["data"]["trip_id"] == str(trip_id)
+            # Mock delete_trip to return True (successful deletion)
+            mock_service.delete_trip = AsyncMock(return_value=True)
+
+            response = authenticated_client.delete(f"/api/v1/trips/{trip_id}")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["message"] == "Trip deleted successfully"
+            assert data["data"]["trip_id"] == str(trip_id)
 
     def test_delete_trip_not_found(self, authenticated_client: TestClient, sample_user: User):
         """Test trip deletion for non-existent trip."""

@@ -1,8 +1,8 @@
 """Claude Agent SDK-based trip planning API endpoints."""
 
 import logging
+from collections.abc import AsyncIterator
 from decimal import Decimal
-from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -11,7 +11,7 @@ from travel_companion.agents_sdk.hooks import BudgetTracker
 from travel_companion.agents_sdk.travel_planner_agent import TravelPlannerAgent
 from travel_companion.api.deps import get_current_user
 from travel_companion.models.base import SuccessResponse
-from travel_companion.models.trip import TripPlanRequest, TripResponse
+from travel_companion.models.trip import TripPlanRequest
 from travel_companion.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -63,8 +63,7 @@ async def generate_trip_plan_sdk(
     Returns streaming JSON objects with planning updates.
     """
     logger.info(
-        f"SDK trip planning request for {trip_request.destination} "
-        f"from user {current_user.user_id}"
+        f"SDK trip planning request for {trip_request.destination} from user {current_user.user_id}"
     )
 
     try:
@@ -121,7 +120,7 @@ async def generate_trip_plan_sdk(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to initialize trip planning: {str(e)}",
-        )
+        ) from e
 
 
 @router.post(
@@ -191,7 +190,7 @@ async def travel_query_sdk(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process query: {str(e)}",
-        )
+        ) from e
 
 
 @router.get(
@@ -209,7 +208,7 @@ async def agent_health_check() -> SuccessResponse[dict]:
         Health status of the agent system
     """
     try:
-        agent = TravelPlannerAgent()
+        _ = TravelPlannerAgent()
 
         # Basic health check - verify agent can be initialized
         health_data = {
@@ -231,4 +230,4 @@ async def agent_health_check() -> SuccessResponse[dict]:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Agent system unhealthy: {str(e)}",
-        )
+        ) from e

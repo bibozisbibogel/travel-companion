@@ -198,7 +198,6 @@ class TestWeatherAgent:
         with pytest.raises((ValueError, Exception)):
             await weather_agent.process(invalid_request)
 
-
     @pytest.mark.asyncio
     async def test_weather_caching(
         self, weather_agent, sample_weather_request, sample_weather_forecast
