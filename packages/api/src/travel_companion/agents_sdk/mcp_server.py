@@ -34,7 +34,7 @@ async def list_tools() -> list[types.Tool]:
         types.Tool(
             name=tool.name,
             description=tool.description or "",
-            inputSchema=tool.input_schema,
+            inputSchema=(tool.input_schema if isinstance(tool.input_schema, dict) else {}),
         )
         for tool in tools
     ]

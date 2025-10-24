@@ -716,14 +716,26 @@ class TestItineraryAgent:
 
     # Performance and Load Tests
     @pytest.mark.asyncio
-    async def test_concurrent_requests_handling(self, itinerary_agent, sample_trip_request):
+    async def test_concurrent_requests_handling(
+        self, itinerary_agent, sample_trip_request, sample_agent_results
+    ):
         """Test handling multiple concurrent requests."""
-        # Mock quick responses
-        itinerary_agent.flight_agent.process = AsyncMock(return_value=Mock())
-        itinerary_agent.hotel_agent.process = AsyncMock(return_value=Mock())
-        itinerary_agent.activity_agent.process = AsyncMock(return_value=Mock())
-        itinerary_agent.weather_agent.process = AsyncMock(return_value=Mock())
-        itinerary_agent.food_agent.process = AsyncMock(return_value=Mock())
+        # Mock quick responses with proper data structures
+        itinerary_agent.flight_agent.process = AsyncMock(
+            return_value=sample_agent_results["flights"]["data"]
+        )
+        itinerary_agent.hotel_agent.process = AsyncMock(
+            return_value=sample_agent_results["hotels"]["data"]
+        )
+        itinerary_agent.activity_agent.process = AsyncMock(
+            return_value=sample_agent_results["activities"]["data"]
+        )
+        itinerary_agent.weather_agent.process = AsyncMock(
+            return_value=sample_agent_results["weather"]["data"]
+        )
+        itinerary_agent.food_agent.process = AsyncMock(
+            return_value=sample_agent_results["restaurants"]["data"]
+        )
         itinerary_agent.redis.get = AsyncMock(return_value=None)
         itinerary_agent.redis.set = AsyncMock(return_value=True)
 

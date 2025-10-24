@@ -47,7 +47,12 @@ class DateRange(BaseModel):
 
     start: date_type = Field(..., description="Trip start date (ISO 8601)")
     end: date_type = Field(..., description="Trip end date (ISO 8601)")
-    duration_days: int = Field(..., ge=1, description="Total trip duration in days")
+    duration_days: int = Field(
+        ...,
+        ge=1,
+        description="Total trip duration in days (inclusive of both start and end dates). "
+        "Calculate as: (end - start).days + 1",
+    )
 
     @field_validator("duration_days")
     @classmethod

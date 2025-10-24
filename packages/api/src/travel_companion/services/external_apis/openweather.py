@@ -237,8 +237,8 @@ class OpenWeatherMapAPIClient:
         raise RuntimeError("Failed to get weather data after all retries")
 
     def _convert_current_weather_to_onecall(
-        self, current_data: dict, lat: float, lon: float
-    ) -> dict:
+        self, current_data: dict[str, Any], lat: float, lon: float
+    ) -> dict[str, Any]:
         """Convert Current Weather API response to OneCall API format.
 
         Args:

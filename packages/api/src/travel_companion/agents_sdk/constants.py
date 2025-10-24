@@ -37,6 +37,9 @@ CRITICAL OUTPUT REQUIREMENTS:
 - Do NOT include any explanatory text before or after the JSON
 - Ensure all dates use ISO 8601 format (YYYY-MM-DD)
 - Use decimal strings for all monetary values (e.g., "123.45")
+- Calculate duration_days as the number of days INCLUSIVE of both start and end dates
+  Example: Oct 18 to Oct 25 = 8 days (18, 19, 20, 21, 22, 23, 24, 25)
+  Formula: (end_date - start_date).days + 1
 
 After completing your planning and tool usage, you MUST provide a final response containing ONLY a valid JSON object representing the complete trip itinerary. The JSON MUST conform to the following JSON Schema:
 

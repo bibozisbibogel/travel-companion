@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -20,19 +21,19 @@ from travel_companion.utils.errors import DatabaseError
 
 
 @pytest.fixture
-def mock_supabase_client():
+def mock_supabase_client() -> MagicMock:
     """Create a mock Supabase client."""
     return MagicMock()
 
 
 @pytest.fixture
-def trip_service(mock_supabase_client):
+def trip_service(mock_supabase_client: MagicMock) -> TripService:
     """Create TripService instance with mock client."""
     return TripService(mock_supabase_client)
 
 
 @pytest.fixture
-def sample_destination():
+def sample_destination() -> TripDestination:
     """Sample trip destination."""
     return TripDestination(
         city="Paris",
@@ -45,7 +46,7 @@ def sample_destination():
 
 
 @pytest.fixture
-def sample_requirements():
+def sample_requirements() -> TripRequirements:
     """Sample trip requirements."""
     return TripRequirements(
         budget=Decimal("2000.00"),
@@ -59,7 +60,7 @@ def sample_requirements():
 
 
 @pytest.fixture
-def sample_db_record():
+def sample_db_record() -> dict[str, Any]:
     """Sample database record for a trip."""
     return {
         "trip_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -95,8 +96,12 @@ class TestTripServiceCreate:
     """Tests for trip creation."""
 
     async def test_create_trip_success(
-        self, trip_service, mock_supabase_client, sample_destination, sample_requirements
-    ):
+        self,
+        trip_service: TripService,
+        mock_supabase_client: MagicMock,
+        sample_destination: TripDestination,
+        sample_requirements: TripRequirements,
+    ) -> None:
         """Test successful trip creation."""
         user_id = UUID("123e4567-e89b-12d3-a456-426614174000")
         mock_result = MagicMock()
@@ -143,8 +148,12 @@ class TestTripServiceCreate:
         mock_supabase_client.table.assert_called_once_with("trips")
 
     async def test_create_trip_with_plan(
-        self, trip_service, mock_supabase_client, sample_destination, sample_requirements
-    ):
+        self,
+        trip_service: TripService,
+        mock_supabase_client: MagicMock,
+        sample_destination: TripDestination,
+        sample_requirements: TripRequirements,
+    ) -> None:
         """Test trip creation with itinerary plan."""
         from travel_companion.models.itinerary_output import (
             AccommodationInfo,
@@ -183,16 +192,28 @@ class TestTripServiceCreate:
                 outbound=FlightDetails(
                     airline="Air France",
                     flight_number="AF123",
-                    route=RouteInfo(from_airport="JFK", to_airport="CDG"),
+                    route=RouteInfo(**{"from": "JFK", "to": "CDG"}),
                     departure=TimeInfo(time="10:00", timezone="America/New_York"),
+                    arrival=TimeInfo(time="22:00", timezone="Europe/Paris"),
+                    duration_minutes=480,
                     price_per_person=Decimal("250.00"),
                     total_price=Decimal("500.00"),
                 ),
                 total_cost=Decimal("500.00"),
+                **{"return": None},
             ),
             accommodation=AccommodationInfo(
                 name="Hotel Paris",
-                address=Address(city="Paris", country="France"),
+                rating=4.5,
+                stars=4,
+                address=Address(
+                    street="123 Rue de la Paix",
+                    postal_code="75001",
+                    city="Paris",
+                    region="Île-de-France",
+                    country="France",
+                ),
+                location_notes="Central Paris, near the Louvre",
                 price_per_night=Decimal("150.00"),
                 nights=6,
                 total_cost=Decimal("900.00"),
@@ -204,15 +225,24 @@ class TestTripServiceCreate:
                     day_of_week="Saturday",
                     title="Arrival Day",
                     daily_cost=DailyCost(
-                        min=Decimal("50.00"), max=Decimal("100.00"), currency="EUR"
+                        min=Decimal("50.00"),
+                        max=Decimal("100.00"),
+                        currency="EUR",
+                        breakdown="Estimated daily spending",
                     ),
                 )
             ],
             budget_breakdown=BudgetBreakdown(
                 flights=Decimal("500.00"),
                 accommodation=Decimal("900.00"),
+                activities=BudgetCategoryRange(min=Decimal("200.00"), max=Decimal("300.00")),
+                meals=BudgetCategoryRange(min=Decimal("150.00"), max=Decimal("250.00")),
+                transportation=BudgetCategoryRange(min=Decimal("50.00"), max=Decimal("100.00")),
+                extras=None,
+                buffer=None,
                 total=BudgetCategoryRange(min=Decimal("1800.00"), max=Decimal("2000.00")),
             ),
+            travel_tips=None,
         )
 
         mock_result = MagicMock()
@@ -256,8 +286,12 @@ class TestTripServiceCreate:
         assert result.plan.trip.destination.city == "Paris"
 
     async def test_create_trip_database_error(
-        self, trip_service, mock_supabase_client, sample_destination, sample_requirements
-    ):
+        self,
+        trip_service: TripService,
+        mock_supabase_client: MagicMock,
+        sample_destination: TripDestination,
+        sample_requirements: TripRequirements,
+    ) -> None:
         """Test trip creation with database error."""
         mock_table = MagicMock()
         mock_table.insert.return_value.execute.side_effect = Exception("Database error")
@@ -278,8 +312,11 @@ class TestTripServiceGet:
     """Tests for trip retrieval."""
 
     async def test_get_trip_by_id_success(
-        self, trip_service, mock_supabase_client, sample_db_record
-    ):
+        self,
+        trip_service: TripService,
+        mock_supabase_client: MagicMock,
+        sample_db_record: dict[str, Any],
+    ) -> None:
         """Test successful trip retrieval by ID."""
         trip_id = UUID("550e8400-e29b-41d4-a716-446655440000")
         user_id = UUID("123e4567-e89b-12d3-a456-426614174000")
@@ -300,7 +337,9 @@ class TestTripServiceGet:
         assert result.name == "Trip to Paris"
         assert result.destination.city == "Paris"
 
-    async def test_get_trip_by_id_not_found(self, trip_service, mock_supabase_client):
+    async def test_get_trip_by_id_not_found(
+        self, trip_service: TripService, mock_supabase_client: MagicMock
+    ) -> None:
         """Test trip retrieval when trip doesn't exist."""
         mock_result = MagicMock()
         mock_result.data = []
@@ -320,8 +359,11 @@ class TestTripServiceList:
     """Tests for listing trips."""
 
     async def test_list_user_trips_success(
-        self, trip_service, mock_supabase_client, sample_db_record
-    ):
+        self,
+        trip_service: TripService,
+        mock_supabase_client: MagicMock,
+        sample_db_record: dict[str, Any],
+    ) -> None:
         """Test successful listing of user trips."""
         user_id = UUID("123e4567-e89b-12d3-a456-426614174000")
 
@@ -353,7 +395,9 @@ class TestTripServiceList:
         assert len(trips) == 1
         assert trips[0].name == "Trip to Paris"
 
-    async def test_list_user_trips_empty(self, trip_service, mock_supabase_client):
+    async def test_list_user_trips_empty(
+        self, trip_service: TripService, mock_supabase_client: MagicMock
+    ) -> None:
         """Test listing trips when user has no trips."""
         mock_count_result = MagicMock()
         mock_count_result.count = 0
@@ -378,12 +422,22 @@ class TestTripServiceList:
 class TestTripServiceUpdate:
     """Tests for trip updates."""
 
-    async def test_update_trip_success(self, trip_service, mock_supabase_client, sample_db_record):
+    async def test_update_trip_success(
+        self,
+        trip_service: TripService,
+        mock_supabase_client: MagicMock,
+        sample_db_record: dict[str, Any],
+    ) -> None:
         """Test successful trip update."""
         trip_id = UUID("550e8400-e29b-41d4-a716-446655440000")
         user_id = UUID("123e4567-e89b-12d3-a456-426614174000")
 
-        update_data = TripUpdate(name="Updated Trip Name", description="Updated description")
+        update_data = TripUpdate(
+            name="Updated Trip Name",
+            description="Updated description",
+            status=None,
+            requirements=None,
+        )
 
         # Mock get_trip_by_id
         mock_get_result = MagicMock()
@@ -418,7 +472,9 @@ class TestTripServiceUpdate:
         assert result.name == "Updated Trip Name"
         assert result.description == "Updated description"
 
-    async def test_update_trip_not_found(self, trip_service, mock_supabase_client):
+    async def test_update_trip_not_found(
+        self, trip_service: TripService, mock_supabase_client: MagicMock
+    ) -> None:
         """Test updating non-existent trip."""
         mock_result = MagicMock()
         mock_result.data = []
@@ -429,7 +485,9 @@ class TestTripServiceUpdate:
         ) = mock_result
         mock_supabase_client.table.return_value = mock_table
 
-        update_data = TripUpdate(name="Updated Trip")
+        update_data = TripUpdate(
+            name="Updated Trip", description=None, status=None, requirements=None
+        )
         result = await trip_service.update_trip(
             trip_id=uuid4(), user_id=uuid4(), update_data=update_data
         )
@@ -440,7 +498,9 @@ class TestTripServiceUpdate:
 class TestTripServiceDelete:
     """Tests for trip deletion."""
 
-    async def test_delete_trip_success(self, trip_service, mock_supabase_client):
+    async def test_delete_trip_success(
+        self, trip_service: TripService, mock_supabase_client: MagicMock
+    ) -> None:
         """Test successful trip deletion."""
         trip_id = uuid4()
         user_id = uuid4()
@@ -458,7 +518,9 @@ class TestTripServiceDelete:
 
         assert result is True
 
-    async def test_delete_trip_not_found(self, trip_service, mock_supabase_client):
+    async def test_delete_trip_not_found(
+        self, trip_service: TripService, mock_supabase_client: MagicMock
+    ) -> None:
         """Test deleting non-existent trip."""
         mock_result = MagicMock()
         mock_result.data = []

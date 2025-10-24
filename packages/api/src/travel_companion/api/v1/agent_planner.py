@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncIterator
 from decimal import Decimal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -72,10 +73,10 @@ async def generate_trip_plan_sdk(
 
         # Create budget tracker for validation
         budget_tracker = None
-        if trip_request.budget:
+        if trip_request.requirements.budget:
             budget_tracker = BudgetTracker(
-                total_budget=Decimal(str(trip_request.budget)),
-                currency=trip_request.currency,
+                total_budget=Decimal(str(trip_request.requirements.budget)),
+                currency=trip_request.requirements.currency,
             )
 
         # Stream generator
@@ -195,12 +196,12 @@ async def travel_query_sdk(
 
 @router.get(
     "/health",
-    response_model=SuccessResponse[dict],
+    response_model=SuccessResponse[dict[str, Any]],
     status_code=status.HTTP_200_OK,
     summary="Check agent health",
     description="Verify the Claude Agent SDK integration is working",
 )
-async def agent_health_check() -> SuccessResponse[dict]:
+async def agent_health_check() -> SuccessResponse[dict[str, Any]]:
     """
     Health check for Claude Agent SDK integration.
 

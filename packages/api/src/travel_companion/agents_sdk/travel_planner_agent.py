@@ -274,7 +274,7 @@ class TravelPlannerAgent:
 
         logger.debug(f"Converting SDK message: {type(sdk_message).__name__}")
 
-        message_dict = {"type": "unknown", "content": str(sdk_message)}
+        message_dict: dict[str, Any] = {"type": "unknown", "content": str(sdk_message)}
 
         try:
             # Check if it's a text message (AssistantMessage, UserMessage, etc.)

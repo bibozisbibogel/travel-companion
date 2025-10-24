@@ -1005,11 +1005,13 @@ class ItineraryAgent(BaseAgent[ItineraryAgentResponse]):
                 return response
             # If it's a response object, try to extract data
             if hasattr(response, "model_dump"):
-                return response.model_dump()
+                return dict(response.model_dump())
             return {}
         else:
             # Unknown agent, return as-is
-            return response
+            if isinstance(response, dict):
+                return response
+            return {}
 
     def _has_prefetched_agent_results(self, trip_request: TripPlanRequest) -> bool:
         """Check if TripPlanRequest contains pre-fetched agent results from workflow.

@@ -52,6 +52,11 @@ async def execute_workflow(request: WorkflowExecutionRequest) -> WorkflowExecuti
                 destination=TripDestination(**request.input_data["destination"]),
                 requirements=TripRequirements(**request.input_data["requirements"]),
                 preferences=request.input_data.get("preferences", {}),
+                flight_options=None,
+                weather_forecast=None,
+                hotel_options=None,
+                activity_options=None,
+                restaurant_options=None,
             )
 
             result = await workflow.execute_trip_planning(
@@ -165,6 +170,11 @@ async def execute_workflow_async(
                         destination=TripDestination(**request.input_data["destination"]),
                         requirements=TripRequirements(**request.input_data["requirements"]),
                         preferences=request.input_data.get("preferences", {}),
+                        flight_options=None,
+                        weather_forecast=None,
+                        hotel_options=None,
+                        activity_options=None,
+                        restaurant_options=None,
                     )
 
                     # Use pre-generated workflow_id for tracking
