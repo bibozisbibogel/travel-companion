@@ -110,9 +110,11 @@ export default function DestinationSearch({
   }
 
   const handleBlur = (e: React.FocusEvent) => {
+    // Capture currentTarget before setTimeout (React synthetic events are pooled)
+    const currentTarget = e.currentTarget
     // Delay closing to allow click on suggestions
     setTimeout(() => {
-      if (!e.currentTarget.contains(document.activeElement)) {
+      if (currentTarget && !currentTarget.contains(document.activeElement)) {
         setIsOpen(false)
         setSelectedIndex(-1)
       }

@@ -263,16 +263,23 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() + 6)
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const validData = {
       destination: 'Tokyo, Japan',
       startDate,
       endDate,
-      budget: 3000,
-      travelers: 2,
+      budget: {
+        amount: 3000,
+        currency: 'USD'
+      },
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0
+      },
       preferences: ['culture', 'food']
     }
-    
+
     const result = travelRequestSchema.safeParse(validData)
     expect(result.success).toBe(true)
   })
@@ -283,14 +290,18 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() + 6)
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const invalidData = {
       destination: '',
       startDate,
       endDate,
-      travelers: 2
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const result = travelRequestSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
     if (!result.success) {
@@ -303,9 +314,13 @@ describe('Travel Request Schema Validation', () => {
       destination: 'Paris',
       startDate: '2020-01-01',
       endDate: '2020-01-07',
-      travelers: 2
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const result = travelRequestSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
     if (!result.success) {
@@ -319,14 +334,18 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() - 3) // End date before start date
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const invalidData = {
       destination: 'London',
       startDate,
       endDate,
-      travelers: 2
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const result = travelRequestSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
     if (!result.success) {
@@ -341,20 +360,27 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() + 6)
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const invalidData = {
       destination: 'Rome',
       startDate,
       endDate,
-      budget: 50,
-      travelers: 2
+      budget: {
+        amount: 50,
+        currency: 'USD'
+      },
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const result = travelRequestSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
     if (!result.success) {
-      const budgetError = result.error.issues.find(issue => issue.path.includes('budget'))
-      expect(budgetError?.message).toContain('at least $100')
+      const budgetError = result.error.issues.find(issue => issue.path.includes('amount'))
+      expect(budgetError?.message).toContain('at least 100')
     }
   })
 
@@ -364,20 +390,27 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() + 6)
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const invalidData = {
       destination: 'Dubai',
       startDate,
       endDate,
-      budget: 200000,
-      travelers: 2
+      budget: {
+        amount: 200000,
+        currency: 'USD'
+      },
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const result = travelRequestSchema.safeParse(invalidData)
     expect(result.success).toBe(false)
     if (!result.success) {
-      const budgetError = result.error.issues.find(issue => issue.path.includes('budget'))
-      expect(budgetError?.message).toContain('cannot exceed $100,000')
+      const budgetError = result.error.issues.find(issue => issue.path.includes('amount'))
+      expect(budgetError?.message).toContain('cannot exceed 100,000')
     }
   })
 
@@ -387,14 +420,18 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() + 6)
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const invalidDataZero = {
       destination: 'Barcelona',
       startDate,
       endDate,
-      travelers: 0
+      travelers: {
+        adults: 0,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const resultZero = travelRequestSchema.safeParse(invalidDataZero)
     expect(resultZero.success).toBe(false)
 
@@ -402,9 +439,13 @@ describe('Travel Request Schema Validation', () => {
       destination: 'Barcelona',
       startDate,
       endDate,
-      travelers: 25
+      travelers: {
+        adults: 25,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const resultTooMany = travelRequestSchema.safeParse(invalidDataTooMany)
     expect(resultTooMany.success).toBe(false)
   })
@@ -415,14 +456,18 @@ describe('Travel Request Schema Validation', () => {
     const startDate = futureDate.toISOString().split('T')[0]
     futureDate.setDate(futureDate.getDate() + 6)
     const endDate = futureDate.toISOString().split('T')[0]
-    
+
     const validData = {
       destination: 'Amsterdam',
       startDate,
       endDate,
-      travelers: 1
+      travelers: {
+        adults: 1,
+        children: 0,
+        infants: 0
+      }
     }
-    
+
     const result = travelRequestSchema.safeParse(validData)
     expect(result.success).toBe(true)
   })

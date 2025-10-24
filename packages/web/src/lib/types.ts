@@ -11,11 +11,22 @@ export interface IUser {
 
 export interface ITripRequest {
   destination: string;
+  origin?: string;
   startDate: string;
   endDate: string;
-  budget?: number;
-  travelers: number;
+  budget?: {
+    amount: number;
+    currency: string;
+  };
+  travelers: {
+    adults: number;
+    children: number;
+    infants: number;
+  };
   preferences?: string[];
+  dietaryRestrictions?: string[];
+  accommodationTypes?: string[];
+  cuisinePreferences?: string[];
 }
 
 export interface IFlightOption {

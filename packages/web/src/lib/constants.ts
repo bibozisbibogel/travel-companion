@@ -95,3 +95,55 @@ export const TRAVELER_OPTIONS = [
   { value: 5, label: 'Group (5)' },
   { value: 6, label: 'Large group (6+)' },
 ]
+
+// Currency options
+export const CURRENCY_OPTIONS = [
+  { value: 'USD', label: 'USD ($)', symbol: '$' },
+  { value: 'EUR', label: 'EUR (€)', symbol: '€' },
+  { value: 'GBP', label: 'GBP (£)', symbol: '£' },
+  { value: 'JPY', label: 'JPY (¥)', symbol: '¥' },
+  { value: 'CAD', label: 'CAD ($)', symbol: 'C$' },
+  { value: 'AUD', label: 'AUD ($)', symbol: 'A$' },
+  { value: 'CHF', label: 'CHF (Fr)', symbol: 'Fr' },
+  { value: 'CNY', label: 'CNY (¥)', symbol: '¥' },
+]
+
+// Dietary restrictions
+export const DIETARY_RESTRICTIONS = [
+  { id: 'vegetarian', label: 'Vegetarian', icon: '🥗' },
+  { id: 'vegan', label: 'Vegan', icon: '🌱' },
+  { id: 'gluten-free', label: 'Gluten-Free', icon: '🌾' },
+  { id: 'dairy-free', label: 'Dairy-Free', icon: '🥛' },
+  { id: 'halal', label: 'Halal', icon: '☪️' },
+  { id: 'kosher', label: 'Kosher', icon: '✡️' },
+  { id: 'nut-allergy', label: 'Nut Allergy', icon: '🥜' },
+  { id: 'seafood-allergy', label: 'Seafood Allergy', icon: '🦐' },
+]
+
+// Accommodation types
+export const ACCOMMODATION_TYPES = [
+  { id: 'hotel', label: 'Hotel', icon: '🏨' },
+  { id: 'hostel', label: 'Hostel', icon: '🛏️' },
+  { id: 'apartment', label: 'Apartment', icon: '🏢' },
+  { id: 'resort', label: 'Resort', icon: '🏝️' },
+  { id: 'villa', label: 'Villa', icon: '🏡' },
+  { id: 'boutique', label: 'Boutique Hotel', icon: '✨' },
+  { id: 'bnb', label: 'B&B', icon: '🏠' },
+  { id: 'camping', label: 'Camping', icon: '⛺' },
+]
+
+// Cuisine preferences
+export const CUISINE_PREFERENCES = [
+  { id: 'local', label: 'Local Cuisine', icon: '🍽️' },
+  { id: 'international', label: 'International', icon: '🌍' },
+  { id: 'italian', label: 'Italian', icon: '🍕' },
+  { id: 'asian', label: 'Asian', icon: '🍜' },
+  { id: 'french', label: 'French', icon: '🥐' },
+  { id: 'mediterranean', label: 'Mediterranean', icon: '🫒' },
+  { id: 'mexican', label: 'Mexican', icon: '🌮' },
+  { id: 'indian', label: 'Indian', icon: '🍛' },
+  { id: 'japanese', label: 'Japanese', icon: '🍱' },
+  { id: 'seafood', label: 'Seafood', icon: '🦞' },
+  { id: 'street-food', label: 'Street Food', icon: '🌭' },
+  { id: 'fine-dining', label: 'Fine Dining', icon: '🍷' },
+]
