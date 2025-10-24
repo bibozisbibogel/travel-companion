@@ -2,17 +2,16 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { registerSchema, type RegisterFormData, calculatePasswordStrength, getPasswordStrengthColor, getPasswordStrengthLabel } from '../../../lib/validation'
-import { apiClient, ApiError } from '../../../lib/api'
+import { useAuth } from '../../../contexts/AuthContext'
+import { ApiError } from '../../../lib/api'
 import { CenteredLayout } from '../../../components/layouts'
 
 export default function RegisterPage() {
-  const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
-  const router = useRouter()
+  const { register: registerUser, loading } = useAuth()
 
   const {
     register,
@@ -30,25 +29,9 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      setIsLoading(true)
       setApiError(null)
 
-      const response = await apiClient.register(data)
-      
-      // Debug: Log the response to see what we're actually getting
-      console.log('Registration response:', response)
-
-      if (response.access_token) {
-        // Store the authentication token
-        apiClient.setToken(response.access_token)
-        
-        // Redirect to home page or dashboard
-        router.push('/')
-      } else if (response.detail?.message) {
-        setApiError(response.detail.message)
-      } else {
-        setApiError(response.message || 'Registration failed. Please try again.')
-      }
+      await registerUser(data)
     } catch (error) {
       console.error('Registration error:', error)
       if (error instanceof ApiError) {
@@ -106,8 +89,6 @@ export default function RegisterPage() {
       } else {
         setApiError('Network error. Please check your connection and try again.')
       }
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -287,12 +268,12 @@ export default function RegisterPage() {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={isLoading || isSubmitting}
+          disabled={loading || isSubmitting}
           className={`btn-primary w-full flex justify-center py-3 ${
-            (isLoading || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''
+            (loading || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
-          {isLoading || isSubmitting ? (
+          {loading || isSubmitting ? (
             <div className="flex items-center">
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

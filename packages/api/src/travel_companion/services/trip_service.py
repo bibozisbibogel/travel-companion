@@ -1,6 +1,6 @@
 """Trip service for handling trip operations."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -293,11 +293,25 @@ class TripService:
         )
 
         # Build requirements object
+        start_date_value = record.get("start_date")
+        end_date_value = record.get("end_date")
         requirements = TripRequirements(
             budget=record.get("total_budget", 0),
             currency=preferences.get("currency", "USD"),
-            start_date=record.get("start_date"),
-            end_date=record.get("end_date"),
+            start_date=(
+                datetime.fromisoformat(start_date_value).date()
+                if isinstance(start_date_value, str)
+                else start_date_value
+                if isinstance(start_date_value, date)
+                else date.today()
+            ),
+            end_date=(
+                datetime.fromisoformat(end_date_value).date()
+                if isinstance(end_date_value, str)
+                else end_date_value
+                if isinstance(end_date_value, date)
+                else date.today()
+            ),
             travelers=record.get("traveler_count", 1),
             travel_class=preferences.get("travel_class", "economy"),
             accommodation_type=preferences.get("accommodation_type"),

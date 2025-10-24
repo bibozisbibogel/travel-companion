@@ -1,15 +1,20 @@
-import os
 import asyncio
-from dotenv import load_dotenv
-from travel_companion.agents.weather_agent import WeatherAgent
-from travel_companion.models.external import (WeatherSearchRequest,)
+import os
 from datetime import UTC, datetime, timedelta
+
+from dotenv import load_dotenv
+
+from travel_companion.agents.weather_agent import WeatherAgent
+from travel_companion.models.external import (
+    WeatherSearchRequest,
+)
+
 
 async def main():
     load_dotenv()
-    api_key=os.getenv("OPENWEATHER_API_KEY")
+    api_key = os.getenv("OPENWEATHER_API_KEY")
     print(api_key)
-    agent=WeatherAgent()
+    agent = WeatherAgent()
     request = WeatherSearchRequest(
         location="Paris, France",
         latitude=48.8566,  # Paris coordinates
@@ -21,10 +26,7 @@ async def main():
     )
     response = await agent.process(request.model_dump())
     print(f"Weather search completed successfully: {response}")
-    
 
-if __name__== "__main__":
+
+if __name__ == "__main__":
     asyncio.run(main())
-    
-
-    

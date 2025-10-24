@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -185,24 +185,50 @@ class TestHotelAgentGooglePlaces:
         self, hotel_search_request, mock_google_place
     ):
         """Test that Google Places is called first in the search flow."""
-        # Mock all API clients
-        mock_places_api = AsyncMock()
-        mock_places_api.text_search.return_value = [mock_google_place]
+        # Create a mock HotelOption from the Place
+        from decimal import Decimal
+        from uuid import uuid4
 
-        mock_google_client = AsyncMock()
-        mock_google_client.__aenter__.return_value = mock_google_client
-        mock_google_client.places_api = mock_places_api
+        from travel_companion.models.external import HotelLocation, HotelOption
 
+        mock_hotel = HotelOption(
+            hotel_id=uuid4(),
+            external_id=f"google_places_{mock_google_place.id}",
+            name=mock_google_place.display_name["text"],
+            address=mock_google_place.formatted_address,
+            location=HotelLocation(
+                latitude=mock_google_place.location.latitude,
+                longitude=mock_google_place.location.longitude,
+                city="Test City",
+                country="Test Country",
+                country_code="TC",
+            ),
+            price_per_night=Decimal("150"),
+            currency="USD",
+            rating=mock_google_place.rating,
+            total_ratings=mock_google_place.user_rating_count,
+            check_in_date=hotel_search_request.check_in_date,
+            check_out_date=hotel_search_request.check_out_date,
+            guest_count=hotel_search_request.guest_count,
+            room_count=hotel_search_request.room_count,
+        )
+
+        hotel_agent = HotelAgent()
+
+        # Mock cache to return None (no cached result)
         with (
-            patch(
-                "travel_companion.agents.hotel_agent.GooglePlacesClient"
-            ) as mock_google_places_client_class,
-            patch.object(get_settings(), "google_places_api_key", "test_key"),
+            patch.object(
+                hotel_agent._cache_manager, "get_hotel_search_cache", new_callable=AsyncMock
+            ) as mock_cache_get,
+            patch.object(
+                hotel_agent._cache_manager, "set_hotel_search_cache", new_callable=AsyncMock
+            ),
+            patch.object(
+                hotel_agent, "search_hotels_google_places", new_callable=AsyncMock
+            ) as mock_search_google,
         ):
-            mock_google_places_client_class.return_value = mock_google_client
-
-            hotel_agent = HotelAgent()
-            # No need to set fallback clients as they are disabled
+            mock_cache_get.return_value = None  # Bypass cache
+            mock_search_google.return_value = [mock_hotel]
 
             # Process the search request
             request_data = {
@@ -216,42 +242,34 @@ class TestHotelAgentGooglePlaces:
             result = await hotel_agent.process(request_data)
 
             # Verify Google Places was called
-            mock_places_api.text_search.assert_called_once()
-
-            # Verify Google Places was used successfully
+            mock_search_google.assert_called_once()
 
             # Verify results
             assert isinstance(result, HotelSearchResponse)
             assert len(result.hotels) == 1
+            assert result.hotels[0].name == "Test Hotel"
             assert result.search_metadata["successful_api"] == "google_places"
             assert "google_places" in result.search_metadata["apis_attempted"]
 
     @pytest.mark.asyncio
     async def test_fallback_to_booking_when_google_places_fails(self, hotel_search_request):
         """Test fallback to Booking.com when Google Places fails."""
-        # Mock Google Places to fail
-        mock_google_client = AsyncMock()
-        mock_google_client.__aenter__.return_value = mock_google_client
-        mock_google_client.places_api.text_search.side_effect = Exception("Google API error")
+        hotel_agent = HotelAgent()
 
-        # Mock successful booking response
-        mock_booking_client = AsyncMock()
-        mock_booking_response = MagicMock()
-        mock_booking_response.hotels = []
-        mock_booking_response.api_response_time_ms = 200
-        mock_booking_response.total_results = 0
-        mock_booking_client.search_hotels.return_value = mock_booking_response
-
+        # Mock the search method to fail with Google Places
         with (
-            patch(
-                "travel_companion.agents.hotel_agent.GooglePlacesClient"
-            ) as mock_google_places_client_class,
-            patch.object(get_settings(), "google_places_api_key", "test_key"),
+            patch.object(
+                hotel_agent._cache_manager, "get_hotel_search_cache", new_callable=AsyncMock
+            ) as mock_cache_get,
+            patch.object(
+                hotel_agent._cache_manager, "set_hotel_search_cache", new_callable=AsyncMock
+            ),
+            patch.object(
+                hotel_agent, "search_hotels_google_places", new_callable=AsyncMock
+            ) as mock_search_google,
         ):
-            mock_google_places_client_class.return_value = mock_google_client
-
-            hotel_agent = HotelAgent()
-            # Booking client is disabled, so no fallback will occur
+            mock_cache_get.return_value = None  # Bypass cache
+            mock_search_google.side_effect = Exception("Google API error")
 
             request_data = {
                 "location": hotel_search_request.location,
@@ -263,7 +281,7 @@ class TestHotelAgentGooglePlaces:
             result = await hotel_agent.process(request_data)
 
             # Verify Google Places was attempted
-            mock_google_client.places_api.text_search.assert_called_once()
+            mock_search_google.assert_called_once()
 
             # Verify no successful API since Google Places failed and no fallback
             assert result.search_metadata["successful_api"] is None

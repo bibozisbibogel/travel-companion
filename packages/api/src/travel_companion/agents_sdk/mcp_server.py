@@ -9,8 +9,8 @@ from mcp.server import Server
 from travel_companion.agents_sdk.tools import (
     search_activities,
     search_flights,
-    search_restaurants,
     search_hotels,
+    search_restaurants,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,15 @@ async def list_tools() -> list[types.Tool]:
     Returns:
         List of tool definitions
     """
+    # Convert SdkMcpTool objects to MCP Tool types
+    tools = [search_flights, search_hotels, search_activities, search_restaurants]
     return [
-        flight_search_tool,
-        hotel_search_tool,
-        activity_search_tool,
-        food_search_tool,
+        types.Tool(
+            name=tool.name,
+            description=tool.description or "",
+            inputSchema=(tool.input_schema if isinstance(tool.input_schema, dict) else {}),
+        )
+        for tool in tools
     ]
 
 
@@ -66,8 +70,8 @@ async def call_tool(
     if name not in tool_handlers:
         raise ValueError(f"Unknown tool: {name}")
 
-    # Execute the tool handler
-    result = await tool_handlers[name](arguments)
+    # Execute the tool handler - use .handler attribute for SdkMcpTool
+    result = await tool_handlers[name].handler(arguments)
 
     # Convert result to MCP format
     if "content" in result:

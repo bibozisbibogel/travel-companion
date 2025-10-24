@@ -1,6 +1,6 @@
 """Weather intelligence agent for travel planning."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from travel_companion.agents.base import BaseAgent

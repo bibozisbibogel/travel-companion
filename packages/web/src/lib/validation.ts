@@ -55,6 +55,10 @@ export const travelRequestSchema = z.object({
     .string()
     .min(1, 'Destination is required')
     .min(2, 'Please enter a valid destination'),
+  origin: z
+    .string()
+    .min(2, 'Please enter a valid origin location')
+    .optional(),
   startDate: z
     .string()
     .min(1, 'Start date is required')
@@ -67,16 +71,46 @@ export const travelRequestSchema = z.object({
   endDate: z
     .string()
     .min(1, 'End date is required'),
-  budget: z
-    .number()
-    .min(100, 'Budget must be at least $100')
-    .max(100000, 'Budget cannot exceed $100,000')
-    .optional(),
-  travelers: z
-    .number()
-    .min(1, 'At least 1 traveler is required')
-    .max(20, 'Cannot exceed 20 travelers'),
+  budget: z.object({
+    amount: z
+      .number()
+      .min(100, 'Budget must be at least 100')
+      .max(100000, 'Budget cannot exceed 100,000'),
+    currency: z
+      .string()
+      .min(3, 'Currency is required')
+      .max(3, 'Invalid currency code'),
+  }).optional(),
+  travelers: z.object({
+    adults: z
+      .number()
+      .min(1, 'At least 1 adult traveler is required')
+      .max(20, 'Cannot exceed 20 adults'),
+    children: z
+      .number()
+      .min(0, 'Children count cannot be negative')
+      .max(20, 'Cannot exceed 20 children'),
+    infants: z
+      .number()
+      .min(0, 'Infants count cannot be negative')
+      .max(20, 'Cannot exceed 20 infants'),
+  }).refine((data) => {
+    const total = data.adults + data.children + data.infants
+    return total <= 20
+  }, {
+    message: 'Total travelers cannot exceed 20',
+    path: ['adults'],
+  }),
   preferences: z
+    .array(z.string())
+    .optional(),
+  dietaryRestrictions: z
+    .array(z.string())
+    .optional(),
+  accommodationTypes: z
+    .array(z.string())
+    .optional(),
+  cuisinePreferences: z
     .array(z.string())
     .optional(),
 }).refine((data) => {

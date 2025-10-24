@@ -47,20 +47,23 @@ class DateRange(BaseModel):
 
     start: date_type = Field(..., description="Trip start date (ISO 8601)")
     end: date_type = Field(..., description="Trip end date (ISO 8601)")
-    duration_days: int = Field(..., ge=1, description="Total trip duration in days")
+    duration_days: int = Field(
+        ...,
+        ge=1,
+        description="Total trip duration in days (inclusive of both start and end dates). "
+        "Calculate as: (end - start).days + 1",
+    )
 
     @field_validator("duration_days")
     @classmethod
     def validate_duration(cls, v: int, info: Any) -> int:
-        """Validate duration matches date range."""
+        """Validate duration matches date range (inclusive of both start and end dates)."""
         if "start" in info.data and "end" in info.data:
             start = info.data["start"]
             end = info.data["end"]
-            calculated_days = (end - start).days
+            calculated_days = (end - start).days + 1
             if v != calculated_days:
-                raise ValueError(
-                    f"Duration {v} doesn't match date range ({calculated_days} days)"
-                )
+                raise ValueError(f"Duration {v} doesn't match date range ({calculated_days} days)")
         return v
 
 
@@ -68,9 +71,7 @@ class TravelerInfo(BaseModel):
     """Traveler information."""
 
     count: int = Field(..., ge=1, le=20, description="Number of travelers")
-    type: str = Field(
-        default="adults", description="Type of travelers (adults, family, etc.)"
-    )
+    type: str = Field(default="adults", description="Type of travelers (adults, family, etc.)")
 
 
 class BudgetInfo(BaseModel):
@@ -193,9 +194,7 @@ class ItineraryActivity(BaseModel):
     title: str = Field(..., min_length=1, description="Activity title")
     description: str | None = Field(None, description="Activity description")
     location: str | None = Field(None, description="Activity location")
-    visit_type: str | None = Field(
-        None, description="Visit type (self-guided, guided, etc.)"
-    )
+    visit_type: str | None = Field(None, description="Visit type (self-guided, guided, etc.)")
     duration_minutes: int | None = Field(None, gt=0, description="Duration in minutes")
     cost_per_person: Decimal | None = Field(None, ge=0, description="Cost per person")
     total_cost: Decimal | None = Field(None, ge=0, description="Total cost")
@@ -209,9 +208,7 @@ class ItineraryActivity(BaseModel):
     # Dining-specific fields
     meal_type: MealType | None = Field(None, description="Type of meal")
     venue: VenueInfo | None = Field(None, description="Dining venue information")
-    recommended_dishes: list[str] = Field(
-        default_factory=list, description="Recommended dishes"
-    )
+    recommended_dishes: list[str] = Field(default_factory=list, description="Recommended dishes")
 
     # Cost estimates (for activities with flexible pricing)
     cost_estimate_min: Decimal | None = Field(None, ge=0, description="Minimum cost estimate")
@@ -258,9 +255,7 @@ class BudgetBreakdown(BaseModel):
     transportation: BudgetCategoryRange | None = Field(
         None, description="Local transportation cost range"
     )
-    extras: dict[str, Any] | None = Field(
-        None, description="Extra costs (description, min, max)"
-    )
+    extras: dict[str, Any] | None = Field(None, description="Extra costs (description, min, max)")
     total: BudgetCategoryRange = Field(..., description="Total cost range")
     buffer: dict[str, Any] | None = Field(None, description="Remaining buffer")
 
@@ -268,9 +263,7 @@ class BudgetBreakdown(BaseModel):
 class TransportationTips(BaseModel):
     """Transportation tips and information."""
 
-    from_airport: dict[str, Any] | None = Field(
-        None, description="Airport transfer information"
-    )
+    from_airport: dict[str, Any] | None = Field(None, description="Airport transfer information")
     metro_pass: dict[str, Any] | None = Field(None, description="Metro/transit pass info")
     notes: list[str] = Field(default_factory=list, description="General transportation notes")
 
@@ -288,9 +281,7 @@ class MoneyTips(BaseModel):
     """Money and payment information."""
 
     payment: str | None = Field(None, description="Payment acceptance info")
-    cash_recommended: dict[str, Any] | None = Field(
-        None, description="Cash recommendations"
-    )
+    cash_recommended: dict[str, Any] | None = Field(None, description="Cash recommendations")
     tipping: str | None = Field(None, description="Tipping guidelines")
 
 
@@ -308,9 +299,7 @@ class FoodTips(BaseModel):
 
     breakfast: str | None = Field(None, description="Breakfast information")
     aperitivo: str | None = Field(None, description="Aperitivo/happy hour info")
-    local_specialties: list[str] = Field(
-        default_factory=list, description="Local specialty dishes"
-    )
+    local_specialties: list[str] = Field(default_factory=list, description="Local specialty dishes")
 
 
 class Phrase(BaseModel):
@@ -326,18 +315,14 @@ class TravelTips(BaseModel):
     transportation: TransportationTips | None = Field(
         None, description="Transportation information"
     )
-    booking_essentials: BookingEssentials | None = Field(
-        None, description="Booking requirements"
-    )
+    booking_essentials: BookingEssentials | None = Field(None, description="Booking requirements")
     money: MoneyTips | None = Field(None, description="Money and payment tips")
     best_practices: list[BestPractice | str] = Field(
         default_factory=list, description="Best practices and tips"
     )
     safety: list[str] = Field(default_factory=list, description="Safety tips")
     food_tips: FoodTips | None = Field(None, description="Food and dining information")
-    useful_phrases: list[Phrase] = Field(
-        default_factory=list, description="Useful local phrases"
-    )
+    useful_phrases: list[Phrase] = Field(default_factory=list, description="Useful local phrases")
 
 
 class ItineraryOutput(BaseModel):
@@ -362,7 +347,7 @@ class ItineraryOutput(BaseModel):
                     "dates": {
                         "start": "2024-06-15",
                         "end": "2024-06-20",
-                        "duration_days": 5,
+                        "duration_days": 6,
                     },
                     "travelers": {"count": 2, "type": "adults"},
                     "budget": {

@@ -152,7 +152,7 @@ FLIGHT_SEARCH_SCHEMA = {
     "Search for flights between two locations. Returns available flight options "
     "with pricing, schedules, and airline information. Supports filtering by "
     "travel class, number of passengers, and maximum results.",
-    FLIGHT_SEARCH_SCHEMA
+    FLIGHT_SEARCH_SCHEMA,
 )
 async def search_flights(arguments: dict[str, Any]) -> dict[str, Any]:
     """
@@ -199,9 +199,7 @@ async def search_flights(arguments: dict[str, Any]) -> dict[str, Any]:
         # Parse dates
         try:
             departure_date = datetime.fromisoformat(departure_date_str)
-            return_date = (
-                datetime.fromisoformat(return_date_str) if return_date_str else None
-            )
+            return_date = datetime.fromisoformat(return_date_str) if return_date_str else None
         except ValueError as e:
             return {
                 "content": [
@@ -284,9 +282,7 @@ async def search_flights(arguments: dict[str, Any]) -> dict[str, Any]:
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(
-                        {"error": str(e), "status": "error", "flights": []}
-                    ),
+                    "text": json.dumps({"error": str(e), "status": "error", "flights": []}),
                 }
             ],
             "isError": True,

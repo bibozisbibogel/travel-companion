@@ -59,7 +59,7 @@ FOOD_SEARCH_SCHEMA = {
     "Returns available restaurant options with cuisine types, pricing, ratings, "
     "and booking information. Supports filtering by meal type, cuisine, budget, "
     "and maximum results.",
-    FOOD_SEARCH_SCHEMA
+    FOOD_SEARCH_SCHEMA,
 )
 async def search_restaurants(arguments: dict[str, Any]) -> dict[str, Any]:
     """
@@ -179,9 +179,7 @@ async def search_restaurants(arguments: dict[str, Any]) -> dict[str, Any]:
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(
-                        {"error": str(e), "status": "error", "restaurants": []}
-                    ),
+                    "text": json.dumps({"error": str(e), "status": "error", "restaurants": []}),
                 }
             ],
             "isError": True,

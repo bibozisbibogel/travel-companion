@@ -270,9 +270,7 @@ async def post_tool_use_hook(
                     activities = result_data["activities"]
                     if activities:
                         # Estimate cost for 3 activities
-                        avg_price = sum(a["price"] for a in activities[:3]) / len(
-                            activities[:3]
-                        )
+                        avg_price = sum(a["price"] for a in activities[:3]) / len(activities[:3])
                         estimated_total = avg_price * 3
                         budget_tracker.allocate(category, Decimal(str(estimated_total)))
 
@@ -298,9 +296,7 @@ async def post_tool_use_hook(
             "metadata": {
                 "tool": tool_name,
                 "success": True,
-                "budget_summary": (
-                    budget_tracker.get_summary() if budget_tracker else None
-                ),
+                "budget_summary": (budget_tracker.get_summary() if budget_tracker else None),
             },
         }
     }

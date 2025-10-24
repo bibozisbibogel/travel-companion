@@ -62,7 +62,7 @@ ACTIVITY_SEARCH_SCHEMA = {
     "Search for activities, attractions, and experiences at a specific location. "
     "Returns available activity options with pricing, ratings, duration, and booking "
     "information. Supports filtering by activity type, budget, and maximum results.",
-    ACTIVITY_SEARCH_SCHEMA
+    ACTIVITY_SEARCH_SCHEMA,
 )
 async def search_activities(arguments: dict[str, Any]) -> dict[str, Any]:
     """
@@ -187,9 +187,7 @@ async def search_activities(arguments: dict[str, Any]) -> dict[str, Any]:
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(
-                        {"error": str(e), "status": "error", "activities": []}
-                    ),
+                    "text": json.dumps({"error": str(e), "status": "error", "activities": []}),
                 }
             ],
             "isError": True,

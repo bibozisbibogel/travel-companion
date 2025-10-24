@@ -48,7 +48,9 @@ def main():
     print_instructions()
 
     # Read the SQL file
-    sql_file = Path(__file__).parent.parent / "src" / "travel_companion" / "core" / "trips_schema.sql"
+    sql_file = (
+        Path(__file__).parent.parent / "src" / "travel_companion" / "core" / "trips_schema.sql"
+    )
 
     if not sql_file.exists():
         print(f"❌ ERROR: SQL file not found at {sql_file}")

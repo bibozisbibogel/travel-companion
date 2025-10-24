@@ -61,6 +61,40 @@ def mock_geocode_response():
 
 
 @pytest.fixture
+def mock_current_weather_response():
+    """Mock Current Weather API response (free tier)."""
+    current_time = int(datetime.now(UTC).timestamp())
+    return {
+        "coord": {"lon": 2.3522, "lat": 48.8566},
+        "weather": [{"id": 801, "main": "Clouds", "description": "few clouds", "icon": "02d"}],
+        "base": "stations",
+        "main": {
+            "temp": 20.5,
+            "feels_like": 22.1,
+            "temp_min": 18.0,
+            "temp_max": 23.0,
+            "pressure": 1013,
+            "humidity": 65,
+        },
+        "visibility": 10000,
+        "wind": {"speed": 4.2, "deg": 180},
+        "clouds": {"all": 25},
+        "dt": current_time,
+        "sys": {
+            "type": 2,
+            "id": 2041230,
+            "country": "FR",
+            "sunrise": current_time - 3600,
+            "sunset": current_time + 7200,
+        },
+        "timezone": 3600,
+        "id": 2988507,
+        "name": "Paris",
+        "cod": 200,
+    }
+
+
+@pytest.fixture
 def mock_onecall_response():
     """Mock One Call API response from OpenWeatherMap."""
     current_time = int(datetime.now(UTC).timestamp())
@@ -163,7 +197,7 @@ class TestOpenWeatherMapAPIClient:
         openweather_client,
         sample_weather_request,
         mock_geocode_response,
-        mock_onecall_response,
+        mock_current_weather_response,
     ):
         """Test successful weather forecast retrieval."""
         with patch("httpx.AsyncClient") as mock_client:
@@ -176,17 +210,17 @@ class TestOpenWeatherMapAPIClient:
             geocode_response.json.return_value = mock_geocode_response
             geocode_response.raise_for_status = Mock()
 
-            # Mock One Call API response
-            onecall_response = Mock()
-            onecall_response.json.return_value = mock_onecall_response
-            onecall_response.raise_for_status = Mock()
+            # Mock Current Weather API response
+            weather_response = Mock()
+            weather_response.json.return_value = mock_current_weather_response
+            weather_response.raise_for_status = Mock()
 
             # Set up the mock to return different responses for different URLs
             def mock_get(url, **kwargs):
                 if "geo/1.0/direct" in url:
                     return geocode_response
-                elif "onecall" in url:
-                    return onecall_response
+                elif "/weather" in url:
+                    return weather_response
                 else:
                     raise ValueError(f"Unexpected URL: {url}")
 
@@ -199,7 +233,6 @@ class TestOpenWeatherMapAPIClient:
             assert result.location.name == "Paris, France"
             assert result.location.latitude == 48.8566
             assert result.location.longitude == 2.3522
-            assert result.location.timezone == "Europe/Paris"
 
             # Verify current weather
             assert result.current is not None
@@ -208,29 +241,9 @@ class TestOpenWeatherMapAPIClient:
             assert result.current.humidity == 65
             assert result.current.condition == WeatherCondition.CLOUDY
 
-            # Verify hourly forecast
-            assert len(result.hourly) == 1
-            hourly = result.hourly[0]
-            assert hourly.temperature == 18.5
-            assert hourly.precipitation_probability == 0.65
-            assert hourly.condition == WeatherCondition.RAIN
-
-            # Verify daily forecast
-            assert len(result.daily) == 1
-            daily = result.daily[0]
-            assert daily.temperature == 22.5  # day temperature
-            assert daily.condition == WeatherCondition.CLEAR
-
-            # Verify alerts
-            assert len(result.alerts) == 1
-            alert = result.alerts[0]
-            assert alert.title == "Wind Advisory"
-            assert alert.severity == WeatherSeverity.MODERATE
-            assert "Strong winds" in alert.description
-
     @pytest.mark.asyncio
     async def test_get_weather_forecast_with_coordinates(
-        self, openweather_client, mock_onecall_response
+        self, openweather_client, mock_current_weather_response
     ):
         """Test weather forecast with provided coordinates (skip geocoding)."""
         request = WeatherSearchRequest(
@@ -246,11 +259,11 @@ class TestOpenWeatherMapAPIClient:
             mock_client_instance = AsyncMock()
             mock_client.return_value.__aenter__.return_value = mock_client_instance
 
-            onecall_response = Mock()
-            onecall_response.json.return_value = mock_onecall_response
-            onecall_response.raise_for_status = Mock()
+            weather_response = Mock()
+            weather_response.json.return_value = mock_current_weather_response
+            weather_response.raise_for_status = Mock()
 
-            mock_client_instance.get = AsyncMock(return_value=onecall_response)
+            mock_client_instance.get = AsyncMock(return_value=weather_response)
 
             await openweather_client.get_weather_forecast(request)
 
@@ -300,7 +313,9 @@ class TestOpenWeatherMapAPIClient:
             assert mock_client_instance.get.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_exclude_alerts_parameter(self, openweather_client, mock_onecall_response):
+    async def test_exclude_alerts_parameter(
+        self, openweather_client, mock_current_weather_response
+    ):
         """Test that alerts can be excluded from API request."""
         request = WeatherSearchRequest(
             location="Test Location",
@@ -315,11 +330,11 @@ class TestOpenWeatherMapAPIClient:
             mock_client_instance = AsyncMock()
             mock_client.return_value.__aenter__.return_value = mock_client_instance
 
-            onecall_response = Mock()
-            onecall_response.json.return_value = mock_onecall_response
-            onecall_response.raise_for_status = Mock()
+            weather_response = Mock()
+            weather_response.json.return_value = mock_current_weather_response
+            weather_response.raise_for_status = Mock()
 
-            mock_client_instance.get = AsyncMock(return_value=onecall_response)
+            mock_client_instance.get = AsyncMock(return_value=weather_response)
 
             await openweather_client.get_weather_forecast(request)
 

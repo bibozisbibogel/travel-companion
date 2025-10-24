@@ -199,19 +199,28 @@ class TestFlightAgent:
             assert "error" in result.search_metadata
 
     @pytest.mark.asyncio
-    async def test_search_flights(self, flight_agent, sample_flight_request):
+    async def test_search_flights(self, flight_agent, sample_flight_request, sample_flights):
         """Test flight search functionality."""
         request = FlightSearchRequest(**sample_flight_request)
 
-        with patch.object(
-            flight_agent, "_get_mock_flight_data", new_callable=AsyncMock
-        ) as mock_data:
-            mock_flights = [Mock() for _ in range(5)]
-            mock_data.return_value = mock_flights
+        with (
+            patch.object(
+                flight_agent, "_search_flights_with_resilience", new_callable=AsyncMock
+            ) as mock_api,
+            patch.object(
+                flight_agent, "_get_mock_flight_data", new_callable=AsyncMock
+            ) as mock_data,
+        ):
+            # Make API call fail to trigger fallback to mock data
+            from travel_companion.utils.errors import ExternalAPIError
+
+            mock_api.side_effect = ExternalAPIError("API unavailable")
+            mock_data.return_value = sample_flights
 
             result = await flight_agent.search_flights(request)
 
-            assert result == mock_flights
+            assert result == sample_flights
+            assert len(result) == 3
             mock_data.assert_called_once_with(request)
 
     @pytest.mark.asyncio
