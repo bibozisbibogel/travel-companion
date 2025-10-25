@@ -76,6 +76,7 @@ export default function Header({ user: propUser, onLogout: propOnLogout }: IHead
 
       return () => document.removeEventListener('keydown', handleTabKey)
     }
+    return undefined
   }, [isMobileMenuOpen])
 
   const navigationLinks = [

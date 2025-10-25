@@ -34,7 +34,11 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
   } = useForm<TravelRequestFormData>({
     resolver: zodResolver(travelRequestSchema),
     defaultValues: {
-      travelers: 2,
+      travelers: {
+        adults: 2,
+        children: 0,
+        infants: 0,
+      },
       preferences: [],
     },
   })
@@ -48,13 +52,16 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
       setApiError(null)
 
       // Convert form data to API format
-      const tripRequest = {
+      const tripRequest: any = {
         destination: data.destination,
         startDate: data.startDate,
         endDate: data.endDate,
-        budget: data.budget,
         travelers: data.travelers,
         preferences: data.preferences,
+      }
+
+      if (data.budget) {
+        tripRequest.budget = data.budget
       }
 
       const response = await apiClient.planTrip(tripRequest)
@@ -125,7 +132,7 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
                 field.onChange(value)
                 setSelectedDestination(destination || null)
               }}
-              error={errors.destination?.message}
+              error={errors.destination?.message || ''}
               placeholder="Where would you like to travel?"
             />
           )}
@@ -143,11 +150,11 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
               label="Start Date"
               value={field.value || ''}
               onChange={field.onChange}
-              error={errors.startDate?.message}
+              error={errors.startDate?.message || ''}
             />
           )}
         />
-        
+
         <Controller
           name="endDate"
           control={control}
@@ -157,8 +164,8 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
               label="End Date"
               value={field.value || ''}
               onChange={field.onChange}
-              error={errors.endDate?.message}
-              minDate={startDate || undefined}
+              error={errors.endDate?.message || ''}
+              {...(startDate && { minDate: startDate })}
             />
           )}
         />
@@ -199,13 +206,14 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {BUDGET_RANGES.map((range) => {
               const currentBudget = watch('budget')
-              const isSelected = currentBudget >= range.min && currentBudget <= range.max
+              const budgetAmount = currentBudget?.amount || 0
+              const isSelected = budgetAmount >= range.min && budgetAmount <= range.max
               
               return (
                 <button
                   key={range.label}
                   type="button"
-                  onClick={() => setValue('budget', (range.min + range.max) / 2)}
+                  onClick={() => setValue('budget', { amount: (range.min + range.max) / 2, currency: 'USD' })}
                   className={`p-3 text-sm rounded-lg border-2 transition-all duration-200 ${
                     isSelected
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -224,22 +232,23 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
               <span className="text-gray-500 text-sm">$</span>
             </div>
             <input
-              {...register('budget', { valueAsNumber: true })}
+              {...register('budget.amount', { valueAsNumber: true })}
               type="number"
               id="budget"
               placeholder="Enter custom budget"
               min="100"
               max="100000"
               step="100"
-              className={`form-input pl-8 ${errors.budget ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
-              aria-invalid={errors.budget ? 'true' : 'false'}
-              aria-describedby={errors.budget ? 'budget-error' : undefined}
+              className={`form-input pl-8 ${errors.budget?.amount ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+              aria-invalid={errors.budget?.amount ? 'true' : 'false'}
+              aria-describedby={errors.budget?.amount ? 'budget-error' : undefined}
             />
+            <input {...register('budget.currency')} type="hidden" value="USD" />
           </div>
         </div>
-        {errors.budget && (
+        {errors.budget?.amount && (
           <p id="budget-error" className="mt-2 text-sm text-red-600" role="alert">
-            {errors.budget.message}
+            {errors.budget.amount.message}
           </p>
         )}
       </div>
@@ -252,7 +261,7 @@ export default function TravelRequestForm({ onSuccess, className = '' }: ITravel
           <PreferencesSelector
             value={field.value || []}
             onChange={field.onChange}
-            error={errors.preferences?.message}
+            error={errors.preferences?.message || ''}
           />
         )}
       />
