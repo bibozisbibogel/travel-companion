@@ -113,8 +113,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await fetchCurrentUser()
         }
 
-        // Redirect to home
-        router.push('/')
+        // Redirect to trips page
+        router.push('/trips')
       } else {
         throw new Error(response.detail?.message || 'Login failed')
       }

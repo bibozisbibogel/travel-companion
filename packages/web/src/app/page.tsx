@@ -1,12 +1,42 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { MainLayout } from '../components/layouts'
+import { useAuth } from '../contexts/AuthContext'
+import { apiClient } from '../lib/api'
 
 export default function Home() {
+  const { isAuthenticated } = useAuth()
+  const [hasTrips, setHasTrips] = useState(false)
+  const [loadingTrips, setLoadingTrips] = useState(false)
+
+  useEffect(() => {
+    const checkUserTrips = async () => {
+      if (!isAuthenticated) {
+        setHasTrips(false)
+        return
+      }
+
+      try {
+        setLoadingTrips(true)
+        const response = await apiClient.getUserTrips(1, 1)
+        setHasTrips(response.data.length > 0)
+      } catch (err) {
+        console.error('Error checking user trips:', err)
+        setHasTrips(false)
+      } finally {
+        setLoadingTrips(false)
+      }
+    }
+
+    checkUserTrips()
+  }, [isAuthenticated])
   return (
     <MainLayout>
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
         {/* Hero Section */}
-        <section className="relative overflow-hidden pt-16 pb-32">
+        <section className="relative overflow-hidden pt-16 pb-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center">
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
@@ -39,8 +69,55 @@ export default function Home() {
         </section>
 
         {/* Travel Request Form Section */}
-        <section className="relative -mt-16">
-
+        <section className="relative -mt-16 pb-16">
+          {!isAuthenticated ? (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center">
+                <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                  <span className="text-gradient-travel">Start Today</span>
+                </h2>
+                <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                  Join Travel Companion and begin planning your dream vacation with AI-powered recommendations
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                  <Link
+                    href="/auth/login"
+                    className="btn-outline text-lg px-8 py-4"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="btn-primary text-lg px-8 py-4"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center">
+                {!loadingTrips && (
+                  hasTrips ? (
+                    <Link
+                      href="/trips"
+                      className="inline-block btn-primary text-lg px-8 py-4"
+                    >
+                      View My Trips
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/trips/new"
+                      className="inline-block btn-primary text-lg px-8 py-4"
+                    >
+                      Start Planning a Trip
+                    </Link>
+                  )
+                )}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Features Section */}
