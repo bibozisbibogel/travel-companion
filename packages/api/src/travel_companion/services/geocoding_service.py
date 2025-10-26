@@ -56,8 +56,8 @@ class GeocodingService:
                 "Set GOOGLE_PLACES_API_KEY environment variable."
             )
 
-        # Initialize Google Maps client
-        self.client = googlemaps.Client(key=self.api_key)
+        # Initialize Google Maps client with timeout
+        self.client = googlemaps.Client(key=self.api_key, timeout=settings.geocoding_timeout_seconds)
 
         # Configuration from settings
         self.max_retries = settings.geocoding_retry_attempts
@@ -180,9 +180,7 @@ class GeocodingService:
             loop = asyncio.get_event_loop()
             geocode_result = await loop.run_in_executor(
                 None,
-                lambda: self.client.geocode(
-                    address=address, timeout=self.timeout
-                ),
+                lambda: self.client.geocode(address=address),
             )
 
             # Handle API response

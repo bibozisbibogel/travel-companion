@@ -133,7 +133,7 @@ class TravelPlannerAgent:
             full_response = "\n".join(accumulated_text)
             logger.debug(f"Accumulated {len(accumulated_text)} text messages")
 
-            itinerary = self._parse_itinerary_response(full_response)
+            itinerary = await self._parse_itinerary_response(full_response)
 
             if itinerary:
                 # Yield final structured itinerary
@@ -365,7 +365,7 @@ class TravelPlannerAgent:
         logger.debug(f"Converted message: {message_dict}")
         return message_dict
 
-    def _parse_itinerary_response(self, accumulated_text: str) -> ItineraryOutput | None:
+    async def _parse_itinerary_response(self, accumulated_text: str) -> ItineraryOutput | None:
         """
         Parse accumulated text response to extract structured JSON itinerary.
 
@@ -414,7 +414,46 @@ class TravelPlannerAgent:
             logger.info(
                 f"Successfully validated itinerary: {len(itinerary.itinerary)} days of activities"
             )
-            return itinerary
+
+            # Geocode all locations in the itinerary (optional - non-blocking)
+            # If geocoding fails for any reason, we still return the itinerary without coordinates
+            try:
+                logger.info("Starting geocoding for itinerary locations")
+
+                # Check if geocoding is available (API key configured)
+                from travel_companion.core.config import get_settings
+                settings = get_settings()
+
+                if not settings.google_places_api_key:
+                    logger.info("Google Maps API key not configured, skipping geocoding")
+                    return itinerary
+
+                from travel_companion.services.itinerary_geocoder import geocode_itinerary
+                import asyncio
+
+                # Geocode itinerary asynchronously with timeout
+                geocoded_itinerary = await asyncio.wait_for(
+                    geocode_itinerary(itinerary),
+                    timeout=30.0  # 30 second timeout for geocoding
+                )
+                logger.info("Geocoding completed successfully")
+                return geocoded_itinerary
+
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Geocoding timed out after 30s, returning itinerary without coordinates"
+                )
+                return itinerary
+            except ImportError as e:
+                logger.warning(f"Geocoding module not available: {e}")
+                return itinerary
+            except Exception as geocoding_error:
+                logger.warning(
+                    f"Geocoding failed: {type(geocoding_error).__name__}: {geocoding_error}",
+                    exc_info=False  # Don't print full stack trace for optional feature
+                )
+                # Return itinerary without geocoding if geocoding fails
+                return itinerary
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing failed: {e}", exc_info=True)

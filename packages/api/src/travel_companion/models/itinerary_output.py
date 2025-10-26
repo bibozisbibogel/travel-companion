@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .coordinates import Coordinates
+
 
 class ActivityCategory(str, Enum):
     """Activity category enumeration."""
@@ -40,6 +42,9 @@ class Destination(BaseModel):
 
     city: str = Field(..., min_length=1, max_length=100, description="Destination city")
     country: str = Field(..., min_length=1, max_length=100, description="Country name")
+    coordinates: Coordinates | None = Field(
+        None, description="Geocoded coordinates for destination city"
+    )
 
 
 class DateRange(BaseModel):
@@ -125,7 +130,13 @@ class FlightDetails(BaseModel):
     flight_number: str = Field(..., description="Flight number")
     route: RouteInfo = Field(..., description="Flight route")
     departure: TimeInfo = Field(..., description="Departure time and timezone")
+    departure_coordinates: Coordinates | None = Field(
+        None, description="Geocoded coordinates for departure airport"
+    )
     arrival: TimeInfo | None = Field(None, description="Arrival time and timezone")
+    arrival_coordinates: Coordinates | None = Field(
+        None, description="Geocoded coordinates for arrival airport"
+    )
     duration_minutes: int | None = Field(None, gt=0, description="Flight duration in minutes")
     stops: int = Field(default=0, ge=0, description="Number of stops")
     price_per_person: Decimal = Field(..., gt=0, description="Price per person")
@@ -161,6 +172,9 @@ class AccommodationInfo(BaseModel):
     rating: float | None = Field(None, ge=0, le=5, description="Rating (0-5)")
     stars: int | None = Field(None, ge=1, le=5, description="Star rating")
     address: Address = Field(..., description="Physical address")
+    coordinates: Coordinates | None = Field(
+        None, description="Geocoded coordinates for accommodation location"
+    )
     amenities: list[str] = Field(default_factory=list, description="Available amenities")
     price_per_night: Decimal = Field(..., gt=0, description="Price per night")
     nights: int = Field(..., ge=1, description="Number of nights")
@@ -174,6 +188,9 @@ class VenueInfo(BaseModel):
     name: str = Field(..., min_length=1, description="Venue name")
     cuisine: str | None = Field(None, description="Cuisine type")
     location: str | None = Field(None, description="Location description")
+    coordinates: Coordinates | None = Field(
+        None, description="Geocoded coordinates for venue location"
+    )
     style: str | None = Field(None, description="Dining style (e.g., fine dining, casual)")
 
 
@@ -194,6 +211,9 @@ class ItineraryActivity(BaseModel):
     title: str = Field(..., min_length=1, description="Activity title")
     description: str | None = Field(None, description="Activity description")
     location: str | None = Field(None, description="Activity location")
+    coordinates: Coordinates | None = Field(
+        None, description="Geocoded coordinates for activity location"
+    )
     visit_type: str | None = Field(None, description="Visit type (self-guided, guided, etc.)")
     duration_minutes: int | None = Field(None, gt=0, description="Duration in minutes")
     cost_per_person: Decimal | None = Field(None, ge=0, description="Cost per person")
