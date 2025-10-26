@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiClient, ApiError } from '../lib/api'
+import { getAuthToken, setAuthToken } from '../lib/auth'
 import type { LoginFormData, RegisterFormData } from '../lib/validation'
 
 interface User {
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      const token = typeof window !== 'undefined' ? getAuthToken() : null
 
       if (!token) {
         setUser(null)
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Failed to fetch current user:', err)
       // If token is invalid, clear it
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        localStorage.removeItem('auth_token')
+        setAuthToken(null)
         apiClient.setToken(null)
         setUser(null)
       }
@@ -114,8 +115,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await fetchCurrentUser()
         }
 
-        // Redirect to trips page
-        router.push('/trips')
+        // Check for redirect parameter in URL
+        const searchParams = new URLSearchParams(window.location.search)
+        const redirectTo = searchParams.get('redirect') || '/trips'
+
+        // Redirect to intended page or trips page
+        router.push(redirectTo)
       } else {
         throw new Error(response.detail?.message || 'Login failed')
       }
@@ -197,8 +202,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null)
     setError(null)
 
-    // Clear token from storage and apiClient
-    localStorage.removeItem('auth_token')
+    // Clear token from cookie and apiClient
+    setAuthToken(null)
     apiClient.setToken(null)
 
     // Clear any draft data

@@ -4,6 +4,7 @@
  */
 
 import type { ILoginRequest, IRegisterRequest, IAuthResponse, ITripRequest, ITripPlanResponse, IDestination, IApiRequestConfig, IRetryConfig, IPaginatedResponse, ITripSummary, ITripDetailResponse } from './types'
+import { getAuthToken, setAuthToken } from './auth'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
@@ -28,21 +29,17 @@ export class ApiClient {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
     this.retryConfig = retryConfig;
-    
-    // Initialize token from localStorage if available
+
+    // Initialize token from cookie if available
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = getAuthToken();
     }
   }
 
   setToken(token: string | null) {
     this.token = token;
     if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('auth_token', token);
-      } else {
-        localStorage.removeItem('auth_token');
-      }
+      setAuthToken(token);
     }
   }
 
@@ -122,6 +119,16 @@ export class ApiClient {
           fetchConfig.body = JSON.stringify(data);
         }
 
+        // Debug logging
+        if (endpoint.includes('login')) {
+          console.log('[API] Request details:', {
+            url: `${this.baseUrl}${endpoint}`,
+            method,
+            headers: fetchConfig.headers,
+            hasBody: !!fetchConfig.body
+          });
+        }
+
         const response = await fetch(`${this.baseUrl}${endpoint}`, fetchConfig);
 
         // Clean up timeout on successful fetch
@@ -194,20 +201,44 @@ export class ApiClient {
 
   // Authentication methods
   async login(credentials: ILoginRequest): Promise<IAuthResponse> {
-    return this.post<IAuthResponse>('/api/v1/users/login', credentials);
+    // Temporarily clear token for login request
+    const existingToken = this.token;
+    this.token = null;
+
+    try {
+      console.log('[API] Login request:', { email: credentials.email, hasPassword: !!credentials.password });
+      const response = await this.post<IAuthResponse>('/api/v1/users/login', credentials);
+      console.log('[API] Login success:', { hasToken: !!response.access_token });
+      return response;
+    } catch (error) {
+      console.error('[API] Login failed:', error);
+      throw error;
+    } finally {
+      // Restore token if login fails
+      this.token = existingToken;
+    }
   }
 
   async register(userData: IRegisterRequest): Promise<IAuthResponse> {
-    const { confirmPassword, firstName, lastName, ...restData } = userData;
-    
-    const registrationData = {
-      ...restData,
-      first_name: firstName,
-      // Send null instead of empty string if no last name provided
-      last_name: lastName || null
-    };
-    
-    return this.post<IAuthResponse>('/api/v1/users/register', registrationData);
+    // Temporarily clear token for registration request
+    const existingToken = this.token;
+    this.token = null;
+
+    try {
+      const { confirmPassword, firstName, lastName, ...restData } = userData;
+
+      const registrationData = {
+        ...restData,
+        first_name: firstName,
+        // Send null instead of empty string if no last name provided
+        last_name: lastName || null
+      };
+
+      return await this.post<IAuthResponse>('/api/v1/users/register', registrationData);
+    } finally {
+      // Restore token if registration fails
+      this.token = existingToken;
+    }
   }
 
   async logout(): Promise<void> {
