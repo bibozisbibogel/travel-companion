@@ -110,10 +110,15 @@ export default function TripPreferencesForm({
       console.log('Trip planning response:', response)
 
       // Extract trip ID from response - handle different response structures
-      const tripId = (response as any)?.trip_id || response?.data?.tripId || (response as any)?.id
+      const tripId = response?.data?.trip_id || (response as any)?.trip_id || response?.data?.tripId || (response as any)?.id
 
       if (tripId) {
         clearDraft()
+
+        // Invalidate trips cache to refresh home page and trips list
+        const { mutate } = await import('swr')
+        mutate((key: any) => Array.isArray(key) && key[0] === 'user-trips')
+
         if (onSuccess) {
           onSuccess(tripId)
         } else {
