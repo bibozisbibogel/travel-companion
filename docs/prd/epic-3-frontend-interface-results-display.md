@@ -82,3 +82,67 @@ so that **I can ensure my trip stays within my financial limits**.
 7. Ability to adjust budget and see updated recommendations
 8. Modern minimal design with clear data visualization
 9. Mobile-responsive budget cards and charts
+
+## Story 3.5: User Trip List Dashboard ✅ COMPLETED
+
+As a **returning user**,
+I want **to see a list of all my trips after logging in**,
+so that **I can quickly access my past and planned trips**.
+
+**Acceptance Criteria:**
+1. Display list of all user trips after successful login
+2. Each trip card shows: trip name, destination, dates, status, and thumbnail/preview
+3. Trips sorted by creation date (most recent first)
+4. Pagination support for users with many trips (20 trips per page)
+5. Filter trips by status (draft, planning, confirmed, completed, cancelled)
+6. Search trips by destination or trip name
+7. Click on trip card navigates to trip detail page
+8. Empty state message when user has no trips with call-to-action to create first trip
+9. Loading state while fetching trips from API
+10. Error handling with retry functionality if API call fails
+11. Modern minimal card-based design consistent with app aesthetic
+12. Mobile-responsive grid layout (1 column mobile, 2-3 columns tablet/desktop)
+
+**Status:** ✅ All acceptance criteria completed and tested
+
+**Implementation Highlights:**
+- Migrated itinerary page to dynamic route `/trips/[trip_id]`
+- Created comprehensive trip list dashboard at `/trips`
+- Implemented TripCard, Pagination, and EmptyState reusable components
+- Integrated with backend API endpoint `GET /api/v1/trips`
+- Added client-side filtering by status and search functionality
+- All 34 unit and integration tests passing
+- Responsive design with Tailwind CSS grid layout
+
+## Story 3.6: Geocoding Integration for Precise Activity Location Mapping
+
+As a **user viewing trip itineraries**,
+I want **activities, accommodations, restaurants, and other locations to appear at their precise geographic coordinates on the map**,
+so that **I can accurately understand distances, travel times, and geographic relationships between all trip elements**.
+
+**Acceptance Criteria:**
+1. Integrate Google Geocoding API in backend for converting location strings to lat/lng coordinates
+2. Geocode all location types during trip generation: activities, accommodations, restaurants, airports, destination city
+3. Store geocoded coordinates (latitude, longitude) in database with each location entity
+4. Handle geocoding API errors gracefully with fallback behavior
+5. Display warning/placeholder marker on map for locations that failed geocoding
+6. Return geocoded coordinates in trip API responses for frontend consumption
+7. Update InteractiveMap component to use precise coordinates instead of placeholder locations
+8. Implement rate limiting and error handling for Google Geocoding API calls
+9. Add geocoding retry logic for transient failures
+10. Log geocoding failures for monitoring and debugging
+11. Include geocoding status field in location data (success, failed, pending)
+12. Update data models to include coordinate fields (latitude, longitude, geocoding_status)
+
+**Technical Requirements:**
+- **Backend Integration:** Server-side geocoding during trip generation workflow
+- **Caching Strategy:** Store geocoded coordinates permanently in database with location entities
+- **Error Handling:** Show placeholder/warning marker on map when geocoding fails
+- **Scope:** All location types (activities, accommodations, restaurants, airports, destination city)
+- **API Configuration:** Use Google Geocoding API with proper authentication and rate limiting
+- **Database Schema:** Add latitude, longitude, geocoding_status fields to relevant tables
+
+**Dependencies:**
+- Google Geocoding API key configured in backend environment
+- Database schema updates for coordinate storage
+- Story 3.3 (Interactive Map) completed for map integration
