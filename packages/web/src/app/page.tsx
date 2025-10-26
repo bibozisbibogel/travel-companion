@@ -1,37 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { MainLayout } from '../components/layouts'
 import { useAuth } from '../contexts/AuthContext'
-import { apiClient } from '../lib/api'
+import { useHasTrips } from '../hooks/useTrips'
 
 export default function Home() {
   const { isAuthenticated } = useAuth()
-  const [hasTrips, setHasTrips] = useState(false)
-  const [loadingTrips, setLoadingTrips] = useState(false)
-
-  useEffect(() => {
-    const checkUserTrips = async () => {
-      if (!isAuthenticated) {
-        setHasTrips(false)
-        return
-      }
-
-      try {
-        setLoadingTrips(true)
-        const response = await apiClient.getUserTrips(1, 1)
-        setHasTrips(response.data.length > 0)
-      } catch (err) {
-        console.error('Error checking user trips:', err)
-        setHasTrips(false)
-      } finally {
-        setLoadingTrips(false)
-      }
-    }
-
-    checkUserTrips()
-  }, [isAuthenticated])
+  const { hasTrips, isLoading: loadingTrips } = useHasTrips(isAuthenticated)
   return (
     <MainLayout>
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">

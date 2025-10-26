@@ -6,12 +6,12 @@
 
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TripCard } from '@/components/trips';
 import { Pagination, EmptyState } from '@/components/ui';
-import { apiClient } from '@/lib/api';
-import { ITripSummary, IPaginationMeta, TripStatus } from '@/lib/types';
+import { useTrips } from '@/hooks/useTrips';
+import { ITripSummary, TripStatus } from '@/lib/types';
 import { Loader2, AlertCircle, Search, Filter, Plane, X } from 'lucide-react';
 import MainLayout from '@/components/layouts/MainLayout';
 
@@ -28,40 +28,29 @@ export default function TripsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // State
-  const [trips, setTrips] = useState<ITripSummary[]>([]);
-  const [pagination, setPagination] = useState<IPaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Get page from URL or default to 1
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+
+  // Fetch trips with caching
+  const {
+    trips: tripsData,
+    pagination,
+    isLoading: loading,
+    isError,
+    error: errorObj,
+  } = useTrips({
+    page: currentPage,
+    perPage: 20,
+  });
+
+  // Memoize trips to prevent dependency changes
+  const trips = useMemo(() => tripsData || [], [tripsData]);
+  const error = isError ? (errorObj?.message || 'Failed to load trips') : null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TripStatus | 'all'>('all');
   const [filteredTrips, setFilteredTrips] = useState<ITripSummary[]>([]);
-
-  // Get page from URL or default to 1
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
-
-  // Fetch trips from API
-  const fetchTrips = useCallback(async (page: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiClient.getUserTrips(page, 20);
-      setTrips(response.data);
-      setPagination(response.pagination);
-    } catch (err) {
-      console.error('Error fetching trips:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load trips');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load trips on mount and when page changes
-  useEffect(() => {
-    fetchTrips(currentPage);
-  }, [currentPage, fetchTrips]);
 
   // Apply filters whenever trips, search, or status changes
   useEffect(() => {
@@ -89,11 +78,6 @@ export default function TripsPage() {
   // Handle page change
   const handlePageChange = (page: number) => {
     router.push(`/trips?page=${page}`);
-  };
-
-  // Handle retry
-  const handleRetry = () => {
-    fetchTrips(currentPage);
   };
 
   // Clear filters
@@ -135,7 +119,7 @@ export default function TripsPage() {
               </h2>
               <p className="text-gray-600 text-center mb-6">{error}</p>
               <button
-                onClick={handleRetry}
+                onClick={() => window.location.reload()}
                 className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Try Again
