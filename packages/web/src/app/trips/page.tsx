@@ -13,6 +13,7 @@ import { Pagination, EmptyState } from '@/components/ui';
 import { apiClient } from '@/lib/api';
 import { ITripSummary, IPaginationMeta, TripStatus } from '@/lib/types';
 import { Loader2, AlertCircle, Search, Filter, Plane, X } from 'lucide-react';
+import MainLayout from '@/components/layouts/MainLayout';
 
 const STATUS_OPTIONS: { value: TripStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All Trips' },
@@ -108,7 +109,7 @@ export default function TripsPage() {
   // Loading state
   if (loading && !trips.length) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <MainLayout className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-32">
             <div className="text-center">
@@ -117,14 +118,14 @@ export default function TripsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   // Error state
   if (error && !trips.length) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <MainLayout className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-32">
             <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
@@ -142,12 +143,12 @@ export default function TripsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <MainLayout className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -205,19 +206,21 @@ export default function TripsPage() {
 
         {/* Trip grid or empty state */}
         {filteredTrips.length === 0 ? (
-          <EmptyState
-            title={
-              trips.length === 0 ? 'No trips yet' : 'No trips match your filters'
-            }
-            message={
-              trips.length === 0
-                ? 'Start planning your next adventure! Create your first trip to begin.'
-                : 'Try adjusting your search or filters to find what you are looking for.'
-            }
-            icon={<Plane className="w-16 h-16" />}
-            ctaText={trips.length === 0 ? 'Create Your First Trip' : undefined}
-            ctaHref={trips.length === 0 ? '/trips/new' : undefined}
-          />
+          trips.length === 0 ? (
+            <EmptyState
+              title="No trips yet"
+              message="Start planning your next adventure! Create your first trip to begin."
+              icon={<Plane className="w-16 h-16" />}
+              ctaText="Create Your First Trip"
+              ctaHref="/trips/new"
+            />
+          ) : (
+            <EmptyState
+              title="No trips match your filters"
+              message="Try adjusting your search or filters to find what you are looking for."
+              icon={<Plane className="w-16 h-16" />}
+            />
+          )
         ) : (
           <>
             {/* Trip cards grid */}
@@ -237,6 +240,6 @@ export default function TripsPage() {
           </>
         )}
       </div>
-    </div>
+    </MainLayout>
   );
 }

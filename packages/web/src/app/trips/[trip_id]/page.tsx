@@ -12,6 +12,7 @@ import { ItineraryTimeline } from '@/components/itinerary';
 import { IFullTripItinerary } from '@/lib/types';
 import { apiClient } from '@/lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { MainLayout } from '@/components/layouts';
 
 // For demo purposes, we'll use sample data
 // In production, this would fetch from the API using trip_id
@@ -333,18 +334,18 @@ export default function TripDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <MainLayout className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Loading your itinerary...</p>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <MainLayout className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
@@ -352,21 +353,21 @@ export default function TripDetailPage() {
           </h2>
           <p className="text-gray-600 text-center">{error}</p>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   if (!itinerary) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <MainLayout className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-600">No itinerary data available</p>
-      </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <MainLayout className="min-h-screen bg-gray-50">
       <ItineraryTimeline itinerary={itinerary} />
-    </div>
+    </MainLayout>
   );
 }

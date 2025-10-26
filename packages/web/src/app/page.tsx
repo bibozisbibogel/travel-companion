@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import TravelRequestForm from '../components/forms/TravelRequestForm'
 import { MainLayout } from '../components/layouts'
 
 export default function Home() {
@@ -41,20 +40,7 @@ export default function Home() {
 
         {/* Travel Request Form Section */}
         <section className="relative -mt-16">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-2xl shadow-travel-lg p-8 md:p-12">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                  Start Planning Your Trip
-                </h2>
-                <p className="text-lg text-gray-600">
-                  Tell us what you&apos;re looking for and we&apos;ll create a personalized travel plan just for you
-                </p>
-              </div>
-              
-              <TravelRequestForm />
-            </div>
-          </div>
+
         </section>
 
         {/* Features Section */}
