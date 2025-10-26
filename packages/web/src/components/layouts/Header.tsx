@@ -7,8 +7,8 @@ import { useAuth } from '../../contexts/AuthContext'
 
 interface IHeaderProps {
   // Props are now optional - Header will use AuthContext if not provided
-  user?: { id: string; email: string; name?: string } | null
-  onLogout?: () => void
+  user?: { id: string; email: string; name?: string } | null | undefined
+  onLogout?: (() => void) | undefined
 }
 
 export default function Header({ user: propUser, onLogout: propOnLogout }: IHeaderProps = {}) {

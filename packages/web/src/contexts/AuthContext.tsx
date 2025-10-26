@@ -54,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       apiClient.setToken(token)
 
       // Fetch user profile
-      const userData = await apiClient.getCurrentUser()
+      const userData = await apiClient.getCurrentUser() as any;
 
       setUser({
         id: userData.id || userData.user_id,
@@ -101,12 +101,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         // Set user data
         if (response.user) {
+          const userData = response.user as any;
           setUser({
-            id: response.user.id || response.user.user_id,
-            email: response.user.email,
-            name: response.user.name || `${response.user.firstName || ''} ${response.user.lastName || ''}`.trim(),
-            firstName: response.user.firstName,
-            lastName: response.user.lastName,
+            id: userData.id || userData.user_id,
+            email: userData.email,
+            name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+            firstName: userData.firstName,
+            lastName: userData.lastName,
           })
         } else {
           // Fetch user profile if not included in login response
@@ -145,7 +146,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true)
       setError(null)
 
-      const response = await apiClient.register(data)
+      const response = await apiClient.register({
+        ...data,
+        lastName: data.lastName ?? '',
+      })
 
       if (response.access_token) {
         // Store token
@@ -153,12 +157,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         // Set user data
         if (response.user) {
+          const userData = response.user as any;
           setUser({
-            id: response.user.id || response.user.user_id,
-            email: response.user.email,
-            name: response.user.name || `${response.user.firstName || ''} ${response.user.lastName || ''}`.trim(),
-            firstName: response.user.firstName,
-            lastName: response.user.lastName,
+            id: userData.id || userData.user_id,
+            email: userData.email,
+            name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+            firstName: userData.firstName,
+            lastName: userData.lastName,
           })
         } else {
           await fetchCurrentUser()

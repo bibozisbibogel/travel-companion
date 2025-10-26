@@ -10,8 +10,8 @@ interface IUser {
 
 interface IMainLayoutProps {
   children: ReactNode
-  user?: IUser | null
-  onLogout?: () => void
+  user?: IUser | null | undefined
+  onLogout?: (() => void) | undefined
   showFooter?: boolean
   className?: string
   containerClassName?: string
