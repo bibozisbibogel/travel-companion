@@ -6,7 +6,7 @@ interface DaySelectorProps {
   totalDays: number;
   selectedDay: number | null;
   onDaySelect: (day: number | null) => void;
-  currentDay?: number;
+  currentDay?: number | null | undefined;
 }
 
 export function DaySelector({

@@ -15,7 +15,7 @@ interface InteractiveMapProps {
   activities: ActivityMarker[];
   accommodations: AccommodationMarker[];
   selectedDay: number | null;
-  center?: { lat: number; lng: number };
+  center?: { lat: number; lng: number } | undefined;
   onMarkerClick?: (markerId: string, type: "activity" | "accommodation") => void;
 }
 
@@ -34,9 +34,11 @@ export function InteractiveMap({
   const [mapStyle, setMapStyle] = useState<MapStyle>("standard");
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: apiKey,
     libraries,
   });
 
@@ -93,9 +95,18 @@ export function InteractiveMap({
   }, [mapStyle]);
 
   if (loadError) {
+    console.error("Google Maps load error:", loadError);
     return (
-      <div className="flex h-full items-center justify-center bg-gray-100 text-gray-600">
-        Error loading maps
+      <div className="flex h-full items-center justify-center bg-gray-100 p-4">
+        <div className="text-center max-w-md">
+          <p className="text-red-600 font-semibold mb-2">Error loading Google Maps</p>
+          <p className="text-gray-600 text-sm mb-2">
+            {loadError.message || "Failed to load Google Maps API"}
+          </p>
+          <p className="text-gray-500 text-xs">
+            Please ensure billing is enabled in Google Cloud Console and the Maps JavaScript API is activated.
+          </p>
+        </div>
       </div>
     );
   }
@@ -118,7 +129,7 @@ export function InteractiveMap({
         onUnmount={onUnmount}
         options={{
           mapTypeId: getMapTypeId(),
-          styles: mapStyle === "standard" ? mapStyles : undefined,
+          styles: mapStyle === "standard" ? mapStyles : null,
           gestureHandling: "cooperative",
           mapTypeControl: true,
           mapTypeControlOptions: {

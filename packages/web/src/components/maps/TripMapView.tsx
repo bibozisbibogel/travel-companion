@@ -18,7 +18,7 @@ interface TripMapViewProps {
   activities: ActivityMarkerType[];
   accommodations: AccommodationMarkerType[];
   routes: DayRoute[];
-  tripCenter?: { lat: number; lng: number };
+  tripCenter?: { lat: number; lng: number } | undefined;
 }
 
 export function TripMapView({

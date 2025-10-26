@@ -81,16 +81,19 @@ export function RouteVisualization({
           stopover: true,
         }));
 
+        const firstSegment = dayRoute.segments[0];
+        const lastSegment = dayRoute.segments[dayRoute.segments.length - 1];
+
+        if (!firstSegment || !lastSegment) continue;
+
         const origin = {
-          lat: dayRoute.segments[0].origin.latitude,
-          lng: dayRoute.segments[0].origin.longitude,
+          lat: firstSegment.origin.latitude,
+          lng: firstSegment.origin.longitude,
         };
 
         const destination = {
-          lat: dayRoute.segments[dayRoute.segments.length - 1].destination
-            .latitude,
-          lng: dayRoute.segments[dayRoute.segments.length - 1].destination
-            .longitude,
+          lat: lastSegment.destination.latitude,
+          lng: lastSegment.destination.longitude,
         };
 
         // Determine most common transport mode
@@ -102,9 +105,10 @@ export function RouteVisualization({
         dayRoute.segments.forEach((segment) => {
           modeCount[segment.mode]++;
         });
-        const travelMode = Object.entries(modeCount).sort(
+        const sortedModes = Object.entries(modeCount).sort(
           ([, a], [, b]) => b - a
-        )[0][0] as TransportMode;
+        );
+        const travelMode = (sortedModes[0]?.[0] ?? 'walk') as TransportMode;
 
         const travelModeMap: Record<
           TransportMode,
@@ -149,7 +153,7 @@ export function RouteVisualization({
     <>
       {Array.from(directionsResults.entries()).map(([day, result]) => {
         const colorIndex = (day - 1) % DAY_ROUTE_COLORS.length;
-        const color = DAY_ROUTE_COLORS[colorIndex];
+        const color = DAY_ROUTE_COLORS[colorIndex] ?? '#3B82F6';
 
         return (
           <DirectionsRenderer
