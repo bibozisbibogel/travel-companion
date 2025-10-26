@@ -78,9 +78,5 @@
     "planning"
   ],
   "author": "Travel Companion Team",
-  "license": "MIT",
-  "dependencies": {
-    "lucide-react": "^0.548.0",
-    "swr": "^2.3.6"
-  }
+  "license": "MIT"
 }
