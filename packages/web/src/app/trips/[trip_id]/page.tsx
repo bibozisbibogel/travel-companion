@@ -1,18 +1,19 @@
 /**
- * Itinerary Demo Page
- * Showcases the Day-by-Day Itinerary Timeline Visualization components
+ * Trip Detail Page - Day-by-Day Itinerary Timeline Visualization
  * Story 3.2: Day-by-Day Itinerary Timeline Visualization
+ * Story 3.5: Migrated from /app/itinerary to dynamic route
  */
 
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { ItineraryTimeline } from '@/components/itinerary';
 import { IFullTripItinerary } from '@/lib/types';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 // For demo purposes, we'll use sample data
-// In production, this would fetch from the API
+// In production, this would fetch from the API using trip_id
 const SAMPLE_ITINERARY: IFullTripItinerary = {
   trip: {
     destination: {
@@ -289,17 +290,20 @@ const SAMPLE_ITINERARY: IFullTripItinerary = {
   ],
 };
 
-export default function ItineraryPage() {
+export default function TripDetailPage() {
+  const params = useParams();
+  const tripId = params.trip_id as string;
   const [itinerary, setItinerary] = useState<IFullTripItinerary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate API call
+    // Simulate API call with trip_id
     const loadItinerary = async () => {
       try {
         setLoading(true);
         // In production, this would be: await apiClient.getItinerary(tripId)
+        console.log('Loading itinerary for trip:', tripId);
         await new Promise((resolve) => setTimeout(resolve, 1000));
         setItinerary(SAMPLE_ITINERARY);
       } catch (err) {
@@ -309,8 +313,10 @@ export default function ItineraryPage() {
       }
     };
 
-    loadItinerary();
-  }, []);
+    if (tripId) {
+      loadItinerary();
+    }
+  }, [tripId]);
 
   if (loading) {
     return (

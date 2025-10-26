@@ -358,3 +358,44 @@ export interface IFullTripItinerary {
   accommodation: IAccommodationInfo;
   itinerary: IDailyItinerary[];
 }
+
+// Trip List Types (Story 3.5)
+export type TripStatus = 'draft' | 'planning' | 'confirmed' | 'completed' | 'cancelled';
+
+export interface ITripSummary {
+  trip_id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  destination: {
+    city: string;
+    country: string;
+  };
+  requirements: {
+    budget: number;
+    currency: string;
+    start_date: string;
+    end_date: string;
+    travelers: number;
+    travel_class?: string;
+    accommodation_type?: string;
+  };
+  status: TripStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IPaginationMeta {
+  page: number;
+  per_page: number;
+  total_items: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface IPaginatedResponse<T> {
+  data: T;
+  pagination: IPaginationMeta;
+  message: string;
+}
