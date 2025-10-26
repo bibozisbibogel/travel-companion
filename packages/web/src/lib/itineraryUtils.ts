@@ -87,7 +87,10 @@ export const ACTIVITY_BG_LIGHT: Record<ActivityCategory, string> = {
 export function getTimeOfDay(timeString: string | null): TimeOfDay {
   if (!timeString) return 'morning'; // Default to morning if no time specified
 
-  const hour = parseInt(timeString.split(':')[0], 10);
+  const hourStr = timeString.split(':')[0];
+  if (!hourStr) return 'morning';
+
+  const hour = parseInt(hourStr, 10);
 
   if (hour >= 5 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 17) return 'afternoon';
@@ -123,6 +126,8 @@ export function formatTime(timeString: string | null): string {
   if (!timeString) return 'Time TBD';
 
   const [hours, minutes] = timeString.split(':');
+  if (!hours || !minutes) return 'Time TBD';
+
   const hour = parseInt(hours, 10);
   const period = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
@@ -221,7 +226,11 @@ export function groupMealsByType(
   };
 
   meals.forEach((meal) => {
-    grouped[meal.meal_type].push(meal);
+    const mealType = meal.meal_type;
+    if (!grouped[mealType]) {
+      grouped[mealType] = [];
+    }
+    grouped[mealType]!.push(meal);
   });
 
   return grouped;
@@ -242,7 +251,12 @@ export function sortActivitiesByTime(
     const timeA = a.time_start.split(':').map(Number);
     const timeB = b.time_start.split(':').map(Number);
 
-    if (timeA[0] !== timeB[0]) return timeA[0] - timeB[0];
-    return timeA[1] - timeB[1];
+    const hourA = timeA[0] ?? 0;
+    const hourB = timeB[0] ?? 0;
+    const minA = timeA[1] ?? 0;
+    const minB = timeB[1] ?? 0;
+
+    if (hourA !== hourB) return hourA - hourB;
+    return minA - minB;
   });
 }

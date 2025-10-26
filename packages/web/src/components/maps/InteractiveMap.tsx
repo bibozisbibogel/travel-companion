@@ -3,19 +3,21 @@
 import { useCallback, useMemo, useState } from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import type {
-  ActivityMarker,
-  AccommodationMarker,
+  ActivityMarker as ActivityMarkerType,
+  AccommodationMarker as AccommodationMarkerType,
   MapStyle,
 } from "@/lib/types/map";
 import { mapStyles } from "./mapStyles";
+import { ActivityMarker } from "./ActivityMarker";
+import { AccommodationMarker } from "./AccommodationMarker";
 
 const libraries: ("places" | "geometry" | "drawing")[] = ["places", "geometry"];
 
 interface InteractiveMapProps {
-  activities: ActivityMarker[];
-  accommodations: AccommodationMarker[];
+  activities: ActivityMarkerType[];
+  accommodations: AccommodationMarkerType[];
   selectedDay: number | null;
-  center?: { lat: number; lng: number };
+  center?: { lat: number; lng: number } | undefined;
   onMarkerClick?: (markerId: string, type: "activity" | "accommodation") => void;
 }
 
@@ -34,9 +36,11 @@ export function InteractiveMap({
   const [mapStyle, setMapStyle] = useState<MapStyle>("standard");
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: apiKey,
     libraries,
   });
 
@@ -93,9 +97,18 @@ export function InteractiveMap({
   }, [mapStyle]);
 
   if (loadError) {
+    console.error("Google Maps load error:", loadError);
     return (
-      <div className="flex h-full items-center justify-center bg-gray-100 text-gray-600">
-        Error loading maps
+      <div className="flex h-full items-center justify-center bg-gray-100 p-4">
+        <div className="text-center max-w-md">
+          <p className="text-red-600 font-semibold mb-2">Error loading Google Maps</p>
+          <p className="text-gray-600 text-sm mb-2">
+            {loadError.message || "Failed to load Google Maps API"}
+          </p>
+          <p className="text-gray-500 text-xs">
+            Please ensure billing is enabled in Google Cloud Console and the Maps JavaScript API is activated.
+          </p>
+        </div>
       </div>
     );
   }
@@ -118,7 +131,7 @@ export function InteractiveMap({
         onUnmount={onUnmount}
         options={{
           mapTypeId: getMapTypeId(),
-          styles: mapStyle === "standard" ? mapStyles : undefined,
+          styles: mapStyle === "standard" ? mapStyles : null,
           gestureHandling: "cooperative",
           mapTypeControl: true,
           mapTypeControlOptions: {
@@ -139,6 +152,24 @@ export function InteractiveMap({
           disableDoubleClickZoom: false,
         }}
       >
+        {/* Render activity markers */}
+        {filteredActivities.map((activity) => (
+          <ActivityMarker
+            key={activity.activity_id}
+            activity={activity}
+            {...(onMarkerClick && { onClick: (id: string) => onMarkerClick(id, "activity") })}
+          />
+        ))}
+
+        {/* Render accommodation markers */}
+        {accommodations.map((accommodation) => (
+          <AccommodationMarker
+            key={accommodation.hotel_id}
+            accommodation={accommodation}
+            {...(onMarkerClick && { onClick: (id: string) => onMarkerClick(id, "accommodation") })}
+          />
+        ))}
+
         {/* Map controls for style switching - mobile optimized */}
         <div className="absolute left-2 top-2 z-10 flex gap-1 rounded-lg bg-white p-1.5 shadow-md sm:left-4 sm:top-4 sm:gap-2 sm:p-2">
           <button

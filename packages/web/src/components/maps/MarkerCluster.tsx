@@ -57,7 +57,6 @@ export function MarkerCluster({
       markers,
       algorithmOptions: {
         maxZoom: 15, // Don't cluster at zoom levels above 15
-        radius: 100, // Cluster radius in pixels
       },
       renderer: {
         render: ({ count, position }) => {

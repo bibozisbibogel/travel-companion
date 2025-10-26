@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiClient, ApiError } from '../lib/api'
+import { getAuthToken, setAuthToken } from '../lib/auth'
 import type { LoginFormData, RegisterFormData } from '../lib/validation'
 
 interface User {
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      const token = typeof window !== 'undefined' ? getAuthToken() : null
 
       if (!token) {
         setUser(null)
@@ -54,7 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       apiClient.setToken(token)
 
       // Fetch user profile
-      const userData = await apiClient.getCurrentUser()
+      const userData = await apiClient.getCurrentUser() as any;
 
       setUser({
         id: userData.id || userData.user_id,
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Failed to fetch current user:', err)
       // If token is invalid, clear it
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        localStorage.removeItem('auth_token')
+        setAuthToken(null)
         apiClient.setToken(null)
         setUser(null)
       }
@@ -101,20 +102,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         // Set user data
         if (response.user) {
+          const userData = response.user as any;
           setUser({
-            id: response.user.id || response.user.user_id,
-            email: response.user.email,
-            name: response.user.name || `${response.user.firstName || ''} ${response.user.lastName || ''}`.trim(),
-            firstName: response.user.firstName,
-            lastName: response.user.lastName,
+            id: userData.id || userData.user_id,
+            email: userData.email,
+            name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+            firstName: userData.firstName,
+            lastName: userData.lastName,
           })
         } else {
           // Fetch user profile if not included in login response
           await fetchCurrentUser()
         }
 
-        // Redirect to home
-        router.push('/')
+        // Check for redirect parameter in URL
+        const searchParams = new URLSearchParams(window.location.search)
+        const redirectTo = searchParams.get('redirect') || '/trips'
+
+        // Redirect to intended page or trips page
+        router.push(redirectTo)
       } else {
         throw new Error(response.detail?.message || 'Login failed')
       }
@@ -145,7 +151,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true)
       setError(null)
 
-      const response = await apiClient.register(data)
+      const response = await apiClient.register({
+        ...data,
+        lastName: data.lastName ?? '',
+      })
 
       if (response.access_token) {
         // Store token
@@ -153,12 +162,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         // Set user data
         if (response.user) {
+          const userData = response.user as any;
           setUser({
-            id: response.user.id || response.user.user_id,
-            email: response.user.email,
-            name: response.user.name || `${response.user.firstName || ''} ${response.user.lastName || ''}`.trim(),
-            firstName: response.user.firstName,
-            lastName: response.user.lastName,
+            id: userData.id || userData.user_id,
+            email: userData.email,
+            name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+            firstName: userData.firstName,
+            lastName: userData.lastName,
           })
         } else {
           await fetchCurrentUser()
@@ -192,8 +202,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null)
     setError(null)
 
-    // Clear token from storage and apiClient
-    localStorage.removeItem('auth_token')
+    // Clear token from cookie and apiClient
+    setAuthToken(null)
     apiClient.setToken(null)
 
     // Clear any draft data

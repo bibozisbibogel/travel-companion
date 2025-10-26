@@ -6,13 +6,14 @@
 
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TripCard } from '@/components/trips';
 import { Pagination, EmptyState } from '@/components/ui';
-import { apiClient } from '@/lib/api';
-import { ITripSummary, IPaginationMeta, TripStatus } from '@/lib/types';
+import { useTrips } from '@/hooks/useTrips';
+import { ITripSummary, TripStatus } from '@/lib/types';
 import { Loader2, AlertCircle, Search, Filter, Plane, X } from 'lucide-react';
+import MainLayout from '@/components/layouts/MainLayout';
 
 const STATUS_OPTIONS: { value: TripStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All Trips' },
@@ -27,40 +28,29 @@ export default function TripsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // State
-  const [trips, setTrips] = useState<ITripSummary[]>([]);
-  const [pagination, setPagination] = useState<IPaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Get page from URL or default to 1
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+
+  // Fetch trips with caching
+  const {
+    trips: tripsData,
+    pagination,
+    isLoading: loading,
+    isError,
+    error: errorObj,
+  } = useTrips({
+    page: currentPage,
+    perPage: 20,
+  });
+
+  // Memoize trips to prevent dependency changes
+  const trips = useMemo(() => tripsData || [], [tripsData]);
+  const error = isError ? (errorObj?.message || 'Failed to load trips') : null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TripStatus | 'all'>('all');
   const [filteredTrips, setFilteredTrips] = useState<ITripSummary[]>([]);
-
-  // Get page from URL or default to 1
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
-
-  // Fetch trips from API
-  const fetchTrips = useCallback(async (page: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiClient.getUserTrips(page, 20);
-      setTrips(response.data);
-      setPagination(response.pagination);
-    } catch (err) {
-      console.error('Error fetching trips:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load trips');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load trips on mount and when page changes
-  useEffect(() => {
-    fetchTrips(currentPage);
-  }, [currentPage, fetchTrips]);
 
   // Apply filters whenever trips, search, or status changes
   useEffect(() => {
@@ -90,11 +80,6 @@ export default function TripsPage() {
     router.push(`/trips?page=${page}`);
   };
 
-  // Handle retry
-  const handleRetry = () => {
-    fetchTrips(currentPage);
-  };
-
   // Clear filters
   const handleClearFilters = () => {
     setSearchQuery('');
@@ -108,7 +93,7 @@ export default function TripsPage() {
   // Loading state
   if (loading && !trips.length) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <MainLayout className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-32">
             <div className="text-center">
@@ -117,14 +102,14 @@ export default function TripsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   // Error state
   if (error && !trips.length) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <MainLayout className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-32">
             <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
@@ -134,7 +119,7 @@ export default function TripsPage() {
               </h2>
               <p className="text-gray-600 text-center mb-6">{error}</p>
               <button
-                onClick={handleRetry}
+                onClick={() => window.location.reload()}
                 className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Try Again
@@ -142,12 +127,12 @@ export default function TripsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <MainLayout className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -205,19 +190,21 @@ export default function TripsPage() {
 
         {/* Trip grid or empty state */}
         {filteredTrips.length === 0 ? (
-          <EmptyState
-            title={
-              trips.length === 0 ? 'No trips yet' : 'No trips match your filters'
-            }
-            message={
-              trips.length === 0
-                ? 'Start planning your next adventure! Create your first trip to begin.'
-                : 'Try adjusting your search or filters to find what you are looking for.'
-            }
-            icon={<Plane className="w-16 h-16" />}
-            ctaText={trips.length === 0 ? 'Create Your First Trip' : undefined}
-            ctaHref={trips.length === 0 ? '/trips/new' : undefined}
-          />
+          trips.length === 0 ? (
+            <EmptyState
+              title="No trips yet"
+              message="Start planning your next adventure! Create your first trip to begin."
+              icon={<Plane className="w-16 h-16" />}
+              ctaText="Create Your First Trip"
+              ctaHref="/trips/new"
+            />
+          ) : (
+            <EmptyState
+              title="No trips match your filters"
+              message="Try adjusting your search or filters to find what you are looking for."
+              icon={<Plane className="w-16 h-16" />}
+            />
+          )
         ) : (
           <>
             {/* Trip cards grid */}
@@ -237,6 +224,6 @@ export default function TripsPage() {
           </>
         )}
       </div>
-    </div>
+    </MainLayout>
   );
 }

@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
+  type LucideIcon,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/currencyUtils';
 
@@ -47,7 +48,7 @@ const CATEGORY_CONFIG: Record<
   BudgetCategory,
   {
     label: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: LucideIcon;
     color: string;
     bgLight: string;
   }

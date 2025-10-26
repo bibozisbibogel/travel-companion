@@ -7,8 +7,8 @@ import { useAuth } from '../../contexts/AuthContext'
 
 interface IHeaderProps {
   // Props are now optional - Header will use AuthContext if not provided
-  user?: { id: string; email: string; name?: string } | null
-  onLogout?: () => void
+  user?: { id: string; email: string; name?: string } | null | undefined
+  onLogout?: (() => void) | undefined
 }
 
 export default function Header({ user: propUser, onLogout: propOnLogout }: IHeaderProps = {}) {
@@ -91,7 +91,14 @@ export default function Header({ user: propUser, onLogout: propOnLogout }: IHead
     if (href === '/') {
       return pathname === '/'
     }
-    return pathname.startsWith(href)
+
+    // Special case: /trips should not match /trips/new
+    if (href === '/trips') {
+      return pathname === '/trips' || (pathname.startsWith('/trips/') && !pathname.startsWith('/trips/new'))
+    }
+
+    // Exact match or starts with href followed by /
+    return pathname === href || pathname.startsWith(href + '/')
   }
 
   const filteredLinks = navigationLinks.filter(link => 

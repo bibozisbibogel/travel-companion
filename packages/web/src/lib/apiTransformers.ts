@@ -50,7 +50,7 @@ function mapAccommodationType(type: string): string | undefined {
 function parseDestination(destination: string): { city: string; country: string } {
   const parts = destination.split(',').map(p => p.trim())
 
-  if (parts.length >= 2) {
+  if (parts.length >= 2 && parts[0] && parts[1]) {
     return { city: parts[0], country: parts[1] }
   }
 
@@ -158,7 +158,7 @@ export function transformTripRequestForBackend(
     ? mapAccommodationType(formData.accommodationTypes[0])
     : undefined
 
-  return {
+  const baseRequest = {
     destination: {
       city,
       country,
@@ -173,8 +173,11 @@ export function transformTripRequestForBackend(
       end_date: formData.endDate,
       travelers: totalTravelers,
       // Map accommodation type to backend enum value
-      accommodation_type: mappedAccommodation,
+      ...(mappedAccommodation && { accommodation_type: mappedAccommodation }),
     },
-    preferences: Object.keys(preferences).length > 0 ? preferences : undefined,
-  }
+  };
+
+  return Object.keys(preferences).length > 0
+    ? { ...baseRequest, preferences }
+    : baseRequest;
 }

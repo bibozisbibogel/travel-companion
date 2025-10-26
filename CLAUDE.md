@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides comprehensive guidance to Claude Code when working with Python code in this repository.
+This file provides comprehensive guidance to Claude Code when working with **Python (Backend)** and **TypeScript (Frontend)** code in this repository.
 
 ## Core Development Philosophy
 
@@ -739,6 +739,541 @@ rg --files -g "*.py"
     "Use 'rg --files | rg pattern' or 'rg --files -g pattern' instead of 'find -name' for better performance",
 ),
 ```
+
+---
+
+# TypeScript/Next.js Frontend Standards
+
+## 📦 Package Management
+
+### NPM/PNPM Commands
+
+This project uses **npm** or **pnpm** for frontend package management.
+
+```bash
+# Install dependencies
+npm install
+# or
+pnpm install
+
+# Add a package
+npm install package-name
+pnpm add package-name
+
+# Add development dependency
+npm install --save-dev @types/node
+pnpm add -D @types/node
+
+# Remove a package
+npm uninstall package-name
+pnpm remove package-name
+
+# Run development server
+npm run dev
+pnpm dev
+
+# Build for production
+npm run build
+pnpm build
+
+# Run tests
+npm test
+pnpm test
+
+# Run linting
+npm run lint
+pnpm lint
+
+# Fix linting issues
+npm run lint:fix
+pnpm lint:fix
+```
+
+## 📋 TypeScript Style Guide
+
+### Code Style
+
+- **Follow ESLint + Prettier** configuration in the project
+- Line length: 100 characters (configured in .prettierrc)
+- Use semicolons
+- Use double quotes for strings
+- Use trailing commas in multi-line structures
+- **Always use explicit types** - avoid `any` unless absolutely necessary
+- **Prefer interfaces over type aliases** for object shapes
+- **Use `const` by default**, `let` when reassignment needed, never `var`
+
+### TypeScript Configuration
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true
+  }
+}
+```
+
+### Naming Conventions
+
+- **React Components**: `PascalCase` (e.g., `InteractiveMap`, `TripCard`)
+- **Functions/Variables**: `camelCase` (e.g., `handleSubmit`, `userId`)
+- **Interfaces**: `PascalCase` with `I` prefix (e.g., `IFlightOption`, `ITripRequest`)
+- **Types**: `PascalCase` (e.g., `UserRole`, `ApiResponse`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `API_BASE_URL`, `MAX_RETRY_COUNT`)
+- **Files**: `kebab-case` for utilities, `PascalCase` for components
+- **Enum values**: `PascalCase` (e.g., `Status.Pending`)
+
+### Type Definitions
+
+```typescript
+// ✅ Good: Explicit interface with documentation
+interface IUser {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+}
+
+// ✅ Good: Generic types for reusability
+interface IApiResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
+}
+
+// ✅ Good: Union types for constrained values
+type TripStatus = "draft" | "planned" | "active" | "completed";
+
+// ❌ Bad: Using any
+function processData(data: any) { }
+
+// ✅ Good: Proper typing
+function processData<T>(data: T): T { }
+```
+
+## 🏗️ Next.js App Router Architecture
+
+### Project Structure
+
+```
+packages/web/src/
+├── app/                        # Next.js 14 App Router
+│   ├── layout.tsx             # Root layout
+│   ├── page.tsx               # Home page
+│   ├── loading.tsx            # Loading UI
+│   ├── error.tsx              # Error boundary
+│   ├── not-found.tsx          # 404 page
+│   ├── auth/
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   └── register/
+│   │       └── page.tsx
+│   ├── trips/
+│   │   ├── page.tsx           # Trip list
+│   │   ├── new/
+│   │   │   └── page.tsx       # New trip form
+│   │   └── [tripId]/
+│   │       ├── page.tsx       # Trip detail
+│   │       └── edit/
+│   │           └── page.tsx
+│   └── api/                   # API routes
+│       └── auth/
+│           └── route.ts
+├── components/
+│   ├── ui/                    # Reusable UI components
+│   │   ├── Button.tsx
+│   │   ├── Input.tsx
+│   │   └── Card.tsx
+│   ├── forms/                 # Form components
+│   │   └── TripPlanningForm.tsx
+│   ├── maps/                  # Map components
+│   │   └── InteractiveMap.tsx
+│   └── layouts/               # Layout components
+│       └── MainLayout.tsx
+├── lib/
+│   ├── api.ts                 # API client
+│   ├── auth.ts                # Auth utilities
+│   ├── utils.ts               # General utilities
+│   └── types.ts               # Shared types
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useTrip.ts
+│   └── useDebounce.ts
+└── styles/
+    └── globals.css
+```
+
+### File Size Limits
+
+- **Components**: Max 300 lines
+- **Pages**: Max 200 lines (extract logic to hooks/utils)
+- **Functions**: Max 50 lines
+- **Hooks**: Max 100 lines
+
+### Component Patterns
+
+```typescript
+// ✅ Good: Functional component with TypeScript
+import { FC } from "react";
+
+interface IButtonProps {
+  label: string;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
+  disabled?: boolean;
+}
+
+export const Button: FC<IButtonProps> = ({
+  label,
+  onClick,
+  variant = "primary",
+  disabled = false,
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`btn btn-${variant}`}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ✅ Good: Server Component (default in App Router)
+export default async function TripsPage() {
+  const trips = await fetchTrips(); // Fetch directly in component
+  return <TripList trips={trips} />;
+}
+
+// ✅ Good: Client Component with hooks
+"use client";
+
+import { useState } from "react";
+
+export function InteractiveMap() {
+  const [location, setLocation] = useState<[number, number]>([0, 0]);
+
+  return <div>Map content</div>;
+}
+```
+
+## 🧪 Frontend Testing Strategy
+
+### Vitest Configuration
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+    },
+  },
+});
+```
+
+### Testing Best Practices
+
+```typescript
+// ✅ Good: Component testing with React Testing Library
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { Button } from "./Button";
+
+describe("Button", () => {
+  it("should render with correct label", () => {
+    render(<Button label="Click me" onClick={() => {}} />);
+    expect(screen.getByText("Click me")).toBeInTheDocument();
+  });
+
+  it("should call onClick when clicked", () => {
+    const handleClick = vi.fn();
+    render(<Button label="Click me" onClick={handleClick} />);
+
+    fireEvent.click(screen.getByText("Click me"));
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("should be disabled when disabled prop is true", () => {
+    render(<Button label="Click me" onClick={() => {}} disabled />);
+    expect(screen.getByText("Click me")).toBeDisabled();
+  });
+});
+
+// ✅ Good: Hook testing
+import { renderHook, act } from "@testing-library/react";
+import { useCounter } from "./useCounter";
+
+describe("useCounter", () => {
+  it("should increment counter", () => {
+    const { result } = renderHook(() => useCounter());
+
+    act(() => {
+      result.current.increment();
+    });
+
+    expect(result.current.count).toBe(1);
+  });
+});
+```
+
+### Test Organization
+
+- **Unit tests**: Test individual components/functions
+- **Integration tests**: Test component interactions
+- **E2E tests**: Use Playwright for critical user flows
+- Tests live next to source: `Button.tsx` → `Button.test.tsx`
+
+## 🌐 API Client Patterns
+
+### Fetch Wrapper with Error Handling
+
+```typescript
+// lib/api.ts
+interface IFetchOptions extends RequestInit {
+  timeout?: number;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public data?: unknown
+  ) {
+    super(`API Error: ${status} ${statusText}`);
+  }
+}
+
+export async function apiClient<T>(
+  url: string,
+  options: IFetchOptions = {}
+): Promise<T> {
+  const { timeout = 10000, ...fetchOptions } = options;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...fetchOptions.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new ApiError(response.status, response.statusText, errorData);
+    }
+
+    return await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof ApiError) throw error;
+    throw new Error(`Network error: ${error}`);
+  }
+}
+
+// Usage
+const trips = await apiClient<ITrip[]>("/api/trips");
+```
+
+## 🎨 React Component Best Practices
+
+### Custom Hooks
+
+```typescript
+// hooks/useAuth.ts
+import { useState, useEffect } from "react";
+
+interface IUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export function useAuth() {
+  const [user, setUser] = useState<IUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch user on mount
+    fetchUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const user = await apiClient<IUser>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    setUser(user);
+  };
+
+  const logout = () => {
+    setUser(null);
+  };
+
+  return { user, loading, login, logout };
+}
+```
+
+### Form Handling with Validation
+
+```typescript
+// Use Zod for schema validation
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const tripSchema = z.object({
+  destination: z.string().min(1, "Destination is required"),
+  startDate: z.date(),
+  endDate: z.date(),
+  budget: z.number().positive("Budget must be positive"),
+});
+
+type TTripFormData = z.infer<typeof tripSchema>;
+
+export function TripPlanningForm() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<TTripFormData>({
+    resolver: zodResolver(tripSchema),
+  });
+
+  const onSubmit = async (data: TTripFormData) => {
+    await apiClient("/api/trips", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("destination")} />
+      {errors.destination && <span>{errors.destination.message}</span>}
+      {/* More fields */}
+    </form>
+  );
+}
+```
+
+## 🚨 Error Handling
+
+### Error Boundaries
+
+```typescript
+// components/ErrorBoundary.tsx
+"use client";
+
+import { Component, ReactNode } from "react";
+
+interface IProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface IState {
+  hasError: boolean;
+  error?: Error;
+}
+
+export class ErrorBoundary extends Component<IProps, IState> {
+  constructor(props: IProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): IState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Error caught by boundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || <div>Something went wrong</div>;
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+## 🎯 Performance Optimization
+
+### Code Splitting and Lazy Loading
+
+```typescript
+// Lazy load heavy components
+import dynamic from "next/dynamic";
+
+const InteractiveMap = dynamic(() => import("@/components/maps/InteractiveMap"), {
+  loading: () => <div>Loading map...</div>,
+  ssr: false, // Disable SSR for client-only components
+});
+
+export default function TripPage() {
+  return (
+    <div>
+      <h1>Trip Details</h1>
+      <InteractiveMap />
+    </div>
+  );
+}
+```
+
+### Memoization
+
+```typescript
+import { useMemo, useCallback } from "react";
+
+export function ExpensiveComponent({ data }: { data: number[] }) {
+  // Memoize expensive calculations
+  const processedData = useMemo(() => {
+    return data.map((item) => item * 2).filter((item) => item > 10);
+  }, [data]);
+
+  // Memoize callbacks passed to children
+  const handleClick = useCallback(() => {
+    console.log("Clicked");
+  }, []);
+
+  return <div onClick={handleClick}>{processedData.length}</div>;
+}
+```
+
+## 🔒 Security Best Practices
+
+- **Never store sensitive data in localStorage** - Use httpOnly cookies
+- **Sanitize user input** - Use DOMPurify for HTML content
+- **Validate all form inputs** - Use Zod or similar
+- **Use environment variables** - Never commit secrets to git
+- **Implement CSRF protection** - Use Next.js built-in protection
+- **Set proper Content Security Policy headers**
 
 ## 🚀 GitHub Flow Workflow Summary
 
