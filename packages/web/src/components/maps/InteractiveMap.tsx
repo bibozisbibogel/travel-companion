@@ -3,17 +3,19 @@
 import { useCallback, useMemo, useState } from "react";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import type {
-  ActivityMarker,
-  AccommodationMarker,
+  ActivityMarker as ActivityMarkerType,
+  AccommodationMarker as AccommodationMarkerType,
   MapStyle,
 } from "@/lib/types/map";
 import { mapStyles } from "./mapStyles";
+import { ActivityMarker } from "./ActivityMarker";
+import { AccommodationMarker } from "./AccommodationMarker";
 
 const libraries: ("places" | "geometry" | "drawing")[] = ["places", "geometry"];
 
 interface InteractiveMapProps {
-  activities: ActivityMarker[];
-  accommodations: AccommodationMarker[];
+  activities: ActivityMarkerType[];
+  accommodations: AccommodationMarkerType[];
   selectedDay: number | null;
   center?: { lat: number; lng: number } | undefined;
   onMarkerClick?: (markerId: string, type: "activity" | "accommodation") => void;
@@ -150,6 +152,24 @@ export function InteractiveMap({
           disableDoubleClickZoom: false,
         }}
       >
+        {/* Render activity markers */}
+        {filteredActivities.map((activity) => (
+          <ActivityMarker
+            key={activity.activity_id}
+            activity={activity}
+            {...(onMarkerClick && { onClick: (id: string) => onMarkerClick(id, "activity") })}
+          />
+        ))}
+
+        {/* Render accommodation markers */}
+        {accommodations.map((accommodation) => (
+          <AccommodationMarker
+            key={accommodation.hotel_id}
+            accommodation={accommodation}
+            {...(onMarkerClick && { onClick: (id: string) => onMarkerClick(id, "accommodation") })}
+          />
+        ))}
+
         {/* Map controls for style switching - mobile optimized */}
         <div className="absolute left-2 top-2 z-10 flex gap-1 rounded-lg bg-white p-1.5 shadow-md sm:left-4 sm:top-4 sm:gap-2 sm:p-2">
           <button

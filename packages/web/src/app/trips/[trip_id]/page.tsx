@@ -6,291 +6,114 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { ItineraryTimeline } from '@/components/itinerary';
 import { IFullTripItinerary } from '@/lib/types';
 import { apiClient } from '@/lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { MainLayout } from '@/components/layouts';
+import { LazyMapLoader } from '@/components/maps';
+import { MapTimelineProvider } from '@/contexts/MapTimelineContext';
+import type { ActivityMarker, AccommodationMarker, DayRoute } from '@/lib/types/map';
 
-// For demo purposes, we'll use sample data
-// In production, this would fetch from the API using trip_id
-const SAMPLE_ITINERARY: IFullTripItinerary = {
-  trip: {
-    destination: {
-      city: 'Rome',
-      country: 'Italy',
-    },
-    dates: {
-      start: '2025-10-18',
-      end: '2025-10-25',
-      duration_days: 7,
-    },
-    travelers: {
-      count: 2,
-      type: 'adults',
-    },
-    budget: {
-      total: '3000.00',
-      currency: 'EUR',
-      spent: '2456.90',
-      remaining: '543.10',
-    },
-  },
-  flights: {
-    outbound: {
-      airline: 'Air Canada',
-      flight_number: 'AC8899',
-      route: {
-        from_airport: 'JFK',
-        to_airport: 'FCO',
-      },
-      departure: {
-        time: '09:00',
-        timezone: 'America/New_York',
-      },
-      arrival: {
-        time: '09:15',
-        timezone: 'Europe/Rome',
-      },
-      duration_minutes: 1095,
-      stops: 1,
-      price_per_person: '408.45',
-      total_price: '816.90',
-    },
-    return_flight: {
-      airline: 'Air Canada',
-      flight_number: 'AC8900',
-      route: {
-        from_airport: 'FCO',
-        to_airport: 'JFK',
-      },
-      departure: {
-        time: '11:30',
-        timezone: 'Europe/Rome',
-      },
-      arrival: {
-        time: '15:45',
-        timezone: 'America/New_York',
-      },
-      duration_minutes: 615,
-      stops: 1,
-      price_per_person: '408.45',
-      total_price: '816.90',
-    },
-    total_cost: '1633.80',
-  },
-  accommodation: {
-    name: 'Hotel Artemide',
-    rating: 4.8,
-    stars: 4,
-    address: {
-      street: 'Via Nazionale, 22',
-      postal_code: '00184',
-      city: 'Roma',
-      region: 'RM',
-      country: 'Italy',
-    },
-    amenities: [
-      'Air Conditioning',
-      'Daily Housekeeping',
-      'Central Location',
-      'Near Termini Station',
-    ],
-    price_per_night: '117.00',
-    nights: 7,
-    total_cost: '819.00',
-    location_notes: 'Centrally located near Via Nazionale, walking distance to major attractions',
-    check_in: '15:00',
-    check_out: '11:00',
-  },
-  itinerary: [
-    {
-      day: 1,
-      date: '2025-10-18',
-      day_of_week: 'Saturday',
-      title: 'Arrival in Rome',
-      activities: [
-        {
-          time_start: '09:15',
-          time_end: null,
-          category: 'transportation',
-          title: 'Arrival at Fiumicino Airport (FCO)',
-          description: 'Land at Rome Fiumicino Airport after overnight flight',
-          duration_minutes: 30,
-        },
-        {
-          time_start: '11:00',
-          time_end: '12:00',
-          category: 'transportation',
-          title: 'Transfer to Hotel',
-          description: 'Take Leonardo Express train from airport to Termini Station, then walk to hotel',
-          duration_minutes: 60,
-          price: '14.00',
-        },
-        {
-          time_start: '15:00',
-          time_end: null,
-          category: 'sightseeing',
-          title: 'Hotel Check-in',
-          description: 'Check into Hotel Artemide and freshen up',
-          duration_minutes: 30,
-          location: 'Hotel Artemide, Via Nazionale',
-        },
-        {
-          time_start: '16:30',
-          time_end: '18:30',
-          category: 'sightseeing',
-          title: 'Evening Walk - Trevi Fountain',
-          description:
-            'Leisurely evening walk to the iconic Trevi Fountain. Toss a coin to ensure your return to Rome!',
-          duration_minutes: 120,
-          location: 'Trevi Fountain',
-        },
-      ],
-      meals: [
-        {
-          restaurant_name: 'Pasta e Vino',
-          cuisine_type: 'Italian',
-          meal_type: 'dinner',
-          time: '19:30',
-          price_range: '€€',
-          rating: 4.5,
-          location: 'Near Trevi Fountain',
-          description: 'Traditional Roman pasta dishes in a cozy atmosphere',
-        },
-      ],
-      accommodation: {
-        name: 'Hotel Artemide',
-        rating: 4.8,
-        stars: 4,
-        address: {
-          street: 'Via Nazionale, 22',
-          postal_code: '00184',
-          city: 'Roma',
-          region: 'RM',
-          country: 'Italy',
-        },
-        amenities: [
-          'Air Conditioning',
-          'Daily Housekeeping',
-          'Central Location',
-          'Near Termini Station',
-        ],
-        price_per_night: '117.00',
-        nights: 7,
-        total_cost: '819.00',
-        location_notes: 'Centrally located near Via Nazionale',
-        check_in: '15:00',
-      },
-      daily_cost: {
-        activities: '14.00',
-        meals: '40.00',
-        accommodation: '117.00',
-        total: '171.00',
-      },
-    },
-    {
-      day: 2,
-      date: '2025-10-19',
-      day_of_week: 'Sunday',
-      title: 'Ancient Rome Exploration',
-      activities: [
-        {
-          time_start: '09:00',
-          time_end: '12:00',
-          category: 'cultural',
-          title: 'Colosseum & Roman Forum Tour',
-          description:
-            'Guided tour of the iconic Colosseum and ancient Roman Forum. Skip-the-line tickets included.',
-          duration_minutes: 180,
-          location: 'Colosseum',
-          price: '55.00',
-          booking_info: 'Pre-booked skip-the-line tickets required',
-        },
-        {
-          time_start: '14:00',
-          time_end: '16:00',
-          category: 'cultural',
-          title: 'Palatine Hill Visit',
-          description: 'Explore the legendary birthplace of Rome with stunning city views',
-          duration_minutes: 120,
-          location: 'Palatine Hill',
-          price: '16.00',
-        },
-        {
-          time_start: '17:00',
-          time_end: '18:30',
-          category: 'relaxation',
-          title: 'Sunset at Orange Garden',
-          description: 'Enjoy panoramic sunset views of Rome from Giardino degli Aranci',
-          duration_minutes: 90,
-          location: 'Giardino degli Aranci, Aventine Hill',
-        },
-      ],
-      meals: [
-        {
-          restaurant_name: 'Café Colosseum',
-          cuisine_type: 'Italian Café',
-          meal_type: 'breakfast',
-          time: '08:00',
-          price_range: '€',
-          rating: 4.2,
-          location: 'Near hotel',
-        },
-        {
-          restaurant_name: 'Taverna dei Fori Imperiali',
-          cuisine_type: 'Roman',
-          meal_type: 'lunch',
-          time: '13:00',
-          price_range: '€€',
-          rating: 4.6,
-          location: 'Near Roman Forum',
-          description: 'Authentic Roman cuisine with traditional recipes',
-        },
-        {
-          restaurant_name: 'Flavio al Velavevodetto',
-          cuisine_type: 'Roman',
-          meal_type: 'dinner',
-          time: '19:30',
-          price_range: '€€€',
-          rating: 4.7,
-          location: 'Testaccio',
-          description: 'Famous for cacio e pepe and traditional Roman dishes',
-        },
-      ],
-      accommodation: {
-        name: 'Hotel Artemide',
-        rating: 4.8,
-        stars: 4,
-        address: {
-          street: 'Via Nazionale, 22',
-          postal_code: '00184',
-          city: 'Roma',
-          region: 'RM',
-          country: 'Italy',
-        },
-        amenities: [
-          'Air Conditioning',
-          'Daily Housekeeping',
-          'Central Location',
-          'Near Termini Station',
-        ],
-        price_per_night: '117.00',
-        nights: 7,
-        total_cost: '819.00',
-        location_notes: 'Centrally located near Via Nazionale',
-      },
-      daily_cost: {
-        activities: '71.00',
-        meals: '70.00',
-        accommodation: '117.00',
-        total: '258.00',
-      },
-    },
-  ],
+/**
+ * City coordinates mapping for common destinations
+ * TODO: Replace with proper geocoding API (Google Geocoding API or similar)
+ */
+const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  'New York City': { lat: 40.7128, lng: -74.0060 },
+  'New York': { lat: 40.7128, lng: -74.0060 },
+  'Rome': { lat: 41.9028, lng: 12.4964 },
+  'Paris': { lat: 48.8566, lng: 2.3522 },
+  'London': { lat: 51.5074, lng: -0.1278 },
+  'Tokyo': { lat: 35.6762, lng: 139.6503 },
+  'Barcelona': { lat: 41.3851, lng: 2.1734 },
+  'Amsterdam': { lat: 52.3676, lng: 4.9041 },
+  'Berlin': { lat: 52.5200, lng: 13.4050 },
+  'Dubai': { lat: 25.2048, lng: 55.2708 },
+  'Singapore': { lat: 1.3521, lng: 103.8198 },
+  'Sydney': { lat: -33.8688, lng: 151.2093 },
+  'Los Angeles': { lat: 34.0522, lng: -118.2437 },
+  'Miami': { lat: 25.7617, lng: -80.1918 },
+  'Bangkok': { lat: 13.7563, lng: 100.5018 },
 };
+
+/**
+ * Transform itinerary data to map marker format
+ *
+ * NOTE: Currently using approximate city-level coordinates since the API
+ * doesn't return geocoded coordinates for each activity location.
+ *
+ * FUTURE IMPROVEMENT: Implement proper geocoding using Google Geocoding API
+ * to convert activity.location strings (e.g., "Trevi Fountain") to precise lat/lng
+ */
+function transformItineraryToMapData(itinerary: IFullTripItinerary) {
+  const activities: ActivityMarker[] = [];
+  const accommodations: AccommodationMarker[] = [];
+  const routes: DayRoute[] = [];
+
+  // Get destination city coordinates
+  const destinationCity = itinerary.trip.destination.city;
+  const cityCoords = CITY_COORDINATES[destinationCity] || { lat: 40.7128, lng: -74.0060 }; // Default to NYC
+
+  console.log(`Map using coordinates for: ${destinationCity}`, cityCoords);
+
+  // Transform activities from each day
+  itinerary.itinerary.forEach((dayPlan) => {
+    dayPlan.activities.forEach((activity, index) => {
+      // Only add activities with location data
+      if (activity.location || activity.title) {
+        const activityLocation = activity.location ||
+                                `${destinationCity}, ${itinerary.trip.destination.country}`;
+
+        // Spread activities around the city center with random offset
+        // This creates a realistic spread on the map until we implement geocoding
+        const latOffset = (Math.random() - 0.5) * 0.02; // ~1km radius
+        const lngOffset = (Math.random() - 0.5) * 0.02;
+
+        activities.push({
+          activity_id: `${dayPlan.day}-${index}`,
+          name: activity.title,
+          category: activity.category === 'cultural' ? 'cultural' :
+                    activity.category === 'transportation' ? 'adventure' :
+                    activity.category === 'sightseeing' ? 'cultural' :
+                    activity.category === 'relaxation' ? 'relaxation' : 'cultural',
+          location: {
+            latitude: cityCoords.lat + latOffset,
+            longitude: cityCoords.lng + lngOffset,
+            address: activityLocation,
+          },
+          time: activity.time_start || '00:00',
+          duration: activity.duration_minutes || 60,
+          description: activity.description || '',
+          day: dayPlan.day,
+        });
+      }
+    });
+  });
+
+  // Add accommodation marker (centered on city)
+  if (itinerary.accommodation) {
+    accommodations.push({
+      hotel_id: 'main-hotel',
+      name: itinerary.accommodation.name,
+      location: {
+        latitude: cityCoords.lat,
+        longitude: cityCoords.lng,
+        address: `${itinerary.accommodation.address.street}, ${itinerary.accommodation.address.city}`,
+      },
+      rating: itinerary.accommodation.rating,
+      price_per_night: parseFloat(itinerary.accommodation.price_per_night),
+      address: `${itinerary.accommodation.address.street}, ${itinerary.accommodation.address.postal_code}`,
+    });
+  }
+
+  // Calculate trip center (use destination city coordinates)
+  const tripCenter = { lat: cityCoords.lat, lng: cityCoords.lng };
+
+  return { activities, accommodations, routes, tripCenter };
+}
 
 export default function TripDetailPage() {
   const params = useParams();
@@ -298,6 +121,12 @@ export default function TripDetailPage() {
   const [itinerary, setItinerary] = useState<IFullTripItinerary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Transform itinerary data for map visualization
+  const mapData = useMemo(() => {
+    if (!itinerary) return null;
+    return transformItineraryToMapData(itinerary);
+  }, [itinerary]);
 
   useEffect(() => {
     const loadItinerary = async () => {
@@ -311,13 +140,12 @@ export default function TripDetailPage() {
         // Extract the trip data from the SuccessResponse wrapper
         const tripData = response.data;
 
-        // If the trip has a plan, use it; otherwise fall back to sample data
+        // If the trip has a plan, use it
         if (tripData?.plan) {
           setItinerary(tripData.plan);
         } else {
           // No plan available yet - trip might be in draft status
-          console.warn('Trip has no itinerary plan yet, using sample data');
-          setItinerary(SAMPLE_ITINERARY);
+          throw new Error('Trip has no itinerary plan yet. Please complete trip planning first.');
         }
       } catch (err) {
         console.error('Failed to load trip:', err);
@@ -366,8 +194,25 @@ export default function TripDetailPage() {
   }
 
   return (
-    <MainLayout className="min-h-screen bg-gray-50">
-      <ItineraryTimeline itinerary={itinerary} />
-    </MainLayout>
+    <MapTimelineProvider>
+      <MainLayout className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          {/* Map Section */}
+          {mapData && (
+            <div className="mb-8 h-[500px] rounded-lg overflow-hidden shadow-lg">
+              <LazyMapLoader
+                activities={mapData.activities}
+                accommodations={mapData.accommodations}
+                routes={mapData.routes}
+                tripCenter={mapData.tripCenter}
+              />
+            </div>
+          )}
+
+          {/* Timeline Section */}
+          <ItineraryTimeline itinerary={itinerary} />
+        </div>
+      </MainLayout>
+    </MapTimelineProvider>
   );
 }
