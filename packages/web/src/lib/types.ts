@@ -249,11 +249,11 @@ export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
 
 export interface IItineraryActivity {
-  time_start: string;
+  time_start: string | null;
   time_end: string | null;
   category: ActivityCategory;
   title: string;
-  description: string;
+  description: string | null;
   duration_minutes?: number;
   location?: string;
   price?: string;
@@ -398,4 +398,38 @@ export interface IPaginatedResponse<T> {
   data: T;
   pagination: IPaginationMeta;
   message: string;
+}
+
+// Trip Detail Response Types
+export interface ITripDetailResponse {
+  data: ITripResponse;
+  message: string;
+}
+
+export interface ITripResponse {
+  trip_id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  destination: {
+    city: string;
+    country: string;
+    country_code: string;
+    airport_code: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  };
+  requirements: {
+    budget: number;
+    currency: string;
+    start_date: string;
+    end_date: string;
+    travelers: number;
+    travel_class?: string;
+    accommodation_type?: string;
+  };
+  status: TripStatus;
+  plan: IFullTripItinerary | null;
+  created_at: string;
+  updated_at: string;
 }

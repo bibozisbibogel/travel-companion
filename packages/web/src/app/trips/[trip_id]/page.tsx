@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ItineraryTimeline } from '@/components/itinerary';
 import { IFullTripItinerary } from '@/lib/types';
+import { apiClient } from '@/lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 // For demo purposes, we'll use sample data
@@ -298,16 +299,28 @@ export default function TripDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate API call with trip_id
     const loadItinerary = async () => {
       try {
         setLoading(true);
-        // In production, this would be: await apiClient.getItinerary(tripId)
-        console.log('Loading itinerary for trip:', tripId);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setItinerary(SAMPLE_ITINERARY);
+        console.log('Loading trip details for:', tripId);
+
+        // Fetch trip details from API
+        const response = await apiClient.getTripById(tripId);
+
+        // Extract the trip data from the SuccessResponse wrapper
+        const tripData = response.data;
+
+        // If the trip has a plan, use it; otherwise fall back to sample data
+        if (tripData?.plan) {
+          setItinerary(tripData.plan);
+        } else {
+          // No plan available yet - trip might be in draft status
+          console.warn('Trip has no itinerary plan yet, using sample data');
+          setItinerary(SAMPLE_ITINERARY);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load itinerary');
+        console.error('Failed to load trip:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load trip details');
       } finally {
         setLoading(false);
       }
