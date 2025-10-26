@@ -81,21 +81,121 @@ CREATE TABLE trips (
 ```
 
 #### trips.itinerary_data
-Complete `ItineraryOutput` structure from TravelPlannerAgent:
+Complete `ItineraryOutput` structure from TravelPlannerAgent with geocoded coordinates:
+
+**Coordinate Structure** (added in v1.1 - Story 3.6):
+All location-based entities now include a `coordinates` object:
 ```json
 {
-  "trip": {
-    "destination": {"city": "Paris", "country": "France"},
-    "dates": {"start": "2024-06-01", "end": "2024-06-07", "duration_days": 6},
-    "travelers": {"count": 2, "type": "adults"},
-    "budget": {"total": 2000, "currency": "EUR"}
-  },
-  "flights": {...},
-  "accommodation": {...},
-  "itinerary": [...],
-  "budget_breakdown": {...}
+  "latitude": 41.9009,
+  "longitude": 12.4833,
+  "geocoding_status": "success",
+  "geocoded_at": "2025-10-26T14:30:00Z",
+  "geocoding_error_message": null
 }
 ```
+
+Field specifications:
+- `latitude`: DECIMAL(10, 8) range (-90 to 90)
+- `longitude`: DECIMAL(11, 8) range (-180 to 180)
+- `geocoding_status`: `"success"`, `"failed"`, or `"pending"`
+- `geocoded_at`: ISO 8601 timestamp
+- `geocoding_error_message`: Present only when status = "failed"
+
+**Complete Structure:**
+```json
+{
+  "destination_city": {
+    "name": "Rome",
+    "country": "Italy",
+    "coordinates": {
+      "latitude": 41.9028,
+      "longitude": 12.4964,
+      "geocoding_status": "success",
+      "geocoded_at": "2025-10-26T14:30:00Z"
+    }
+  },
+  "activities": [
+    {
+      "day": 1,
+      "time": "10:00 AM",
+      "name": "Visit Trevi Fountain",
+      "location": "Trevi Fountain, Rome, Italy",
+      "coordinates": {
+        "latitude": 41.9009,
+        "longitude": 12.4833,
+        "geocoding_status": "success",
+        "geocoded_at": "2025-10-26T14:30:00Z"
+      },
+      "description": "Iconic 18th-century fountain",
+      "category": "cultural",
+      "estimated_duration_minutes": 60,
+      "estimated_cost": 0.0
+    }
+  ],
+  "accommodations": [
+    {
+      "name": "Hotel Quirinale",
+      "location": "Via Nazionale, 7, Rome",
+      "coordinates": {
+        "latitude": 41.9010,
+        "longitude": 12.4926,
+        "geocoding_status": "success"
+      },
+      "check_in_date": "2025-11-01",
+      "check_out_date": "2025-11-05",
+      "room_type": "Double Room",
+      "estimated_price_per_night": 150.00
+    }
+  ],
+  "restaurants": [
+    {
+      "day": 1,
+      "meal": "dinner",
+      "name": "Trattoria da Enzo",
+      "location": "Via dei Vascellari, 29, Rome",
+      "coordinates": {
+        "latitude": 41.8897,
+        "longitude": 12.4707,
+        "geocoding_status": "success"
+      },
+      "cuisine": "Italian",
+      "estimated_cost_per_person": 30.00
+    }
+  ],
+  "flights": {
+    "outbound": {
+      "departure_airport": "JFK",
+      "departure_location": "New York, USA",
+      "departure_coordinates": {
+        "latitude": 40.6413,
+        "longitude": -73.7781,
+        "geocoding_status": "success"
+      },
+      "arrival_airport": "FCO",
+      "arrival_location": "Rome, Italy",
+      "arrival_coordinates": {
+        "latitude": 41.8003,
+        "longitude": 12.2389,
+        "geocoding_status": "success"
+      }
+    }
+  },
+  "budget_breakdown": {
+    "flights": 800.00,
+    "accommodations": 600.00,
+    "activities": 150.00,
+    "food": 240.00,
+    "total": 2000.00,
+    "currency": "USD"
+  }
+}
+```
+
+**Geocoding Indexes** (added in migration `add_geocoding_schema.sql`):
+- GIN index on `itinerary_data` for efficient JSONB queries
+- Expression index for destination coordinates
+- Partial index for geocoding failures (monitoring)
 
 -- Flight Options (normalized for comparison)
 CREATE TABLE flight_options (
