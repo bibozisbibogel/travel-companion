@@ -17,7 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/itineraryUtils';
+import { formatCurrency } from '@/lib/currencyUtils';
 
 export type BudgetCategory =
   | 'flights'

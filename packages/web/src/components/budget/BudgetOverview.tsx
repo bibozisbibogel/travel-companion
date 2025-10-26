@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { DollarSign, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
-import { formatCurrency } from '@/lib/itineraryUtils';
+import { formatCurrency } from '@/lib/currencyUtils';
 
 export interface BudgetOverviewProps {
   totalBudget: number;
