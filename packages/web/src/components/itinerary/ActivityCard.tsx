@@ -28,8 +28,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   currency = 'EUR',
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const Icon = ACTIVITY_ICONS[activity.category];
-  const bgColor = ACTIVITY_BG_LIGHT[activity.category];
+  const Icon = ACTIVITY_ICONS[activity.category] || MapPin;
+  const bgColor = ACTIVITY_BG_LIGHT[activity.category] || 'bg-gray-50';
 
   const timeDisplay = activity.duration_minutes
     ? calculateTimeRange(activity.time_start, activity.duration_minutes)
@@ -93,13 +93,15 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
           </div>
 
           {/* Brief Description */}
-          <p
-            className={`text-sm text-gray-700 leading-relaxed ${
-              !isExpanded ? 'line-clamp-2' : ''
-            }`}
-          >
-            {activity.description}
-          </p>
+          {activity.description && (
+            <p
+              className={`text-sm text-gray-700 leading-relaxed ${
+                !isExpanded ? 'line-clamp-2' : ''
+              }`}
+            >
+              {activity.description}
+            </p>
+          )}
 
           {/* Booking Info (when expanded) */}
           {isExpanded && activity.booking_info && (
@@ -112,7 +114,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
           )}
 
           {/* Expand/Collapse Button */}
-          {(activity.description.length > 100 || activity.booking_info) && (
+          {((activity.description && activity.description.length > 100) || activity.booking_info) && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="mt-2 flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"

@@ -11,7 +11,7 @@ import {
 import {
   Compass,
   Landmark,
-  Palmtree,
+  TreePalm,
   Utensils,
   Music,
   ShoppingBag,
@@ -42,7 +42,7 @@ export const ACTIVITY_COLORS: Record<ActivityCategory, string> = {
 export const ACTIVITY_ICONS: Record<ActivityCategory, LucideIcon> = {
   adventure: Compass,
   cultural: Landmark,
-  relaxation: Palmtree,
+  relaxation: TreePalm,
   dining: Utensils,
   nightlife: Music,
   shopping: ShoppingBag,
@@ -84,7 +84,9 @@ export const ACTIVITY_BG_LIGHT: Record<ActivityCategory, string> = {
 /**
  * Determine time of day from a time string (HH:MM format)
  */
-export function getTimeOfDay(timeString: string): TimeOfDay {
+export function getTimeOfDay(timeString: string | null): TimeOfDay {
+  if (!timeString) return 'morning'; // Default to morning if no time specified
+
   const hour = parseInt(timeString.split(':')[0], 10);
 
   if (hour >= 5 && hour < 12) return 'morning';
@@ -117,7 +119,9 @@ export function groupActivitiesByTimeOfDay(
 /**
  * Format time string to display format (e.g., "09:00" -> "9:00 AM")
  */
-export function formatTime(timeString: string): string {
+export function formatTime(timeString: string | null): string {
+  if (!timeString) return 'Time TBD';
+
   const [hours, minutes] = timeString.split(':');
   const hour = parseInt(hours, 10);
   const period = hour >= 12 ? 'PM' : 'AM';
@@ -142,9 +146,10 @@ export function formatDuration(minutes: number): string {
  * Calculate estimated time range for an activity
  */
 export function calculateTimeRange(
-  startTime: string,
+  startTime: string | null,
   durationMinutes?: number
 ): string {
+  if (!startTime) return 'Time TBD';
   if (!durationMinutes) return formatTime(startTime);
 
   const [hours, minutes] = startTime.split(':').map(Number);
@@ -229,6 +234,11 @@ export function sortActivitiesByTime(
   activities: IItineraryActivity[]
 ): IItineraryActivity[] {
   return [...activities].sort((a, b) => {
+    // Activities without time go to the end
+    if (!a.time_start && !b.time_start) return 0;
+    if (!a.time_start) return 1;
+    if (!b.time_start) return -1;
+
     const timeA = a.time_start.split(':').map(Number);
     const timeB = b.time_start.split(':').map(Number);
 
