@@ -232,6 +232,15 @@ export interface ICompleteItinerary {
   };
 }
 
+// Coordinates Types (Story 3.6 - Geocoding Integration)
+export interface ICoordinates {
+  latitude: number;
+  longitude: number;
+  geocoding_status: 'success' | 'failed' | 'pending';
+  geocoded_at?: string | null;
+  geocoding_error_message?: string | null;
+}
+
 // Enhanced Itinerary Timeline Types (Story 3.2)
 export type ActivityCategory =
   | 'adventure'
@@ -248,6 +257,14 @@ export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
 
+export interface IVenueInfo {
+  name: string;
+  cuisine?: string;
+  location?: string;
+  coordinates?: ICoordinates;
+  style?: string;
+}
+
 export interface IItineraryActivity {
   time_start: string | null;
   time_end: string | null;
@@ -256,8 +273,10 @@ export interface IItineraryActivity {
   description: string | null;
   duration_minutes?: number;
   location?: string;
+  coordinates?: ICoordinates;
   price?: string;
   booking_info?: string;
+  venue?: IVenueInfo;
 }
 
 export interface IMealRecommendation {
@@ -282,6 +301,7 @@ export interface IAccommodationInfo {
     region: string;
     country: string;
   };
+  coordinates?: ICoordinates;
   amenities: string[];
   price_per_night: string;
   nights: number;
@@ -318,10 +338,12 @@ export interface IFlightDetails {
     time: string;
     timezone: string;
   };
+  departure_coordinates?: ICoordinates;
   arrival: {
     time: string;
     timezone: string;
   };
+  arrival_coordinates?: ICoordinates;
   duration_minutes: number;
   stops: number;
   price_per_person: string;
@@ -333,6 +355,7 @@ export interface IFullTripItinerary {
     destination: {
       city: string;
       country: string;
+      coordinates?: ICoordinates;
     };
     dates: {
       start: string;
@@ -418,6 +441,7 @@ export interface ITripResponse {
     airport_code: string | null;
     latitude: number | null;
     longitude: number | null;
+    coordinates?: ICoordinates;
   };
   requirements: {
     budget: number;
