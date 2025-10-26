@@ -3,7 +3,7 @@
  * Enhanced with timeout, retry logic, and comprehensive error handling
  */
 
-import type { ILoginRequest, IRegisterRequest, IAuthResponse, ITripRequest, ITripPlanResponse, IDestination, IApiRequestConfig, IRetryConfig } from './types'
+import type { ILoginRequest, IRegisterRequest, IAuthResponse, ITripRequest, ITripPlanResponse, IDestination, IApiRequestConfig, IRetryConfig, IPaginatedResponse, ITripSummary } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
@@ -243,6 +243,13 @@ export class ApiClient {
   // Itinerary methods
   async getItinerary(tripId: string): Promise<any> {
     return this.get<any>(`/api/v1/trips/${tripId}/itinerary`);
+  }
+
+  // Trip list methods (Story 3.5)
+  async getUserTrips(page: number = 1, perPage: number = 20): Promise<IPaginatedResponse<ITripSummary[]>> {
+    return this.get<IPaginatedResponse<ITripSummary[]>>(
+      `/api/v1/trips?page=${page}&per_page=${perPage}`
+    );
   }
 }
 

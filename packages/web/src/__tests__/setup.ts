@@ -32,6 +32,32 @@ vi.mock('next/image', () => ({
 
 // Mock Next.js Link to avoid prefetch/state updates during tests
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: any) =>
-    React.createElement('a', { href, ...props }, children),
+  default: ({ href, children, ...props }: any) => {
+    return React.createElement('a', { href, ...props }, children)
+  },
 }))
+
+// Mock lucide-react icons to avoid rendering issues in tests
+vi.mock('lucide-react', () => {
+  const mockIcon = ({ 'data-testid': testId, className, ...props }: any) =>
+    React.createElement('svg', {
+      'data-testid': testId || 'mock-icon',
+      className,
+      ...props
+    })
+
+  return {
+    Loader2: mockIcon,
+    AlertCircle: mockIcon,
+    Search: mockIcon,
+    Filter: mockIcon,
+    Plane: mockIcon,
+    X: mockIcon,
+    Plus: mockIcon,
+    ChevronLeft: mockIcon,
+    ChevronRight: mockIcon,
+    Calendar: mockIcon,
+    MapPin: mockIcon,
+    DollarSign: mockIcon,
+  }
+})
