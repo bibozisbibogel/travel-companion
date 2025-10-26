@@ -7,7 +7,6 @@
     "type": "git",
     "url": "https://github.com/your-org/travel-companion.git"
   },
-
   "scripts": {
     "dev": "./scripts/dev.sh",
     "dev:api": "./scripts/dev.sh --service api",
@@ -79,5 +78,8 @@
     "planning"
   ],
   "author": "Travel Companion Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "lucide-react": "^0.548.0"
+  }
 }

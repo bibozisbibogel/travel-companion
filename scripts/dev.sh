@@ -103,7 +103,7 @@ check_environment() {
     
     if [ "$MODE" = "local" ]; then
         # Check Python virtual environment
-        if [ ! -d ".venv" ]; then
+        if [ ! -d "packages/api/.venv" ]; then
             print_error "Python virtual environment not found. Run './scripts/setup.sh' first"
             exit 1
         fi
@@ -162,7 +162,7 @@ start_local() {
                 
         # Activate virtual environment and start server
         (
-            source ../../.venv/bin/activate
+            source .venv/bin/activate
             export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
             uv run uvicorn travel_companion.main:app \
                 --host 0.0.0.0 \
