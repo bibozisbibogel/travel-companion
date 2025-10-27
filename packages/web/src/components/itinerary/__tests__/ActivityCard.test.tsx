@@ -13,7 +13,7 @@ describe('ActivityCard', () => {
   const mockActivity: IItineraryActivity = {
     time_start: '09:00',
     time_end: '12:00',
-    category: 'cultural',
+    category: 'attraction',
     title: 'Colosseum Tour',
     description: 'Guided tour of the ancient Roman amphitheater',
     duration_minutes: 180,
@@ -97,7 +97,7 @@ describe('ActivityCard', () => {
     const minimalActivity: IItineraryActivity = {
       time_start: '09:00',
       time_end: null,
-      category: 'sightseeing',
+      category: 'exploration',
       title: 'City Walk',
       description: 'Walk around the city',
     };

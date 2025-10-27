@@ -90,10 +90,7 @@ function transformItineraryToMapData(itinerary: IFullTripItinerary) {
         activities.push({
           activity_id: `${dayPlan.day}-${index}`,
           name: activity.title,
-          category: activity.category === 'cultural' ? 'cultural' :
-                    activity.category === 'transportation' ? 'adventure' :
-                    activity.category === 'sightseeing' ? 'cultural' :
-                    activity.category === 'relaxation' ? 'relaxation' : 'cultural',
+          category: activity.category,
           location: {
             latitude,
             longitude,

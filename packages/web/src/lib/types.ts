@@ -242,16 +242,16 @@ export interface ICoordinates {
 }
 
 // Enhanced Itinerary Timeline Types (Story 3.2)
+// Updated to match backend categories (Story 3.6)
 export type ActivityCategory =
-  | 'adventure'
-  | 'cultural'
-  | 'relaxation'
-  | 'dining'
-  | 'nightlife'
-  | 'shopping'
   | 'transportation'
-  | 'sightseeing'
-  | 'entertainment';
+  | 'accommodation'
+  | 'attraction'
+  | 'dining'
+  | 'exploration'
+  | 'entertainment'
+  | 'shopping'
+  | 'other';
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
 

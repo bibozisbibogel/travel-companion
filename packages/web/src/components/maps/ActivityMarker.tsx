@@ -14,12 +14,14 @@ interface ActivityMarkerProps {
 }
 
 const CATEGORY_ICONS: Record<ActivityCategory, string> = {
-  adventure: "🏔️",
-  cultural: "🏛️",
-  relaxation: "🧘",
+  transportation: "🚕",
+  accommodation: "🏨",
+  attraction: "🏛️",
   dining: "🍽️",
-  nightlife: "🌃",
+  exploration: "🧭",
+  entertainment: "🎭",
   shopping: "🛍️",
+  other: "📍",
 };
 
 export function ActivityMarker({ activity, onClick }: ActivityMarkerProps) {
