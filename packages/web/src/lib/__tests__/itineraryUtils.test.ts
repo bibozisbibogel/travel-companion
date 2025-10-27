@@ -289,15 +289,14 @@ describe('itineraryUtils', () => {
   describe('Color constants', () => {
     it('should have colors defined for all activity categories', () => {
       const categories = [
-        'adventure',
-        'cultural',
-        'relaxation',
-        'dining',
-        'nightlife',
-        'shopping',
         'transportation',
-        'sightseeing',
+        'accommodation',
+        'attraction',
+        'dining',
+        'exploration',
         'entertainment',
+        'shopping',
+        'other',
       ];
 
       categories.forEach((category) => {

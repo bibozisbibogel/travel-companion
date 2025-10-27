@@ -178,7 +178,7 @@ class TestTripServiceCreate:
         # Create a minimal valid ItineraryOutput
         plan = ItineraryOutput(
             trip=TripInfo(
-                destination=Destination(city="Paris", country="France"),
+                destination=Destination(city="Paris", country="France", coordinates=None),
                 dates=DateRange(start=date(2024, 6, 1), end=date(2024, 6, 7), duration_days=7),
                 travelers=TravelerInfo(count=2),
                 budget=BudgetInfo(
@@ -195,6 +195,8 @@ class TestTripServiceCreate:
                     route=RouteInfo(**{"from": "JFK", "to": "CDG"}),
                     departure=TimeInfo(time="10:00", timezone="America/New_York"),
                     arrival=TimeInfo(time="22:00", timezone="Europe/Paris"),
+                    departure_coordinates=None,
+                    arrival_coordinates=None,
                     duration_minutes=480,
                     price_per_person=Decimal("250.00"),
                     total_price=Decimal("500.00"),
@@ -213,6 +215,7 @@ class TestTripServiceCreate:
                     region="Île-de-France",
                     country="France",
                 ),
+                coordinates=None,
                 location_notes="Central Paris, near the Louvre",
                 price_per_night=Decimal("150.00"),
                 nights=6,

@@ -28,7 +28,7 @@ describe('ActivityCard', () => {
 
   it('should render activity category', () => {
     render(<ActivityCard activity={mockActivity} />);
-    expect(screen.getByText('Cultural')).toBeInTheDocument();
+    expect(screen.getByText('Attraction')).toBeInTheDocument();
   });
 
   it('should render activity description', () => {

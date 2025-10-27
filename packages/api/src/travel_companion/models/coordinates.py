@@ -23,10 +23,14 @@ class Coordinates(BaseModel):
         None, description="Error message if geocoding failed"
     )
 
-    model_config = {"json_schema_extra": {"example": {
-        "latitude": 41.9009,
-        "longitude": 12.4833,
-        "geocoding_status": "success",
-        "geocoded_at": "2025-10-26T14:30:00Z",
-        "geocoding_error_message": None,
-    }}}
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "latitude": 41.9009,
+                "longitude": 12.4833,
+                "geocoding_status": "success",
+                "geocoded_at": "2025-10-26T14:30:00Z",
+                "geocoding_error_message": None,
+            }
+        }
+    }

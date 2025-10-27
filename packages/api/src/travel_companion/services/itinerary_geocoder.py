@@ -2,7 +2,9 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from collections.abc import Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 from travel_companion.models.coordinates import Coordinates
 from travel_companion.models.itinerary_output import (
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 class ItineraryGeocoder:
     """Helper class to geocode all locations in an itinerary."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the itinerary geocoder."""
         self.geocoding_service = get_geocoding_service()
 
@@ -90,7 +92,7 @@ class ItineraryGeocoder:
                 latitude=result.latitude if result.latitude is not None else 0.0,
                 longitude=result.longitude if result.longitude is not None else 0.0,
                 geocoding_status=result.status,
-                geocoded_at=datetime.now() if result.status == "success" else None,
+                geocoded_at=datetime.now(UTC) if result.status == "success" else None,
                 geocoding_error_message=result.error_message,
             )
 
@@ -105,6 +107,7 @@ class ItineraryGeocoder:
                 latitude=0.0,
                 longitude=0.0,
                 geocoding_status="failed",
+                geocoded_at=None,
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 
@@ -131,7 +134,7 @@ class ItineraryGeocoder:
                 latitude=result.latitude if result.latitude is not None else 0.0,
                 longitude=result.longitude if result.longitude is not None else 0.0,
                 geocoding_status=result.status,
-                geocoded_at=datetime.now() if result.status == "success" else None,
+                geocoded_at=datetime.now(UTC) if result.status == "success" else None,
                 geocoding_error_message=result.error_message,
             )
 
@@ -146,6 +149,7 @@ class ItineraryGeocoder:
                 latitude=0.0,
                 longitude=0.0,
                 geocoding_status="failed",
+                geocoded_at=None,
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 
@@ -167,7 +171,7 @@ class ItineraryGeocoder:
                 latitude=result.latitude if result.latitude is not None else 0.0,
                 longitude=result.longitude if result.longitude is not None else 0.0,
                 geocoding_status=result.status,
-                geocoded_at=datetime.now() if result.status == "success" else None,
+                geocoded_at=datetime.now(UTC) if result.status == "success" else None,
                 geocoding_error_message=result.error_message,
             )
 
@@ -186,6 +190,7 @@ class ItineraryGeocoder:
                 latitude=0.0,
                 longitude=0.0,
                 geocoding_status="failed",
+                geocoded_at=None,
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 
@@ -207,7 +212,7 @@ class ItineraryGeocoder:
                 latitude=result.latitude if result.latitude is not None else 0.0,
                 longitude=result.longitude if result.longitude is not None else 0.0,
                 geocoding_status=result.status,
-                geocoded_at=datetime.now() if result.status == "success" else None,
+                geocoded_at=datetime.now(UTC) if result.status == "success" else None,
                 geocoding_error_message=result.error_message,
             )
 
@@ -222,10 +227,11 @@ class ItineraryGeocoder:
                 latitude=0.0,
                 longitude=0.0,
                 geocoding_status="failed",
+                geocoded_at=None,
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 
-    def _geocode_flights(self, flight: FlightDetails) -> list:
+    def _geocode_flights(self, flight: FlightDetails) -> list[Coroutine[Any, Any, None]]:
         """
         Create geocoding tasks for flight airports.
 
@@ -272,7 +278,7 @@ class ItineraryGeocoder:
                 latitude=result.latitude if result.latitude is not None else 0.0,
                 longitude=result.longitude if result.longitude is not None else 0.0,
                 geocoding_status=result.status,
-                geocoded_at=datetime.now() if result.status == "success" else None,
+                geocoded_at=datetime.now(UTC) if result.status == "success" else None,
                 geocoding_error_message=result.error_message,
             )
 
@@ -292,6 +298,7 @@ class ItineraryGeocoder:
                 latitude=0.0,
                 longitude=0.0,
                 geocoding_status="failed",
+                geocoded_at=None,
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 

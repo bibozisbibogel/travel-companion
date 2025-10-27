@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface GeocodingMetrics {
   totalRequests: number;
@@ -53,18 +53,7 @@ export function GeocodingMetrics() {
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
-  useEffect(() => {
-    loadMetrics();
-  }, []);
-
-  useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(loadMetrics, 30000); // Refresh every 30 seconds
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh]);
-
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     try {
       // In production, fetch from /api/monitoring/geocoding-metrics
       // For now, use mock data or calculate from localStorage
@@ -93,7 +82,18 @@ export function GeocodingMetrics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadMetrics();
+  }, [loadMetrics]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(loadMetrics, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadMetrics]);
 
   const generateMock24HourData = () => {
     const data = [];

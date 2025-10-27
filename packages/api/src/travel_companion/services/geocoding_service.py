@@ -6,7 +6,7 @@ import logging
 from functools import lru_cache
 from typing import Literal
 
-import googlemaps
+import googlemaps  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field, field_validator
 
 from travel_companion.core.config import get_settings
@@ -57,7 +57,9 @@ class GeocodingService:
             )
 
         # Initialize Google Maps client with timeout
-        self.client = googlemaps.Client(key=self.api_key, timeout=settings.geocoding_timeout_seconds)
+        self.client = googlemaps.Client(
+            key=self.api_key, timeout=settings.geocoding_timeout_seconds
+        )
 
         # Configuration from settings
         self.max_retries = settings.geocoding_retry_attempts
@@ -146,9 +148,7 @@ class GeocodingService:
         self._cache[cache_key] = result
         logger.debug("Added to geocoding cache", extra={"cache_key": cache_key[:16]})
 
-    async def geocode_location(
-        self, address: str, retry_count: int = 0
-    ) -> GeocodeResult:
+    async def geocode_location(self, address: str, retry_count: int = 0) -> GeocodeResult:
         """
         Geocode a location string to latitude/longitude coordinates.
 
@@ -188,6 +188,9 @@ class GeocodingService:
                 # ZERO_RESULTS - no results found
                 result = GeocodeResult(
                     status="failed",
+                    latitude=None,
+                    longitude=None,
+                    formatted_address=None,
                     error_message=f"No geocoding results found for address: {address[:100]}",
                 )
                 logger.warning(
@@ -210,6 +213,9 @@ class GeocodingService:
             if latitude is None or longitude is None:
                 result = GeocodeResult(
                     status="failed",
+                    latitude=None,
+                    longitude=None,
+                    formatted_address=None,
                     error_message=f"Invalid coordinates in geocoding response: {address[:100]}",
                 )
                 logger.error(
@@ -228,6 +234,7 @@ class GeocodingService:
                 latitude=latitude,
                 longitude=longitude,
                 formatted_address=formatted_address,
+                error_message=None,
             )
 
             logger.info(
@@ -268,7 +275,13 @@ class GeocodingService:
                 return await self.geocode_location(address, retry_count + 1)
 
             # Permanent error or max retries reached
-            result = GeocodeResult(status="failed", error_message=error_message)
+            result = GeocodeResult(
+                status="failed",
+                latitude=None,
+                longitude=None,
+                formatted_address=None,
+                error_message=error_message,
+            )
             self._add_to_cache(normalized_address, result)
             return result
 
@@ -276,7 +289,11 @@ class GeocodingService:
             # Timeout error
             logger.warning(
                 "Geocoding request timeout",
-                extra={"address": address[:100], "timeout": self.timeout, "retry_count": retry_count},
+                extra={
+                    "address": address[:100],
+                    "timeout": self.timeout,
+                    "retry_count": retry_count,
+                },
             )
 
             # Retry once on timeout
@@ -286,6 +303,9 @@ class GeocodingService:
 
             result = GeocodeResult(
                 status="failed",
+                latitude=None,
+                longitude=None,
+                formatted_address=None,
                 error_message=f"Geocoding request timed out after {self.timeout}s",
             )
             self._add_to_cache(normalized_address, result)
@@ -299,7 +319,13 @@ class GeocodingService:
                 extra={"address": address[:100], "retry_count": retry_count},
             )
 
-            result = GeocodeResult(status="failed", error_message=error_message)
+            result = GeocodeResult(
+                status="failed",
+                latitude=None,
+                longitude=None,
+                formatted_address=None,
+                error_message=error_message,
+            )
             # Don't cache unexpected errors (might be transient)
             return result
 
@@ -334,7 +360,7 @@ class GeocodingService:
 
             # Handle any exceptions in the batch
             for idx, result in enumerate(batch_results):
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     logger.error(
                         "Batch geocoding error",
                         extra={
@@ -345,6 +371,9 @@ class GeocodingService:
                     results.append(
                         GeocodeResult(
                             status="failed",
+                            latitude=None,
+                            longitude=None,
+                            formatted_address=None,
                             error_message=f"Batch processing error: {str(result)}",
                         )
                     )

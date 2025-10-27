@@ -422,24 +422,26 @@ class TravelPlannerAgent:
 
                 # Check if geocoding is available (API key configured)
                 from travel_companion.core.config import get_settings
+
                 settings = get_settings()
 
                 if not settings.google_places_api_key:
                     logger.info("Google Maps API key not configured, skipping geocoding")
                     return itinerary
 
-                from travel_companion.services.itinerary_geocoder import geocode_itinerary
                 import asyncio
+
+                from travel_companion.services.itinerary_geocoder import geocode_itinerary
 
                 # Geocode itinerary asynchronously with timeout
                 geocoded_itinerary = await asyncio.wait_for(
                     geocode_itinerary(itinerary),
-                    timeout=30.0  # 30 second timeout for geocoding
+                    timeout=30.0,  # 30 second timeout for geocoding
                 )
                 logger.info("Geocoding completed successfully")
                 return geocoded_itinerary
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     "Geocoding timed out after 30s, returning itinerary without coordinates"
                 )
@@ -450,7 +452,7 @@ class TravelPlannerAgent:
             except Exception as geocoding_error:
                 logger.warning(
                     f"Geocoding failed: {type(geocoding_error).__name__}: {geocoding_error}",
-                    exc_info=False  # Don't print full stack trace for optional feature
+                    exc_info=False,  # Don't print full stack trace for optional feature
                 )
                 # Return itinerary without geocoding if geocoding fails
                 return itinerary

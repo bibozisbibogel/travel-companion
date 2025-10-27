@@ -179,7 +179,7 @@ describe('AuthContext', () => {
         lastName: mockResponse.user.lastName,
       })
       expect(result.current.isAuthenticated).toBe(true)
-      expect(mockRouter.push).toHaveBeenCalledWith('/')
+      expect(mockRouter.push).toHaveBeenCalledWith('/trips')
     })
 
     it.skip('should handle login with 401 error', async () => {

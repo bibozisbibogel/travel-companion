@@ -3,7 +3,7 @@
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class CacheMetrics:
         self.miss_rate = 0.0
         self.last_reset = datetime.now(UTC)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, int | float | str]:
         """Convert metrics to dictionary for logging/API responses."""
         return {
             "hits": self.hits,
@@ -79,7 +79,7 @@ class PerformanceTimer:
         self.start_time = time.perf_counter()
         return self
 
-    def __exit__(self, *args) -> None:
+    def __exit__(self, *args: object) -> None:
         """Stop timing and log duration."""
         self.end_time = time.perf_counter()
         self.duration_ms = (self.end_time - self.start_time) * 1000
@@ -171,7 +171,7 @@ class GeocodingMetrics:
             return 0.0
         return (self.failed_requests / self.total_requests) * 100
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, int | float | str | dict[str, int]]:
         """Convert metrics to dictionary for API responses."""
         return {
             "total_requests": self.total_requests,
