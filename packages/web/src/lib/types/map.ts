@@ -7,6 +7,9 @@ export interface Location {
   longitude: number;
   address?: string;
   place_id?: string;
+  geocoding_status?: 'success' | 'failed' | 'pending';
+  geocoded_at?: string | null;
+  geocoding_error_message?: string | null;
 }
 
 export type ActivityCategory =

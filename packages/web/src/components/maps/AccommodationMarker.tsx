@@ -16,6 +16,8 @@ export function AccommodationMarker({
 }: AccommodationMarkerProps) {
   const [showInfo, setShowInfo] = useState(false);
 
+  const hasGeocodingError = accommodation.location.geocoding_status === 'failed';
+
   const position = {
     lat: accommodation.location.latitude,
     lng: accommodation.location.longitude,
@@ -31,11 +33,12 @@ export function AccommodationMarker({
   }, []);
 
   // Create custom icon for accommodation
+  // If geocoding failed, use warning color with red stroke
   const icon = {
     path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
-    fillColor: ACCOMMODATION_COLOR,
+    fillColor: hasGeocodingError ? "#F59E0B" : ACCOMMODATION_COLOR,
     fillOpacity: 1,
-    strokeColor: "#FFFFFF",
+    strokeColor: hasGeocodingError ? "#DC2626" : "#FFFFFF",
     strokeWeight: 2,
     scale: 1.5,
     anchor: new google.maps.Point(12, 22),
@@ -54,6 +57,24 @@ export function AccommodationMarker({
             <h3 className="text-lg font-semibold text-gray-900">
               {accommodation.name}
             </h3>
+
+            {/* Geocoding warning message */}
+            {hasGeocodingError && (
+              <div className="mt-2 rounded-md bg-amber-50 p-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-base">⚠️</span>
+                  <p className="text-xs font-medium text-amber-800">
+                    Location coordinates approximate - geocoding failed
+                  </p>
+                </div>
+                {accommodation.location.geocoding_error_message && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    {accommodation.location.geocoding_error_message}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="mt-2 space-y-1 text-sm text-gray-600">
               <div className="flex items-center gap-1">
                 <span>{renderStars(accommodation.rating)}</span>
