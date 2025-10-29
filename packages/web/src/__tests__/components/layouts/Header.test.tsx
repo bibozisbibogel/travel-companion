@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import Header from '../../../components/layouts/Header'
 
@@ -12,6 +12,21 @@ vi.mock('next/navigation', () => ({
     push: mockPush,
     replace: vi.fn(),
     prefetch: vi.fn(),
+  }),
+}))
+
+// Mock AuthContext
+vi.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: vi.fn(),
+    isAuthenticated: false,
+    clearError: vi.fn(),
   }),
 }))
 

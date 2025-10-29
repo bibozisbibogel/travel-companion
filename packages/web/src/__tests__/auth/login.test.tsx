@@ -33,6 +33,22 @@ vi.mock('../../lib/api', () => {
   }
 })
 
+// Mock AuthContext
+const mockLogin = vi.fn()
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    login: mockLogin,
+    register: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: vi.fn(),
+    isAuthenticated: false,
+    clearError: vi.fn(),
+  }),
+}))
+
 // Mock CenteredLayout
 vi.mock('../../components/layouts', () => ({
   CenteredLayout: ({ children, title, subtitle }: any) => (
@@ -54,6 +70,16 @@ describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(useRouter as any).mockReturnValue(mockRouter)
+
+    // Wire mockLogin to call apiClient.login, setToken, and router.push like real AuthContext
+    mockLogin.mockImplementation(async (credentials) => {
+      const response = await apiClient.login(credentials)
+      if (response.access_token) {
+        apiClient.setToken(response.access_token)
+        // Real AuthContext redirects to /trips after login, not /
+        mockRouter.push('/trips')
+      }
+    })
   })
 
   it('should render login form with all fields', () => {
@@ -166,7 +192,7 @@ describe('LoginPage', () => {
         password: 'Password123!'
       })
       expect(apiClient.setToken).toHaveBeenCalledWith('test-token')
-      expect(mockRouter.push).toHaveBeenCalledWith('/')
+      expect(mockRouter.push).toHaveBeenCalledWith('/trips')
     })
   })
 

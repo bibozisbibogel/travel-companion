@@ -14,17 +14,21 @@ interface ActivityMarkerProps {
 }
 
 const CATEGORY_ICONS: Record<ActivityCategory, string> = {
-  adventure: "🏔️",
-  cultural: "🏛️",
-  relaxation: "🧘",
+  transportation: "🚕",
+  accommodation: "🏨",
+  attraction: "🏛️",
   dining: "🍽️",
-  nightlife: "🌃",
+  exploration: "🧭",
+  entertainment: "🎭",
   shopping: "🛍️",
+  other: "📍",
 };
 
 export function ActivityMarker({ activity, onClick }: ActivityMarkerProps) {
   const [showInfo, setShowInfo] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+
+  const hasGeocodingError = activity.location.geocoding_status === 'failed';
 
   const position = {
     lat: activity.location.latitude,
@@ -49,20 +53,22 @@ export function ActivityMarker({ activity, onClick }: ActivityMarkerProps) {
   }, []);
 
   // Create custom icon for activity with category color
+  // If geocoding failed, use warning color with red stroke
   const icon = useMemo(() => {
-    const color = CATEGORY_COLORS[activity.category];
+    const color = hasGeocodingError ? "#F59E0B" : CATEGORY_COLORS[activity.category];
+    const strokeColor = hasGeocodingError ? "#DC2626" : "#FFFFFF";
     const scale = isHovered ? 1.8 : 1.5;
 
     return {
       path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
       fillColor: color,
       fillOpacity: 1,
-      strokeColor: "#FFFFFF",
+      strokeColor: strokeColor,
       strokeWeight: 2,
       scale: scale,
       anchor: new google.maps.Point(12, 22),
     };
-  }, [activity.category, isHovered]);
+  }, [activity.category, hasGeocodingError, isHovered]);
 
   const formatDuration = (minutes: number): string => {
     if (minutes < 60) return `${minutes}min`;
@@ -89,6 +95,24 @@ export function ActivityMarker({ activity, onClick }: ActivityMarkerProps) {
                 <h3 className="text-lg font-semibold text-gray-900">
                   {activity.name}
                 </h3>
+
+                {/* Geocoding warning message */}
+                {hasGeocodingError && (
+                  <div className="mt-2 rounded-md bg-amber-50 p-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-base">⚠️</span>
+                      <p className="text-xs font-medium text-amber-800">
+                        Location coordinates approximate - geocoding failed
+                      </p>
+                    </div>
+                    {activity.location.geocoding_error_message && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        {activity.location.geocoding_error_message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-1 space-y-1 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
                     <span

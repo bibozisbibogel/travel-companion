@@ -110,7 +110,7 @@ describe('CategoryBreakdown', () => {
       );
 
       expect(screen.getByText('Total')).toBeInTheDocument();
-      expect(screen.getByText(/€2,000\.00/)).toBeInTheDocument();
+      expect(screen.getByText(/2\.000,00\s*€/)).toBeInTheDocument();
     });
   });
 
@@ -250,8 +250,8 @@ describe('CategoryBreakdown', () => {
         />
       );
 
-      // Lucide icons should be rendered (check for SVG elements)
-      const icons = container.querySelectorAll('svg.lucide');
+      // Lucide icons should be rendered (check for SVG elements with w-4 h-4 classes)
+      const icons = container.querySelectorAll('svg.w-4.h-4');
       expect(icons.length).toBeGreaterThan(0);
     });
   });
@@ -260,7 +260,7 @@ describe('CategoryBreakdown', () => {
     it('uses EUR as default currency when not specified', () => {
       render(<CategoryBreakdown categories={mockCategories} totalCost={2000} />);
 
-      expect(screen.getByText(/€2,000\.00/)).toBeInTheDocument();
+      expect(screen.getByText(/2\.000,00\s*€/)).toBeInTheDocument();
     });
   });
 

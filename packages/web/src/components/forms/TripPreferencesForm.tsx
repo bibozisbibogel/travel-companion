@@ -49,6 +49,10 @@ export default function TripPreferencesForm({
   } = useForm<TravelRequestFormData>({
     resolver: zodResolver(travelRequestSchema),
     defaultValues: {
+      destination: '',
+      origin: '',
+      startDate: '',
+      endDate: '',
       travelers: {
         adults: 2,
         children: 0,

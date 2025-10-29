@@ -28,6 +28,7 @@ dependencies = [
     "structlog>=25.4.0",
     "bcrypt>=4.3.0",
     "claude-agent-sdk>=0.1.0",
+    "googlemaps>=4.10.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"

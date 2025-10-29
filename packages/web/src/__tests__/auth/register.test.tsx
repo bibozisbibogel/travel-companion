@@ -23,6 +23,22 @@ vi.mock('../../lib/api', () => ({
   },
 }))
 
+// Mock AuthContext
+const mockRegister = vi.fn()
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    login: vi.fn(),
+    register: mockRegister,
+    logout: vi.fn(),
+    refreshUser: vi.fn(),
+    isAuthenticated: false,
+    clearError: vi.fn(),
+  }),
+}))
+
 // Mock CenteredLayout
 vi.mock('../../components/layouts', () => ({
   CenteredLayout: ({ children, title, subtitle }: any) => (
@@ -44,6 +60,16 @@ describe('RegisterPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(useRouter as any).mockReturnValue(mockRouter)
+
+    // Wire mockRegister to call apiClient.register, setToken, and router.push like real AuthContext
+    mockRegister.mockImplementation(async (data) => {
+      const response = await apiClient.register(data)
+      if (response.access_token) {
+        apiClient.setToken(response.access_token)
+        // Real AuthContext redirects to / after registration
+        mockRouter.push('/')
+      }
+    })
   })
 
   it('should render registration form with all fields', () => {

@@ -58,6 +58,7 @@ export const travelRequestSchema = z.object({
   origin: z
     .string()
     .min(2, 'Please enter a valid origin location')
+    .or(z.literal(''))
     .optional(),
   startDate: z
     .string()

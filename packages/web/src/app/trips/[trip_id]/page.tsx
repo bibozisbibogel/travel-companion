@@ -42,22 +42,25 @@ const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
 /**
  * Transform itinerary data to map marker format
  *
- * NOTE: Currently using approximate city-level coordinates since the API
- * doesn't return geocoded coordinates for each activity location.
- *
- * FUTURE IMPROVEMENT: Implement proper geocoding using Google Geocoding API
- * to convert activity.location strings (e.g., "Trevi Fountain") to precise lat/lng
+ * Uses geocoded coordinates from the API response for precise location mapping.
+ * Falls back to city center coordinates if geocoding failed or is unavailable.
  */
 function transformItineraryToMapData(itinerary: IFullTripItinerary) {
   const activities: ActivityMarker[] = [];
   const accommodations: AccommodationMarker[] = [];
   const routes: DayRoute[] = [];
 
-  // Get destination city coordinates
+  // Get destination city coordinates from geocoded data or fallback to hardcoded
   const destinationCity = itinerary.trip.destination.city;
-  const cityCoords = CITY_COORDINATES[destinationCity] || { lat: 40.7128, lng: -74.0060 }; // Default to NYC
+  const geocodedCoords = itinerary.trip.destination.coordinates;
 
-  console.log(`Map using coordinates for: ${destinationCity}`, cityCoords);
+  // Use geocoded coordinates if available and successful, otherwise fallback
+  const cityCoords = (geocodedCoords && geocodedCoords.geocoding_status === 'success')
+    ? { lat: geocodedCoords.latitude, lng: geocodedCoords.longitude }
+    : CITY_COORDINATES[destinationCity] || { lat: 40.7128, lng: -74.0060 }; // Default to NYC
+
+  console.log(`Map using coordinates for: ${destinationCity}`, cityCoords,
+              geocodedCoords ? `(geocoded: ${geocodedCoords.geocoding_status})` : '(fallback)');
 
   // Transform activities from each day
   itinerary.itinerary.forEach((dayPlan) => {
@@ -67,21 +70,30 @@ function transformItineraryToMapData(itinerary: IFullTripItinerary) {
         const activityLocation = activity.location ||
                                 `${destinationCity}, ${itinerary.trip.destination.country}`;
 
-        // Spread activities around the city center with random offset
-        // This creates a realistic spread on the map until we implement geocoding
-        const latOffset = (Math.random() - 0.5) * 0.02; // ~1km radius
-        const lngOffset = (Math.random() - 0.5) * 0.02;
+        // Use geocoded coordinates if available and successful, otherwise fallback to city center
+        const activityCoords = activity.coordinates;
+        let latitude: number;
+        let longitude: number;
+
+        if (activityCoords && activityCoords.geocoding_status === 'success') {
+          // Use precise geocoded coordinates
+          latitude = activityCoords.latitude;
+          longitude = activityCoords.longitude;
+        } else {
+          // Fallback: spread activities around city center with small random offset
+          const latOffset = (Math.random() - 0.5) * 0.02; // ~1km radius
+          const lngOffset = (Math.random() - 0.5) * 0.02;
+          latitude = cityCoords.lat + latOffset;
+          longitude = cityCoords.lng + lngOffset;
+        }
 
         activities.push({
           activity_id: `${dayPlan.day}-${index}`,
           name: activity.title,
-          category: activity.category === 'cultural' ? 'cultural' :
-                    activity.category === 'transportation' ? 'adventure' :
-                    activity.category === 'sightseeing' ? 'cultural' :
-                    activity.category === 'relaxation' ? 'relaxation' : 'cultural',
+          category: activity.category,
           location: {
-            latitude: cityCoords.lat + latOffset,
-            longitude: cityCoords.lng + lngOffset,
+            latitude,
+            longitude,
             address: activityLocation,
           },
           time: activity.time_start || '00:00',
@@ -93,14 +105,29 @@ function transformItineraryToMapData(itinerary: IFullTripItinerary) {
     });
   });
 
-  // Add accommodation marker (centered on city)
+  // Add accommodation marker
   if (itinerary.accommodation) {
+    const accommodationCoords = itinerary.accommodation.coordinates;
+
+    // Use geocoded coordinates if available, otherwise fallback to city center
+    let latitude: number;
+    let longitude: number;
+
+    if (accommodationCoords && accommodationCoords.geocoding_status === 'success') {
+      latitude = accommodationCoords.latitude;
+      longitude = accommodationCoords.longitude;
+    } else {
+      // Fallback to city center
+      latitude = cityCoords.lat;
+      longitude = cityCoords.lng;
+    }
+
     accommodations.push({
       hotel_id: 'main-hotel',
       name: itinerary.accommodation.name,
       location: {
-        latitude: cityCoords.lat,
-        longitude: cityCoords.lng,
+        latitude,
+        longitude,
         address: `${itinerary.accommodation.address.street}, ${itinerary.accommodation.address.city}`,
       },
       rating: itinerary.accommodation.rating,

@@ -11,74 +11,69 @@ import {
 import {
   Compass,
   Landmark,
-  TreePalm,
   Utensils,
-  Music,
   ShoppingBag,
   Car,
-  Camera,
   Theater,
+  Hotel,
+  MapPin,
   LucideIcon,
 } from 'lucide-react';
 
 /**
- * Color coding for activity categories as per Story 3.2 design system
+ * Color coding for activity categories (updated to match backend categories - Story 3.6)
  */
 export const ACTIVITY_COLORS: Record<ActivityCategory, string> = {
-  adventure: '#3B82F6', // Blue
-  cultural: '#8B5CF6', // Purple
-  relaxation: '#10B981', // Green
-  dining: '#F59E0B', // Orange
-  nightlife: '#EC4899', // Pink
-  shopping: '#14B8A6', // Teal
-  transportation: '#6B7280', // Gray
-  sightseeing: '#3B82F6', // Blue
+  transportation: '#3B82F6', // Blue
+  accommodation: '#EF4444', // Red
+  attraction: '#8B5CF6', // Purple
+  dining: '#F59E0B', // Amber
+  exploration: '#10B981', // Green
   entertainment: '#EC4899', // Pink
+  shopping: '#14B8A6', // Teal
+  other: '#6B7280', // Gray
 };
 
 /**
- * Icon mapping for activity categories
+ * Icon mapping for activity categories (updated to match backend categories - Story 3.6)
  */
 export const ACTIVITY_ICONS: Record<ActivityCategory, LucideIcon> = {
-  adventure: Compass,
-  cultural: Landmark,
-  relaxation: TreePalm,
-  dining: Utensils,
-  nightlife: Music,
-  shopping: ShoppingBag,
   transportation: Car,
-  sightseeing: Camera,
+  accommodation: Hotel,
+  attraction: Landmark,
+  dining: Utensils,
+  exploration: Compass,
   entertainment: Theater,
+  shopping: ShoppingBag,
+  other: MapPin,
 };
 
 /**
- * Tailwind CSS class mapping for activity colors
+ * Tailwind CSS class mapping for activity colors (updated to match backend categories - Story 3.6)
  */
 export const ACTIVITY_TAILWIND_COLORS: Record<ActivityCategory, string> = {
-  adventure: 'bg-blue-500 text-blue-900 border-blue-300',
-  cultural: 'bg-purple-500 text-purple-900 border-purple-300',
-  relaxation: 'bg-green-500 text-green-900 border-green-300',
-  dining: 'bg-orange-500 text-orange-900 border-orange-300',
-  nightlife: 'bg-pink-500 text-pink-900 border-pink-300',
-  shopping: 'bg-teal-500 text-teal-900 border-teal-300',
-  transportation: 'bg-gray-400 text-gray-900 border-gray-300',
-  sightseeing: 'bg-blue-500 text-blue-900 border-blue-300',
+  transportation: 'bg-blue-500 text-blue-900 border-blue-300',
+  accommodation: 'bg-red-500 text-red-900 border-red-300',
+  attraction: 'bg-purple-500 text-purple-900 border-purple-300',
+  dining: 'bg-amber-500 text-amber-900 border-amber-300',
+  exploration: 'bg-green-500 text-green-900 border-green-300',
   entertainment: 'bg-pink-500 text-pink-900 border-pink-300',
+  shopping: 'bg-teal-500 text-teal-900 border-teal-300',
+  other: 'bg-gray-500 text-gray-900 border-gray-300',
 };
 
 /**
- * Light background colors for activity cards
+ * Light background colors for activity cards (updated to match backend categories - Story 3.6)
  */
 export const ACTIVITY_BG_LIGHT: Record<ActivityCategory, string> = {
-  adventure: 'bg-blue-50',
-  cultural: 'bg-purple-50',
-  relaxation: 'bg-green-50',
-  dining: 'bg-orange-50',
-  nightlife: 'bg-pink-50',
-  shopping: 'bg-teal-50',
-  transportation: 'bg-gray-50',
-  sightseeing: 'bg-blue-50',
+  transportation: 'bg-blue-50',
+  accommodation: 'bg-red-50',
+  attraction: 'bg-purple-50',
+  dining: 'bg-amber-50',
+  exploration: 'bg-green-50',
   entertainment: 'bg-pink-50',
+  shopping: 'bg-teal-50',
+  other: 'bg-gray-50',
 };
 
 /**

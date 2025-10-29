@@ -5,21 +5,25 @@ import type { ActivityCategory } from "@/lib/types/map";
 import { CATEGORY_COLORS, ACCOMMODATION_COLOR } from "@/lib/types/map";
 
 const CATEGORY_LABELS: Record<ActivityCategory, string> = {
-  adventure: "Adventure",
-  cultural: "Cultural",
-  relaxation: "Relaxation",
+  transportation: "Transportation",
+  accommodation: "Accommodation",
+  attraction: "Attraction",
   dining: "Dining",
-  nightlife: "Nightlife",
+  exploration: "Exploration",
+  entertainment: "Entertainment",
   shopping: "Shopping",
+  other: "Other",
 };
 
 const CATEGORY_ICONS: Record<ActivityCategory, string> = {
-  adventure: "🏔️",
-  cultural: "🏛️",
-  relaxation: "🧘",
+  transportation: "🚕",
+  accommodation: "🏨",
+  attraction: "🏛️",
   dining: "🍽️",
-  nightlife: "🌃",
+  exploration: "🧭",
+  entertainment: "🎭",
   shopping: "🛍️",
+  other: "📍",
 };
 
 export function MapLegend() {
@@ -45,7 +49,9 @@ export function MapLegend() {
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
               Activities
             </div>
-            {(Object.entries(CATEGORY_LABELS) as [ActivityCategory, string][]).map(
+            {(Object.entries(CATEGORY_LABELS) as [ActivityCategory, string][])
+              .filter(([category]) => category !== 'accommodation') // Filter out accommodation as it's shown separately
+              .map(
               ([category, label]) => (
                 <div key={category} className="flex items-center gap-2 text-sm">
                   <span className="text-base">{CATEGORY_ICONS[category]}</span>

@@ -14,12 +14,14 @@ describe("MapLegend", () => {
   it("shows all activity categories", () => {
     render(<MapLegend />);
 
-    expect(screen.getByText("Adventure")).toBeInTheDocument();
-    expect(screen.getByText("Cultural")).toBeInTheDocument();
-    expect(screen.getByText("Relaxation")).toBeInTheDocument();
+    expect(screen.getByText("Transportation")).toBeInTheDocument();
+    // Accommodation is filtered out from activities as it's shown separately in the hotels section
+    expect(screen.getByText("Attraction")).toBeInTheDocument();
     expect(screen.getByText("Dining")).toBeInTheDocument();
-    expect(screen.getByText("Nightlife")).toBeInTheDocument();
+    expect(screen.getByText("Exploration")).toBeInTheDocument();
+    expect(screen.getByText("Entertainment")).toBeInTheDocument();
     expect(screen.getByText("Shopping")).toBeInTheDocument();
+    expect(screen.getByText("Other")).toBeInTheDocument();
   });
 
   it("shows accommodation marker type", () => {

@@ -7,15 +7,20 @@ export interface Location {
   longitude: number;
   address?: string;
   place_id?: string;
+  geocoding_status?: 'success' | 'failed' | 'pending';
+  geocoded_at?: string | null;
+  geocoding_error_message?: string | null;
 }
 
 export type ActivityCategory =
-  | "adventure"
-  | "cultural"
-  | "relaxation"
+  | "transportation"
+  | "accommodation"
+  | "attraction"
   | "dining"
-  | "nightlife"
-  | "shopping";
+  | "exploration"
+  | "entertainment"
+  | "shopping"
+  | "other";
 
 export type TransportMode = "walk" | "drive" | "transit";
 
@@ -66,12 +71,14 @@ export interface MapConfig {
 }
 
 export const CATEGORY_COLORS: Record<ActivityCategory, string> = {
-  adventure: "#3B82F6",
-  cultural: "#8B5CF6",
-  relaxation: "#10B981",
-  dining: "#F59E0B",
-  nightlife: "#EC4899",
-  shopping: "#14B8A6",
+  transportation: "#3B82F6", // Blue
+  accommodation: "#EF4444", // Red
+  attraction: "#8B5CF6", // Purple
+  dining: "#F59E0B", // Amber
+  exploration: "#10B981", // Green
+  entertainment: "#EC4899", // Pink
+  shopping: "#14B8A6", // Teal
+  other: "#6B7280", // Gray
 };
 
 export const ACCOMMODATION_COLOR = "#EF4444";
