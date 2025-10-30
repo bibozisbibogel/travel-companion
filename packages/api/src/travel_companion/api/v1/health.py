@@ -110,13 +110,17 @@ async def detailed_health_check(
             "api_key_present": bool(settings.amadeus_api_key),
             "api_secret_present": bool(settings.amadeus_api_secret),
         },
-        "booking": {
-            "configured": bool(settings.booking_api_key),
-            "api_key_present": bool(settings.booking_api_key),
+        "google_places": {
+            "configured": bool(settings.google_places_api_key),
+            "api_key_present": bool(settings.google_places_api_key),
         },
-        "tripadvisor": {
-            "configured": bool(settings.tripadvisor_api_key),
-            "api_key_present": bool(settings.tripadvisor_api_key),
+        "openweather": {
+            "configured": bool(settings.openweather_api_key),
+            "api_key_present": bool(settings.openweather_api_key),
+        },
+        "geoapify": {
+            "configured": bool(settings.geoapify_api_key),
+            "api_key_present": bool(settings.geoapify_api_key),
         },
         "openai": {
             "configured": bool(settings.openai_api_key),

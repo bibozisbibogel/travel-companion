@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 from functools import lru_cache
 
 import httpx
-from supabase import Client, create_client
+from supabase import Client, ClientOptions, create_client
 
 from travel_companion.core.config import get_settings
 
@@ -28,7 +28,22 @@ class DatabaseManager:
                     "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_KEY"
                 )
 
-            self._client = create_client(self._settings.supabase_url, key)
+            # Configure httpx client with timeout and verify settings
+            # This prevents deprecation warnings from Supabase
+            http_client = httpx.Client(timeout=30.0, verify=True)
+
+            # Create client with proper options to avoid deprecation warnings
+            options = ClientOptions(
+                httpx_client=http_client,
+                postgrest_client_timeout=30.0,
+                storage_client_timeout=30.0,
+            )
+
+            self._client = create_client(
+                self._settings.supabase_url,
+                key,
+                options=options
+            )
 
         return self._client
 

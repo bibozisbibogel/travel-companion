@@ -48,13 +48,7 @@ def mock_redis():
 @pytest.fixture
 def activity_agent(mock_settings, mock_database, mock_redis):
     """Create ActivityAgent instance for testing."""
-    with (
-        patch("travel_companion.services.external_apis.tripadvisor.TripAdvisorAPIClient"),
-        patch("travel_companion.services.external_apis.viator.ViatorAPIClient"),
-        patch("travel_companion.services.external_apis.getyourguide.GetYourGuideAPIClient"),
-        patch("travel_companion.services.external_apis.geoapify.GeoapifyClient"),
-    ):
-        return ActivityAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
+    return ActivityAgent(settings=mock_settings, database=mock_database, redis=mock_redis)
 
 
 @pytest.fixture
@@ -195,7 +189,7 @@ class TestActivityAgent:
     @pytest.mark.asyncio
     async def test_process_no_activities_found(self, activity_agent, sample_activity_request):
         """Test processing when no activities are found."""
-        with patch.object(activity_agent, "_search_all_providers", return_value=[]):
+        with patch.object(activity_agent, "_search_google_places", return_value=[]):
             result = await activity_agent.process(sample_activity_request)
 
             assert isinstance(result, ActivitySearchResponse)
@@ -209,7 +203,7 @@ class TestActivityAgent:
         """Test processing with found activities."""
         activities = [sample_activity_option]
 
-        with patch.object(activity_agent, "_search_all_providers", return_value=activities):
+        with patch.object(activity_agent, "_search_google_places", return_value=activities):
             result = await activity_agent.process(sample_activity_request)
 
             assert isinstance(result, ActivitySearchResponse)
@@ -218,14 +212,16 @@ class TestActivityAgent:
             assert result.total_results == 1
 
     @pytest.mark.asyncio
-    async def test_search_all_providers_success(
+    async def test_search_google_places_success(
         self, activity_agent, sample_activity_request, sample_activity_option
     ):
-        """Test successful search across all providers."""
+        """Test successful activity search from Google Places."""
         with patch.object(
-            activity_agent, "_search_google_places", return_value=[sample_activity_option]
+            activity_agent.google_places_client,
+            "search_activities",
+            return_value=[sample_activity_option],
         ):
-            result = await activity_agent._search_all_providers(
+            result = await activity_agent._search_google_places(
                 ActivitySearchRequest(**sample_activity_request)
             )
 
@@ -233,61 +229,21 @@ class TestActivityAgent:
             assert result[0].name == "Louvre Museum Tour"
 
     @pytest.mark.asyncio
-    async def test_search_all_providers_with_failures(
+    async def test_search_google_places_failure(
         self, activity_agent, sample_activity_request, sample_activity_option
     ):
-        """Test search with provider failure."""
-        # Google Places fails, but we still get empty result
+        """Test search with Google Places failure returns empty list."""
+        # Google Places client raises exception, method returns empty list
         with patch.object(
-            activity_agent, "_search_google_places", side_effect=Exception("API Error")
+            activity_agent.google_places_client,
+            "search_activities",
+            side_effect=Exception("API Error"),
         ):
-            result = await activity_agent._search_all_providers(
+            result = await activity_agent._search_google_places(
                 ActivitySearchRequest(**sample_activity_request)
             )
 
             assert len(result) == 0
-
-    @pytest.mark.asyncio
-    async def test_deduplicate_activities(self, activity_agent):
-        """Test activity deduplication."""
-        # Create duplicate activities with same name and location
-        activity1 = ActivityOption(
-            external_id="ta_123",
-            name="Eiffel Tower Visit",
-            description="Visit the iconic tower",
-            category=ActivityCategory.CULTURAL,
-            location=ActivityLocation(latitude=48.8584, longitude=2.2945),
-            price=Decimal("25.00"),
-            provider="tripadvisor",
-        )
-
-        activity2 = ActivityOption(
-            external_id="viator_456",
-            name="Eiffel Tower Visit",  # Same name
-            description="Tower tour with guide",
-            category=ActivityCategory.CULTURAL,
-            location=ActivityLocation(latitude=48.8584, longitude=2.2945),  # Same location
-            price=Decimal("30.00"),
-            provider="viator",
-        )
-
-        activity3 = ActivityOption(
-            external_id="gyg_789",
-            name="Louvre Museum Tour",  # Different activity
-            description="Museum visit",
-            category=ActivityCategory.CULTURAL,
-            location=ActivityLocation(latitude=48.8606, longitude=2.3376),
-            price=Decimal("35.00"),
-            provider="getyourguide",
-        )
-
-        activities = [activity1, activity2, activity3]
-        result = await activity_agent._deduplicate_activities(activities)
-
-        assert len(result) == 2  # One duplicate should be removed
-        names = [activity.name for activity in result]
-        assert "Eiffel Tower Visit" in names
-        assert "Louvre Museum Tour" in names
 
     @pytest.mark.asyncio
     async def test_rank_activities_by_rating(self, activity_agent, sample_activity_request):
@@ -518,230 +474,3 @@ class TestActivityAgent:
 
         result = await activity_agent._rank_activities([], request)
         assert result == []
-
-        deduped = await activity_agent._deduplicate_activities([])
-        assert deduped == []
-
-
-class TestActivityAgentGeoapifyIntegration:
-    """Test cases for ActivityAgent Geoapify integration."""
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_success(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test successful activity search with Geoapify."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            return_value=sample_geoapify_activities,
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=ActivityCategory.CULTURAL,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 2
-            assert result.activities[0].provider == "geoapify"
-            assert result.activities[0].name == "National Museum"
-            assert result.total_results == 2
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_coordinates(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test Geoapify search with coordinates."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            return_value=sample_geoapify_activities,
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=ActivityCategory.CULTURAL,
-                latitude=44.3302,
-                longitude=23.7949,
-                radius_meters=5000,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 2
-            activity_agent.geoapify_client.search_activities.assert_called_once()
-
-            # Verify coordinates were passed correctly
-            call_args = activity_agent.geoapify_client.search_activities.call_args
-            assert call_args[1]["latitude"] == 44.3302
-            assert call_args[1]["longitude"] == 23.7949
-            assert call_args[1]["radius_meters"] == 5000
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_empty_results(self, activity_agent):
-        """Test Geoapify search with no results."""
-        with patch.object(activity_agent.geoapify_client, "search_activities", return_value=[]):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Remote Location",
-                category=ActivityCategory.CULTURAL,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 0
-            assert result.total_results == 0
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_error_handling(self, activity_agent):
-        """Test Geoapify search error handling."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            side_effect=Exception("Geoapify API Error"),
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Test Location",
-                category=ActivityCategory.CULTURAL,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 0
-            assert result.total_results == 0
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_category_filtering(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test Geoapify search with category filtering."""
-        # Filter to only cultural activities
-        cultural_activities = [
-            act for act in sample_geoapify_activities if act.category == ActivityCategory.CULTURAL
-        ]
-
-        with patch.object(
-            activity_agent.geoapify_client, "search_activities", return_value=cultural_activities
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=ActivityCategory.CULTURAL,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 1
-            assert all(act.category == ActivityCategory.CULTURAL for act in result.activities)
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_all_categories(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test Geoapify search without category filter (all categories)."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            return_value=sample_geoapify_activities,
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=None,  # No category filter
-                max_results=10,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 2
-            # Should have activities from different categories
-            categories = {act.category for act in result.activities}
-            assert len(categories) == 2  # CULTURAL and NATURE
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_guest_count_parameter(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test that guest_count parameter is handled correctly."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            return_value=sample_geoapify_activities,
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=ActivityCategory.CULTURAL,
-                guest_count=4,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) == 2
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_max_results_limiting(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test that max_results parameter limits results correctly."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            return_value=sample_geoapify_activities,
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=None,
-                max_results=1,  # Limit to 1 result
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert len(result.activities) <= 1
-
-    @pytest.mark.asyncio
-    async def test_search_activities_with_geoapify_response_timing(
-        self, activity_agent, sample_geoapify_activities
-    ):
-        """Test that response includes timing information."""
-        with patch.object(
-            activity_agent.geoapify_client,
-            "search_activities",
-            return_value=sample_geoapify_activities,
-        ):
-            result = await activity_agent.search_activities_with_geoapify(
-                location="Craiova, Romania",
-                category=ActivityCategory.CULTURAL,
-                max_results=5,
-            )
-
-            assert isinstance(result, ActivitySearchResponse)
-            assert hasattr(result, "search_time_ms")
-            assert result.search_time_ms >= 0
-
-    @pytest.mark.asyncio
-    async def test_enhanced_search_all_providers_includes_geoapify(
-        self, activity_agent, sample_activity_request, sample_geoapify_activities
-    ):
-        """Test that enhanced _search_all_providers includes Geoapify results."""
-        with (
-            patch.object(activity_agent, "_search_tripadvisor", return_value=[]),
-            patch.object(activity_agent, "_search_viator", return_value=[]),
-            patch.object(activity_agent, "_search_getyourguide", return_value=[]),
-            patch.object(
-                activity_agent,
-                "search_activities_with_geoapify",
-                return_value=ActivitySearchResponse(
-                    activities=sample_geoapify_activities,
-                    total_results=len(sample_geoapify_activities),
-                    search_time_ms=100,
-                ),
-            ),
-        ):
-            # Check if _search_all_providers has been enhanced to include Geoapify
-            try:
-                result = await activity_agent._search_all_providers(
-                    ActivitySearchRequest(**sample_activity_request)
-                )
-
-                # If Geoapify integration is complete, we should see Geoapify results
-                geoapify_activities = [act for act in result if act.provider == "geoapify"]
-                assert len(geoapify_activities) >= 0  # Could be 0 if not integrated yet
-
-            except AttributeError:
-                # This is expected if the enhanced search method doesn't exist yet
-                pass

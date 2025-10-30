@@ -114,7 +114,7 @@ def test_detailed_health_check_external_apis_configuration(client: TestClient):
     external_apis = data["dependencies"]["external_apis"]
 
     # Check that all expected API configurations are reported
-    expected_apis = ["amadeus", "booking", "tripadvisor", "openai"]
+    expected_apis = ["amadeus", "google_places", "openweather", "geoapify", "openai"]
     for api_name in expected_apis:
         assert api_name in external_apis
         api_config = external_apis[api_name]

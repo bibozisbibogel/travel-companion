@@ -248,8 +248,7 @@ class TestHotelAgentGooglePlaces:
             assert isinstance(result, HotelSearchResponse)
             assert len(result.hotels) == 1
             assert result.hotels[0].name == "Test Hotel"
-            assert result.search_metadata["successful_api"] == "google_places"
-            assert "google_places" in result.search_metadata["apis_attempted"]
+            assert result.search_metadata["api_used"] == "google_places"
 
     @pytest.mark.asyncio
     async def test_fallback_to_booking_when_google_places_fails(self, hotel_search_request):
@@ -283,8 +282,7 @@ class TestHotelAgentGooglePlaces:
             # Verify Google Places was attempted
             mock_search_google.assert_called_once()
 
-            # Verify no successful API since Google Places failed and no fallback
-            assert result.search_metadata["successful_api"] is None
-            assert "google_places" in result.search_metadata["apis_attempted"]
+            # Verify API failed since Google Places failed
+            assert result.search_metadata["api_used"] == "google_places"
             assert "google_places" in result.search_metadata["api_errors"]
             assert len(result.hotels) == 0
