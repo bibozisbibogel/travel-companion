@@ -97,39 +97,6 @@ class TestAPIVersioningIntegration:
             assert response.headers["X-API-Version"] == "v1"
             assert response.headers["X-App-Version"] == "0.1.0"
 
-    def test_workflows_endpoint_has_version_headers(self, client):
-        """Test that workflows endpoint has version headers."""
-        workflow_data = {
-            "user_id": "test-user-123",
-            "request_id": "test-request-456",
-            "input_data": {
-                "destination": {"city": "Paris", "country": "France"},
-                "requirements": {
-                    "start_date": "2024-06-01",
-                    "end_date": "2024-06-07",
-                    "budget": 2000,
-                },
-                "preferences": {
-                    "activity_types": ["cultural", "food"],
-                    "accommodation_type": "hotel",
-                },
-            },
-        }
-
-        with patch("travel_companion.workflows.orchestrator.TripPlanningWorkflow") as mock_workflow:
-            mock_workflow_instance = AsyncMock()
-            mock_workflow_instance.execute_trip_planning.return_value = {
-                "trip_id": "test-trip-789",
-                "status": "completed",
-            }
-            mock_workflow.return_value = mock_workflow_instance
-
-            response = client.post("/api/v1/workflows/execute", json=workflow_data)
-
-            # May return error due to missing dependencies, but should have version headers
-            assert response.headers["X-API-Version"] == "v1"
-            assert response.headers["X-App-Version"] == "0.1.0"
-
     @pytest.mark.parametrize(
         "endpoint",
         [
@@ -137,7 +104,6 @@ class TestAPIVersioningIntegration:
             "/api/v1/health/detailed",
             "/api/v1/trips/",
             "/api/v1/users/me",  # Will return 401, but should have headers
-            "/api/v1/workflows/status/test-session",  # Will return error, but should have headers
         ],
     )
     def test_all_versioned_endpoints_have_headers(self, client, endpoint):

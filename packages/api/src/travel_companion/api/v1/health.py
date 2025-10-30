@@ -126,26 +126,6 @@ async def detailed_health_check(
 
     health_status["dependencies"]["external_apis"] = external_apis
 
-    # Check workflow engine health
-    try:
-        from travel_companion.workflows.orchestrator import TripPlanningWorkflow
-
-        workflow = TripPlanningWorkflow()
-        workflow_health = workflow.get_health_status()
-
-        health_status["dependencies"]["workflow_engine"] = workflow_health
-
-    except Exception as e:
-        health_status["dependencies"]["workflow_engine"] = {
-            "status": "error",
-            "error": str(e),
-            "workflow_type": "unknown",
-            "graph_built": False,
-            "redis_connected": False,
-            "node_count": 0,
-            "edge_count": 0,
-        }
-
     # Calculate dependency metrics
     dependencies = health_status["dependencies"]
     total_deps = len(dependencies)
@@ -173,12 +153,8 @@ async def detailed_health_check(
     # Overall status determination
     database_ok = health_status["dependencies"]["database"]["status"] in ["healthy", "unhealthy"]
     redis_ok = health_status["dependencies"]["redis"]["status"] in ["healthy", "unhealthy"]
-    workflow_ok = health_status["dependencies"]["workflow_engine"]["status"] in [
-        "healthy",
-        "degraded",
-    ]
 
-    if not (database_ok and redis_ok and workflow_ok):
+    if not (database_ok and redis_ok):
         health_status["status"] = "degraded"
 
     # Cache the health status for performance (only if Redis is working)

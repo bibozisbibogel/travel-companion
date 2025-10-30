@@ -447,7 +447,7 @@ class AuthLogger:
 
 
 class WorkflowLogger:
-    """Centralized workflow event logger for LangGraph workflows."""
+    """Centralized workflow event logger."""
 
     def __init__(self) -> None:
         self.logger = setup_auth_logger("travel_companion.workflow")

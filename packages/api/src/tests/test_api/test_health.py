@@ -39,7 +39,6 @@ def test_detailed_health_check_structure(client: TestClient):
     assert "database" in dependencies
     assert "redis" in dependencies
     assert "external_apis" in dependencies
-    assert "workflow_engine" in dependencies
 
     # Check metrics structure
     metrics = data["metrics"]
@@ -106,22 +105,6 @@ def test_detailed_health_check_redis_error(mock_redis, client: TestClient):
     assert "Redis connection failed" in dependencies["redis"]["error"]
 
 
-@patch("travel_companion.workflows.orchestrator.TripPlanningWorkflow")
-def test_detailed_health_check_workflow_error(mock_workflow_class, client: TestClient):
-    """Test health check with workflow engine error."""
-    # Mock workflow to raise exception
-    mock_workflow_class.side_effect = Exception("Workflow initialization failed")
-
-    response = client.get("/api/v1/health/detailed")
-    assert response.status_code == 200
-
-    data = response.json()
-    dependencies = data["dependencies"]
-    assert dependencies["workflow_engine"]["status"] == "error"
-    assert "error" in dependencies["workflow_engine"]
-    assert "Workflow initialization failed" in dependencies["workflow_engine"]["error"]
-
-
 def test_detailed_health_check_external_apis_configuration(client: TestClient):
     """Test health check external API configuration reporting."""
     response = client.get("/api/v1/health/detailed")
@@ -173,10 +156,7 @@ def test_detailed_health_check_metrics_calculation(client: TestClient):
 
 @patch("travel_companion.core.database.get_database_manager")
 @patch("travel_companion.core.redis.get_redis_manager")
-@patch("travel_companion.workflows.orchestrator.TripPlanningWorkflow")
-def test_detailed_health_check_degraded_status(
-    mock_workflow_class, mock_redis, mock_db, client: TestClient
-):
+def test_detailed_health_check_degraded_status(mock_redis, mock_db, client: TestClient):
     """Test health check degraded status when dependencies fail."""
     # Mock all dependencies to fail
     mock_db_manager = AsyncMock()
@@ -186,8 +166,6 @@ def test_detailed_health_check_degraded_status(
     mock_redis_manager = AsyncMock()
     mock_redis_manager.ping.side_effect = Exception("Redis failed")
     mock_redis.return_value = mock_redis_manager
-
-    mock_workflow_class.side_effect = Exception("Workflow failed")
 
     response = client.get("/api/v1/health/detailed")
     assert response.status_code == 200

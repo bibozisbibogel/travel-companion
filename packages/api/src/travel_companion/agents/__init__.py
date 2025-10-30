@@ -1,4 +1,4 @@
-"""LangGraph agents for travel planning."""
+"""Travel planning agents used as tools for Claude SDK."""
 
 from travel_companion.agents.base import BaseAgent
 from travel_companion.agents.flight_agent import FlightAgent
