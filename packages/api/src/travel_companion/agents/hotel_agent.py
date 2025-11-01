@@ -48,15 +48,10 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         self.max_results_per_request = getattr(self.settings, "hotel_max_results", 100)
         self.timeout_seconds = getattr(self.settings, "hotel_api_timeout_seconds", 30)
 
-        # Initialize API clients with fallback chain
-        # self._booking_client = BookingClient(timeout=self.timeout_seconds)
-        # self._expedia_client = ExpediaClient()
-        # self._airbnb_client = AirbnbClient()
-        # self._geoapify_client = GeoapifyClient()
-        # self._liteapi_client = LiteAPIClient(timeout=self.timeout_seconds)
+        # Initialize Google Places API client
         self._google_places_client = GooglePlacesClient(redis_manager=self.redis)
 
-        # Initialize enhanced cache manager
+        # Initialize cache manager
         self._cache_manager = CacheManager(self.redis)
 
         self.logger.info(
@@ -271,7 +266,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             f"rooms={search_request.room_count}"
         )
 
-        # Implement API fallback chain: Google Places → Booking.com → Expedia → Airbnb
+        # Search using Google Places API
         hotels: list[HotelOption] = []
         search_metadata: dict[str, Any] = {
             "location": search_request.location,
@@ -284,226 +279,21 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             else None,
             "currency": search_request.currency,
             "max_results": search_request.max_results,
-            "apis_attempted": [],
-            "successful_api": None,
+            "api_used": "google_places",
             "api_errors": {},
         }
 
-        # Try Google Places first
+        # Search using Google Places API
         try:
-            self.logger.info("Attempting Google Places API search")
-            search_metadata["apis_attempted"].append("google_places")
-
+            self.logger.info("Searching hotels via Google Places API")
             hotels_from_google = await self.search_hotels_google_places(search_request)
             hotels.extend(hotels_from_google)
-
-            search_metadata["successful_api"] = "google_places"
             search_metadata["google_places_results"] = len(hotels_from_google)
             self.logger.info(f"Google Places API returned {len(hotels_from_google)} hotels")
 
         except Exception as e:
-            self.logger.warning(f"Google Places API failed: {e}")
+            self.logger.error(f"Google Places API failed: {e}")
             search_metadata["api_errors"]["google_places"] = str(e)
-
-            # Try Booking.com as fallback
-            # try:
-            #     self.logger.info("Attempting Booking.com API search (fallback)")
-            #     search_metadata["apis_attempted"].append("booking.com")
-
-            #     booking_params = HotelSearchParams(
-            #         location=search_request.location,
-            #         check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
-            #         check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
-            #         guest_count=search_request.guest_count,
-            #         room_count=search_request.room_count,
-            #         max_results=search_request.max_results,
-            #         currency=search_request.currency,
-            #         language="en",
-            #     )
-
-            #     booking_response = await self._booking_client.search_hotels(booking_params)
-
-            #     # Convert Booking.com results to internal HotelOption models
-            #     for booking_hotel in booking_response.hotels:
-            #         try:
-            #             # Apply budget filter if specified
-            #             if (
-            #                 search_request.budget_per_night
-            #                 and booking_hotel.price_per_night
-            #                 and Decimal(str(booking_hotel.price_per_night))
-            #                 > search_request.budget_per_night
-            #             ):
-            #                 continue
-
-            #             hotel_location = HotelLocation(
-            #                 latitude=booking_hotel.latitude or 0.0,
-            #                 longitude=booking_hotel.longitude or 0.0,
-            #                 address=booking_hotel.address,
-            #                 city=None,  # Extract from address if needed
-            #                 country=None,  # Extract from address if needed
-            #                 postal_code=None,
-            #             )
-
-            #             hotel_option = HotelOption(
-            #                 trip_id=None,
-            #                 external_id=f"booking_{booking_hotel.hotel_id}",
-            #                 name=booking_hotel.name,
-            #                 location=hotel_location,
-            #                 price_per_night=Decimal(str(booking_hotel.price_per_night))
-            #                 if booking_hotel.price_per_night
-            #                 else Decimal("0"),
-            #                 currency=booking_hotel.currency,
-            #                 rating=booking_hotel.rating,
-            #                 amenities=booking_hotel.amenities,
-            #                 photos=booking_hotel.photos,
-            #                 booking_url=booking_hotel.booking_url,
-            #                 created_at=datetime.now(UTC),
-            #             )
-            #             hotels.append(hotel_option)
-
-            #         except (ValueError, TypeError) as e:
-            #             self.logger.warning(f"Failed to convert Booking.com hotel result: {e}")
-            #             continue
-
-            #     search_metadata["successful_api"] = "booking.com"
-            #     search_metadata["booking_api_response_time"] = booking_response.api_response_time_ms
-            #     search_metadata["booking_total_results"] = booking_response.total_results
-            #     self.logger.info(f"Booking.com API returned {len(hotels)} hotels")
-
-            # except Exception as e:
-            #     self.logger.warning(f"Booking.com API failed: {e}")
-            #     search_metadata["api_errors"]["booking.com"] = str(e)
-
-            #     # Try Expedia as fallback
-            #     try:
-            #         self.logger.info("Attempting Expedia API search (fallback)")
-            #         search_metadata["apis_attempted"].append("expedia")
-
-            #         expedia_params = ExpediaSearchParams(
-            #             location=search_request.location,
-            #             check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
-            #             check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
-            #             guest_count=search_request.guest_count,
-            #             room_count=search_request.room_count,
-            #             max_results=search_request.max_results,
-            #             currency=search_request.currency,
-            #             language="en",
-            #         )
-
-            #         expedia_results = await self._expedia_client.search_hotels(expedia_params)
-
-            #         # Convert Expedia results to internal HotelOption models
-            #         for expedia_hotel in expedia_results:
-            #             try:
-            #                 # Apply budget filter if specified
-            #                 if (
-            #                     search_request.budget_per_night
-            #                     and expedia_hotel.price_per_night
-            #                     and Decimal(str(expedia_hotel.price_per_night))
-            #                     > search_request.budget_per_night
-            #                 ):
-            #                     continue
-
-            #                 hotel_location = HotelLocation(
-            #                     latitude=expedia_hotel.latitude or 0.0,
-            #                     longitude=expedia_hotel.longitude or 0.0,
-            #                     address=expedia_hotel.address,
-            #                     city=None,  # Extract from address if needed
-            #                     country=None,  # Extract from address if needed
-            #                     postal_code=None,
-            #                 )
-
-            #                 hotel_option = HotelOption(
-            #                     trip_id=None,
-            #                     external_id=f"expedia_{expedia_hotel.hotel_id}",
-            #                     name=expedia_hotel.name,
-            #                     location=hotel_location,
-            #                     price_per_night=Decimal(str(expedia_hotel.price_per_night))
-            #                     if expedia_hotel.price_per_night
-            #                     else Decimal("0"),
-            #                     currency=expedia_hotel.currency,
-            #                     rating=expedia_hotel.rating,
-            #                     amenities=expedia_hotel.amenities,
-            #                     photos=expedia_hotel.photos,
-            #                     booking_url=expedia_hotel.booking_url,
-            #                     created_at=datetime.now(UTC),
-            #                 )
-            #                 hotels.append(hotel_option)
-
-            #             except (ValueError, TypeError) as e:
-            #                 self.logger.warning(f"Failed to convert Expedia hotel result: {e}")
-            #                 continue
-
-            #         search_metadata["successful_api"] = "expedia"
-            #         search_metadata["expedia_total_results"] = len(expedia_results)
-            #         self.logger.info(f"Expedia API returned {len(hotels)} hotels")
-
-            #     except Exception as e:
-            #         self.logger.warning(f"Expedia API failed: {e}")
-            #         search_metadata["api_errors"]["expedia"] = str(e)
-
-            #         # Try Airbnb as final fallback
-            #         try:
-            #             self.logger.info("Attempting Airbnb API search (final fallback)")
-            #             search_metadata["apis_attempted"].append("airbnb")
-
-            #             airbnb_params = AirbnbSearchParams(
-            #                 location=search_request.location,
-            #                 check_in=search_request.check_in_date.strftime("%Y-%m-%d"),
-            #                 check_out=search_request.check_out_date.strftime("%Y-%m-%d"),
-            #                 guest_count=search_request.guest_count,
-            #                 max_results=search_request.max_results,
-            #                 currency=search_request.currency,
-            #                 language="en",
-            #                 property_type=None,
-            #                 min_price=None,
-            #                 max_price=float(search_request.budget_per_night)
-            #                 if search_request.budget_per_night
-            #                 else None,
-            #             )
-
-            #             airbnb_results = await self._airbnb_client.search_listings(airbnb_params)
-
-            #             # Convert Airbnb results to internal HotelOption models
-            #             for airbnb_listing in airbnb_results:
-            #                 try:
-            #                     hotel_location = HotelLocation(
-            #                         latitude=airbnb_listing.latitude or 0.0,
-            #                         longitude=airbnb_listing.longitude or 0.0,
-            #                         address=airbnb_listing.address,
-            #                         city=None,  # Extract from address if needed
-            #                         country=None,  # Extract from address if needed
-            #                         postal_code=None,
-            #                     )
-
-            #                     hotel_option = HotelOption(
-            #                         trip_id=None,
-            #                         external_id=f"airbnb_{airbnb_listing.listing_id}",
-            #                         name=airbnb_listing.name,
-            #                         location=hotel_location,
-            #                         price_per_night=Decimal(str(airbnb_listing.price_per_night))
-            #                         if airbnb_listing.price_per_night
-            #                         else Decimal("0"),
-            #                         currency=airbnb_listing.currency,
-            #                         rating=airbnb_listing.rating,
-            #                         amenities=airbnb_listing.amenities,
-            #                         photos=airbnb_listing.photos,
-            #                         booking_url=airbnb_listing.booking_url,
-            #                         created_at=datetime.now(UTC),
-            #                     )
-            #                     hotels.append(hotel_option)
-
-            #                 except (ValueError, TypeError) as e:
-            #                     self.logger.warning(f"Failed to convert Airbnb listing result: {e}")
-            #                     continue
-
-            #             search_metadata["successful_api"] = "airbnb"
-            #             search_metadata["airbnb_total_results"] = len(airbnb_results)
-            #             self.logger.info(f"Airbnb API returned {len(hotels)} hotels")
-
-            #         except Exception as e:
-            #             self.logger.error(f"All APIs failed. Last error (Airbnb): {e}")
-            #             search_metadata["api_errors"]["airbnb"] = str(e)
 
         # Calculate search time
         end_time = time.time()
@@ -520,7 +310,7 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
         )
 
         self.logger.info(
-            f"Hotel search completed using {search_metadata['successful_api'] or 'no APIs'}: "
+            f"Hotel search completed using {search_metadata['api_used']}: "
             f"found {len(hotels)} hotels in {search_time_ms}ms"
         )
 
@@ -564,60 +354,6 @@ class HotelAgent(BaseAgent[HotelSearchResponse]):
             request_data["max_results"] = self.max_results_per_request
 
         return await self.process(request_data)
-
-    async def search_hotels_with_rates(
-        self,
-        location: str,
-        check_in_date: str,
-        check_out_date: str,
-        guest_count: int,
-        room_count: int = 1,
-        budget_per_night: float | None = None,
-        max_results: int = 20,
-        get_full_rates: bool = False,
-    ) -> HotelSearchResponse:
-        """
-        Enhanced hotel search using Geoapify + LiteAPI integration.
-
-        First gets hotel list from Geoapify, then fetches rates from LiteAPI.
-
-        Args:
-            location: Search location (city, address, etc.)
-            check_in_date: Check-in date in ISO format (YYYY-MM-DD)
-            check_out_date: Check-out date in ISO format (YYYY-MM-DD)
-            guest_count: Number of guests
-            room_count: Number of rooms needed
-            budget_per_night: Optional budget filter per night
-            max_results: Maximum number of results
-            get_full_rates: Whether to get detailed rates or just minimum rates
-
-        Returns:
-            HotelSearchResponse with hotels and pricing from LiteAPI
-        """
-        raise NotImplementedError(
-            "search_hotels_with_rates is disabled because Geoapify and LiteAPI clients are currently disabled. "
-            "Use the main search_hotels_by_location method which uses Google Places API instead."
-        )
-
-    async def _create_fallback_response(
-        self, geoapify_hotels: list[dict[str, Any]], location: str, start_time: float
-    ) -> HotelSearchResponse:
-        """Create fallback response with Geoapify data only."""
-        raise NotImplementedError(
-            "_create_fallback_response is disabled because Geoapify client is currently disabled."
-        )
-
-    async def _combine_geoapify_liteapi_data(
-        self,
-        geoapify_hotels: list[dict[str, Any]],
-        liteapi_hotels: list[dict[str, Any]],
-        rates_data: dict[str, Any],
-        budget_filter: float | None = None,
-    ) -> list[HotelOption]:
-        """Combine Geoapify location data with LiteAPI rates."""
-        raise NotImplementedError(
-            "_combine_geoapify_liteapi_data is disabled because Geoapify and LiteAPI clients are currently disabled."
-        )
 
     def _calculate_distance_km(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Calculate distance between two coordinates using Haversine formula.

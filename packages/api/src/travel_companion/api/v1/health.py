@@ -110,13 +110,17 @@ async def detailed_health_check(
             "api_key_present": bool(settings.amadeus_api_key),
             "api_secret_present": bool(settings.amadeus_api_secret),
         },
-        "booking": {
-            "configured": bool(settings.booking_api_key),
-            "api_key_present": bool(settings.booking_api_key),
+        "google_places": {
+            "configured": bool(settings.google_places_api_key),
+            "api_key_present": bool(settings.google_places_api_key),
         },
-        "tripadvisor": {
-            "configured": bool(settings.tripadvisor_api_key),
-            "api_key_present": bool(settings.tripadvisor_api_key),
+        "openweather": {
+            "configured": bool(settings.openweather_api_key),
+            "api_key_present": bool(settings.openweather_api_key),
+        },
+        "geoapify": {
+            "configured": bool(settings.geoapify_api_key),
+            "api_key_present": bool(settings.geoapify_api_key),
         },
         "openai": {
             "configured": bool(settings.openai_api_key),
@@ -125,26 +129,6 @@ async def detailed_health_check(
     }
 
     health_status["dependencies"]["external_apis"] = external_apis
-
-    # Check workflow engine health
-    try:
-        from travel_companion.workflows.orchestrator import TripPlanningWorkflow
-
-        workflow = TripPlanningWorkflow()
-        workflow_health = workflow.get_health_status()
-
-        health_status["dependencies"]["workflow_engine"] = workflow_health
-
-    except Exception as e:
-        health_status["dependencies"]["workflow_engine"] = {
-            "status": "error",
-            "error": str(e),
-            "workflow_type": "unknown",
-            "graph_built": False,
-            "redis_connected": False,
-            "node_count": 0,
-            "edge_count": 0,
-        }
 
     # Calculate dependency metrics
     dependencies = health_status["dependencies"]
@@ -173,12 +157,8 @@ async def detailed_health_check(
     # Overall status determination
     database_ok = health_status["dependencies"]["database"]["status"] in ["healthy", "unhealthy"]
     redis_ok = health_status["dependencies"]["redis"]["status"] in ["healthy", "unhealthy"]
-    workflow_ok = health_status["dependencies"]["workflow_engine"]["status"] in [
-        "healthy",
-        "degraded",
-    ]
 
-    if not (database_ok and redis_ok and workflow_ok):
+    if not (database_ok and redis_ok):
         health_status["status"] = "degraded"
 
     # Cache the health status for performance (only if Redis is working)
