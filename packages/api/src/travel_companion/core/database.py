@@ -15,6 +15,7 @@ class DatabaseManager:
     def __init__(self) -> None:
         self._client: Client | None = None
         self._settings = get_settings()
+        self._async_http_client: httpx.AsyncClient | None = None
 
     @property
     def client(self) -> Client:
@@ -47,29 +48,43 @@ class DatabaseManager:
 
         return self._client
 
+    @property
+    def async_http_client(self) -> httpx.AsyncClient:
+        """Get or create shared async HTTP client for health checks."""
+        if self._async_http_client is None:
+            self._async_http_client = httpx.AsyncClient(timeout=5.0, verify=True)
+        return self._async_http_client
+
     async def health_check(self) -> bool:
         """Check database connection health."""
         try:
             if not self._settings.supabase_url:
                 return False
 
-            # Simple health check by attempting to connect
+            # Simple health check by attempting to connect using shared client
             key = self._settings.supabase_key
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self._settings.supabase_url}/rest/v1/",
-                    headers={"apikey": key},
-                    timeout=5.0,
-                )
-                return response.status_code in [200, 404]  # 404 is OK for root endpoint
+            response = await self.async_http_client.get(
+                f"{self._settings.supabase_url}/rest/v1/",
+                headers={"apikey": key},
+                timeout=5.0,
+            )
+            return response.status_code in [200, 404]  # 404 is OK for root endpoint
         except Exception:
             return False
 
     async def close(self) -> None:
-        """Close database connection."""
+        """Close database connection and async HTTP client."""
         if self._client:
             # Supabase client doesn't need explicit closing
             self._client = None
+
+        if self._async_http_client:
+            try:
+                await self._async_http_client.aclose()
+            except RuntimeError:
+                # Event loop might already be closed, which is fine
+                pass
+            self._async_http_client = None
 
 
 @lru_cache

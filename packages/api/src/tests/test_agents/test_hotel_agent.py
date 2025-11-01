@@ -1,6 +1,5 @@
 """Tests for HotelAgent implementation."""
 
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,7 +7,6 @@ import pytest
 from travel_companion.agents.hotel_agent import HotelAgent
 from travel_companion.core.config import Settings
 from travel_companion.models.external import (
-    HotelOption,
     HotelSearchResponse,
 )
 
