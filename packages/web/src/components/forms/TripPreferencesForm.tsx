@@ -12,6 +12,7 @@ import DestinationSearch from '../ui/DestinationSearch'
 import DatePicker from '../ui/DatePicker'
 import PreferencesSelector from '../ui/PreferencesSelector'
 import MultiSelect from '../ui/MultiSelect'
+import LoadingScreen from '../ui/LoadingScreen'
 import {
   CURRENCY_OPTIONS,
   DIETARY_RESTRICTIONS,
@@ -177,8 +178,10 @@ export default function TripPreferencesForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className={`space-y-8 ${className}`}>
-      {showDraftNotification && (
+    <>
+      {isLoading && <LoadingScreen />}
+      <form onSubmit={handleSubmit(onSubmit)} className={`space-y-8 ${className}`}>
+        {showDraftNotification && (
         <div className="rounded-md bg-blue-50 border border-blue-200 p-4 animate-slide-down" role="status">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -536,5 +539,6 @@ export default function TripPreferencesForm({
         </button>
       </div>
     </form>
+    </>
   )
 }
