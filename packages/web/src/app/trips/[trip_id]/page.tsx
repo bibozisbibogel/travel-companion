@@ -15,6 +15,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { MainLayout } from '@/components/layouts';
 import { LazyMapLoader } from '@/components/maps';
 import { MapTimelineProvider } from '@/contexts/MapTimelineContext';
+import { transformItineraryResponse } from '@/lib/itineraryUtils';
 import type { ActivityMarker, AccommodationMarker, DayRoute } from '@/lib/types/map';
 
 /**
@@ -169,7 +170,10 @@ export default function TripDetailPage() {
 
         // If the trip has a plan, use it
         if (tripData?.plan) {
-          setItinerary(tripData.plan);
+          // Transform the backend response to match frontend expectations
+          // This extracts meals from dining activities and distributes accommodation per day
+          const transformedPlan = transformItineraryResponse(tripData.plan);
+          setItinerary(transformedPlan);
         } else {
           // No plan available yet - trip might be in draft status
           throw new Error('Trip has no itinerary plan yet. Please complete trip planning first.');

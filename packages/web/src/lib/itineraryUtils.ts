@@ -7,6 +7,10 @@ import {
   TimeOfDay,
   IItineraryActivity,
   IMealRecommendation,
+  IDailyItinerary,
+  IFullTripItinerary,
+  IAccommodationInfo,
+  MealType,
 } from './types';
 import {
   Compass,
@@ -254,4 +258,151 @@ export function sortActivitiesByTime(
     if (hourA !== hourB) return hourA - hourB;
     return minA - minB;
   });
+}
+
+/**
+ * Extract meals from activities and convert to IMealRecommendation format
+ * Backend returns meals as activities with category "dining"
+ */
+export function extractMealsFromActivities(
+  activities: IItineraryActivity[]
+): IMealRecommendation[] {
+  return activities
+    .filter((activity) => activity.category === 'dining')
+    .map((activity): IMealRecommendation => {
+      // Access the meal_type and venue fields that exist in dining activities
+      const activityWithMeal = activity as any;
+      const venue = activityWithMeal.venue || {};
+
+      // Calculate price_range from cost estimate fields (backend uses cost_estimate_min/max)
+      let priceRange = '';
+      if (activityWithMeal.cost_estimate_min && activityWithMeal.cost_estimate_max) {
+        priceRange = `${activityWithMeal.cost_estimate_min}-${activityWithMeal.cost_estimate_max}`;
+      } else if (activityWithMeal.cost_estimate_min) {
+        priceRange = activityWithMeal.cost_estimate_min;
+      } else if (activityWithMeal.cost_per_person) {
+        const cost = parseFloat(activityWithMeal.cost_per_person);
+        // Estimate a range (±20%)
+        const min = Math.floor(cost * 0.8);
+        const max = Math.ceil(cost * 1.2);
+        priceRange = `${min}-${max}`;
+      } else if (activityWithMeal.total_cost) {
+        priceRange = activityWithMeal.total_cost;
+      } else if (activity.price) {
+        priceRange = activity.price;
+      }
+
+      return {
+        restaurant_name: venue.name || activity.title,
+        cuisine_type: venue.cuisine || 'Local Cuisine',
+        meal_type: (activityWithMeal.meal_type || 'lunch') as MealType,
+        time: activity.time_start || '12:00',
+        price_range: priceRange,
+        rating: venue.rating,
+        location: activity.location || venue.location,
+        description: activity.description || undefined,
+      };
+    });
+}
+
+/**
+ * Filter out dining activities from the activities list
+ * Since meals are displayed separately, we don't want to show them twice
+ */
+export function filterOutDiningActivities(
+  activities: IItineraryActivity[]
+): IItineraryActivity[] {
+  return activities.filter((activity) => activity.category !== 'dining');
+}
+
+/**
+ * Parse the daily_cost.breakdown string to extract category costs
+ * Format: "Attractions (51), Meals (69-96)" or "Activities (100), Accommodation (150)"
+ */
+export function parseDailyCostBreakdown(
+  breakdown: string | undefined
+): {
+  activities: number;
+  meals: number;
+  accommodation: number;
+} {
+  const result = {
+    activities: 0,
+    meals: 0,
+    accommodation: 0,
+  };
+
+  if (!breakdown) return result;
+
+  // Match patterns like "Category (amount)" or "Category (min-max)"
+  const regex = /(\w+)\s*\(([^)]+)\)/g;
+  let match;
+
+  while ((match = regex.exec(breakdown)) !== null) {
+    const category = match[1]?.toLowerCase() || '';
+    const valueStr = match[2] || '';
+
+    // Parse the value (could be single number or range like "69-96")
+    let value = 0;
+    if (valueStr.includes('-')) {
+      // It's a range, take the average
+      const parts = valueStr.split('-');
+      const min = parseFloat(parts[0] || '0');
+      const max = parseFloat(parts[1] || '0');
+      value = (min + max) / 2;
+    } else {
+      value = parseFloat(valueStr);
+    }
+
+    // Map category names to our structure
+    if (category.includes('meal') || category.includes('food') || category.includes('dining')) {
+      result.meals += value;
+    } else if (
+      category.includes('accommod') ||
+      category.includes('hotel') ||
+      category.includes('lodging')
+    ) {
+      result.accommodation += value;
+    } else if (
+      category.includes('activit') ||
+      category.includes('attraction') ||
+      category.includes('entertain') ||
+      category.includes('tour')
+    ) {
+      result.activities += value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Transform backend itinerary response to frontend format
+ * Extracts meals from activities and distributes accommodation per day
+ */
+export function transformItineraryResponse(
+  backendData: IFullTripItinerary
+): IFullTripItinerary {
+  const topLevelAccommodation = backendData.accommodation;
+
+  const transformedItinerary: IDailyItinerary[] = backendData.itinerary.map((day) => {
+    // Extract meals from dining activities
+    const meals = extractMealsFromActivities(day.activities);
+
+    // Filter out dining activities since they're now in meals
+    const nonDiningActivities = filterOutDiningActivities(day.activities);
+
+    // Distribute accommodation to each day (the same accommodation for all days)
+    return {
+      ...day,
+      activities: nonDiningActivities,
+      meals: meals.length > 0 ? meals : undefined,
+      accommodation: topLevelAccommodation,
+    };
+  });
+
+  return {
+    ...backendData,
+    itinerary: transformedItinerary,
+  };
 }

@@ -320,10 +320,10 @@ export interface IDailyItinerary {
   meals?: IMealRecommendation[];
   accommodation?: IAccommodationInfo;
   daily_cost?: {
-    activities: string;
-    meals: string;
-    accommodation: string;
-    total: string;
+    min: number;
+    max: number;
+    currency: string;
+    breakdown?: string;
   };
 }
 

@@ -190,13 +190,14 @@ export const DayCard: React.FC<DayCardProps> = ({
                 )}
 
                 {/* Daily Budget Summary */}
-                {day.daily_cost && (
-                  <DailyBudgetSummary
-                    dailyCost={day.daily_cost}
-                    currency={currency}
-                    {...(tripBudget && { tripBudget })}
-                  />
-                )}
+                <DailyBudgetSummary
+                  activities={day.activities}
+                  meals={day.meals}
+                  accommodation={day.accommodation}
+                  dailyCost={day.daily_cost}
+                  currency={currency}
+                  {...(tripBudget && { tripBudget })}
+                />
               </div>
             </div>
           </div>
