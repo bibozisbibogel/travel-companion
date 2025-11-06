@@ -10,6 +10,8 @@ import type {
 import { mapStyles } from "./mapStyles";
 import { ActivityMarker } from "./ActivityMarker";
 import { AccommodationMarker } from "./AccommodationMarker";
+import { RouteLayer } from "./RouteLayer";
+import type { RoutePolyline } from "@/lib/geoapifyRouting";
 
 const libraries: ("places" | "geometry" | "drawing")[] = ["places", "geometry"];
 
@@ -19,6 +21,7 @@ interface InteractiveMapProps {
   selectedDay: number | null;
   center?: { lat: number; lng: number } | undefined;
   onMarkerClick?: (markerId: string, type: "activity" | "accommodation") => void;
+  routes?: RoutePolyline[];
 }
 
 const containerStyle = {
@@ -32,6 +35,7 @@ export function InteractiveMap({
   selectedDay,
   center,
   onMarkerClick,
+  routes = [],
 }: InteractiveMapProps) {
   const [mapStyle, setMapStyle] = useState<MapStyle>("standard");
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -169,6 +173,15 @@ export function InteractiveMap({
             {...(onMarkerClick && { onClick: (id: string) => onMarkerClick(id, "accommodation") })}
           />
         ))}
+
+        {/* Render routes between waypoints - key based only on route data to avoid remounting with stale data */}
+        {routes.length > 0 && (
+          <RouteLayer
+            key={`routes-${routes[0]?.distance || 0}-${routes[0]?.coordinates.length || 0}`}
+            routes={routes}
+            map={map}
+          />
+        )}
 
         {/* Map controls for style switching - mobile optimized */}
         <div className="absolute left-2 top-2 z-10 flex gap-1 rounded-lg bg-white p-1.5 shadow-md sm:left-4 sm:top-4 sm:gap-2 sm:p-2">

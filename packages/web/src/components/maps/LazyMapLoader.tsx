@@ -6,6 +6,7 @@ import type {
   AccommodationMarker,
   DayRoute,
 } from "@/lib/types/map";
+import type { RoutePolyline } from "@/lib/geoapifyRouting";
 
 // Lazy load the map component to reduce initial bundle size
 const TripMapView = lazy(() =>
@@ -17,6 +18,7 @@ interface LazyMapLoaderProps {
   accommodations: AccommodationMarker[];
   routes: DayRoute[];
   tripCenter?: { lat: number; lng: number };
+  routePolylines?: RoutePolyline[];
 }
 
 function MapLoadingFallback() {
@@ -35,6 +37,7 @@ export function LazyMapLoader({
   accommodations,
   routes,
   tripCenter,
+  routePolylines,
 }: LazyMapLoaderProps) {
   return (
     <Suspense fallback={<MapLoadingFallback />}>
@@ -43,6 +46,7 @@ export function LazyMapLoader({
         accommodations={accommodations}
         routes={routes}
         tripCenter={tripCenter}
+        routePolylines={routePolylines}
       />
     </Suspense>
   );

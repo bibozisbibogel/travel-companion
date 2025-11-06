@@ -21,30 +21,73 @@ import { DayCard } from './DayCard';
 
 interface ItineraryTimelineProps {
   itinerary: IFullTripItinerary;
+  onDayChange?: (dayNumber: number | null) => void; // null = all days view
 }
 
-export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({ itinerary }) => {
+export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
+  itinerary,
+  onDayChange
+}) => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [allExpanded, setAllExpanded] = useState(false);
 
   const currentDay = itinerary.itinerary[currentDayIndex];
   const totalDays = itinerary.itinerary.length;
 
+  console.log(`🎬 [ItineraryTimeline] RENDER - currentDayIndex: ${currentDayIndex}, totalDays: ${totalDays}`);
+  console.log(`🎬 [ItineraryTimeline] allExpanded: ${allExpanded}`);
+
+  // Log when currentDayIndex changes
+  React.useEffect(() => {
+    console.log(`🔢 [ItineraryTimeline] currentDayIndex STATE changed to: ${currentDayIndex}`);
+    console.log(`🔢 [ItineraryTimeline] currentDay.day is: ${currentDay?.day}`);
+  }, [currentDayIndex, currentDay]);
+
+  // Notify parent when day changes
+  React.useEffect(() => {
+    console.log(`📅 [ItineraryTimeline] Effect fired - currentDayIndex: ${currentDayIndex}, allExpanded: ${allExpanded}, currentDay.day: ${currentDay.day}`);
+    if (onDayChange) {
+      if (allExpanded) {
+        console.log('📅 [ItineraryTimeline] Calling onDayChange(null) - All days expanded');
+        onDayChange(null); // All days view - no specific day
+      } else {
+        console.log(`📅 [ItineraryTimeline] Calling onDayChange(${currentDay.day}) - Day ${currentDay.day} (index ${currentDayIndex})`);
+        onDayChange(currentDay.day); // Current day number
+      }
+    } else {
+      console.log('📅 [ItineraryTimeline] onDayChange is null/undefined!');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDayIndex, allExpanded, currentDay.day]);
+
   const handlePreviousDay = () => {
+    console.log(`⬅️ Previous button clicked. Current index: ${currentDayIndex}`);
     if (currentDayIndex > 0) {
+      console.log(`⬅️ Moving from index ${currentDayIndex} to ${currentDayIndex - 1}`);
       setCurrentDayIndex(currentDayIndex - 1);
       scrollToTop();
+    } else {
+      console.log(`⬅️ Already at first day, can't go back`);
     }
   };
 
   const handleNextDay = () => {
+    console.log(`➡️ ============ NEXT BUTTON CLICKED ============`);
+    console.log(`➡️ Current index: ${currentDayIndex}, Total days: ${totalDays}`);
+    console.log(`➡️ Can move forward? ${currentDayIndex < totalDays - 1}`);
     if (currentDayIndex < totalDays - 1) {
+      console.log(`➡️ Moving from index ${currentDayIndex} to ${currentDayIndex + 1}`);
       setCurrentDayIndex(currentDayIndex + 1);
       scrollToTop();
+    } else {
+      console.log(`➡️ Already at last day, can't go forward`);
     }
   };
 
   const handleJumpToDay = (dayIndex: number) => {
+    console.log(`🎯 ============ DROPDOWN CHANGED ============`);
+    console.log(`🎯 Selected index: ${dayIndex}`);
+    console.log(`🎯 Current index before change: ${currentDayIndex}`);
     setCurrentDayIndex(dayIndex);
     scrollToTop();
   };
@@ -122,7 +165,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({ itinerary 
           {/* Day Navigation */}
           <div className="flex items-center gap-3">
             <button
-              onClick={handlePreviousDay}
+              onClick={() => {
+                console.log('⬅️ PREV BUTTON PHYSICALLY CLICKED');
+                handlePreviousDay();
+              }}
               disabled={currentDayIndex === 0}
               className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               aria-label="Previous day"
@@ -134,7 +180,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({ itinerary 
               <span className="text-sm font-medium text-gray-700">Jump to:</span>
               <select
                 value={currentDayIndex}
-                onChange={(e) => handleJumpToDay(Number(e.target.value))}
+                onChange={(e) => {
+                  console.log('📍 DROPDOWN PHYSICALLY CHANGED');
+                  handleJumpToDay(Number(e.target.value));
+                }}
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {itinerary.itinerary.map((day, index) => (
@@ -146,7 +195,10 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({ itinerary 
             </div>
 
             <button
-              onClick={handleNextDay}
+              onClick={() => {
+                console.log('➡️ NEXT BUTTON PHYSICALLY CLICKED');
+                handleNextDay();
+              }}
               disabled={currentDayIndex === totalDays - 1}
               className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               aria-label="Next day"

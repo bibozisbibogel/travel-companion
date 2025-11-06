@@ -25,7 +25,10 @@ export function DaySelector({
       <div className="text-sm font-medium text-gray-700">Filter by Day</div>
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => onDaySelect(null)}
+          onClick={() => {
+            console.log('🔘 [DaySelector] "All Days" button CLICKED');
+            onDaySelect(null);
+          }}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
             selectedDay === null
               ? "bg-blue-500 text-white shadow-md"
@@ -37,7 +40,10 @@ export function DaySelector({
         {days.map((day) => (
           <button
             key={day}
-            onClick={() => onDaySelect(day)}
+            onClick={() => {
+              console.log(`🔘 [DaySelector] Day ${day} button CLICKED`);
+              onDaySelect(day);
+            }}
             className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               selectedDay === day
                 ? "bg-blue-500 text-white shadow-md"
