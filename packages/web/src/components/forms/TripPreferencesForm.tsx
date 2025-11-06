@@ -495,7 +495,9 @@ export default function TripPreferencesForm({
               value={field.value || []}
               onChange={field.onChange}
               error={errors.cuisinePreferences?.message || ""}
-              columns={4}
+              columns={5}
+              searchable={true}
+              maxHeight="max-h-80"
             />
           )}
         />
