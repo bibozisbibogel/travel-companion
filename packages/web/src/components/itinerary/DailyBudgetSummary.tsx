@@ -8,8 +8,8 @@
 
 import React, { useMemo } from 'react';
 import { DollarSign, TrendingUp, Hotel, Utensils, Compass } from 'lucide-react';
-import { formatCurrency, parseDailyCostBreakdown } from '@/lib/itineraryUtils';
-import { IItineraryActivity, IMealRecommendation, IAccommodationInfo } from '@/lib/types';
+import { formatCurrency } from '@/lib/itineraryUtils';
+import { IItineraryActivity, IAccommodationInfo } from '@/lib/types';
 
 interface BudgetCategory {
   label: string;
@@ -20,7 +20,6 @@ interface BudgetCategory {
 
 interface DailyBudgetSummaryProps {
   activities: IItineraryActivity[];
-  meals?: IMealRecommendation[];
   accommodation?: IAccommodationInfo;
   dailyCost?: {
     min: number;
@@ -34,65 +33,99 @@ interface DailyBudgetSummaryProps {
     spent: string;
     remaining: string;
   };
+  isLastDay?: boolean;
+  travelerCount?: number;
 }
 
 export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
   activities,
-  meals,
   accommodation,
   dailyCost,
   currency = 'EUR',
   tripBudget,
+  isLastDay = false,
+  travelerCount = 1,
 }) => {
   // Calculate costs from actual data since backend breakdown is just descriptive text
   const breakdownCosts = useMemo(() => {
-    // Calculate accommodation cost
+    // Calculate accommodation cost (excluding last day - checkout day with no night stay)
+    // Use price_per_night × travelerCount (each traveler typically needs their own room)
     let accommodationTotal = 0;
-    if (accommodation?.total_cost) {
-      const parsed = parseFloat(accommodation.total_cost);
-      accommodationTotal = isNaN(parsed) ? 0 : parsed;
+    if (accommodation?.price_per_night && !isLastDay) {
+      const parsed = parseFloat(accommodation.price_per_night);
+      accommodationTotal = isNaN(parsed) ? 0 : parsed * travelerCount;
     }
 
-    // Calculate meals cost from price_range
+    // Separate activities by category
+    // Dining activities -> Meals budget category
+    // Transportation activities -> Excluded from daily budget (trip-level costs like flights)
+    // Everything else -> Activities budget category
+    const diningActivities = activities.filter(activity => activity.category === 'dining');
+    const transportationActivities = activities.filter(activity => activity.category === 'transportation');
+    const actualActivities = activities.filter(
+      activity => activity.category !== 'dining' && activity.category !== 'transportation'
+    );
+
+    // Calculate meals cost from dining activities
+    // Multiply per-person costs by traveler count since everyone eats
     let mealsTotal = 0;
-    if (meals && meals.length > 0) {
-      mealsTotal = meals.reduce((total, meal) => {
-        if (!meal.price_range) {
-          return total;
-        }
-
-        const matches = meal.price_range.match(/[\d.]+/g);
-
-        if (matches && matches.length >= 2) {
-          const min = parseFloat(matches[0] || '0');
-          const max = parseFloat(matches[1] || '0');
-          const avg = (min + max) / 2;
-          return total + avg;
-        } else if (matches && matches.length === 1) {
-          const value = parseFloat(matches[0] || '0');
-          return total + value;
-        }
-
-        return total;
-      }, 0);
-    }
-
-    // Calculate activities cost
-    let activitiesTotal = 0;
-    activitiesTotal = activities.reduce((total, activity) => {
-      if (activity.price) {
-        const parsed = parseFloat(activity.price);
-        if (!isNaN(parsed)) return total + parsed;
-      }
+    mealsTotal = diningActivities.reduce((total, activity) => {
       const activityTyped = activity as any;
+
+      // Prefer total_cost if backend already calculated for all travelers
       if (activityTyped.total_cost) {
         const parsed = parseFloat(activityTyped.total_cost);
         if (!isNaN(parsed)) return total + parsed;
       }
+
+      // If cost_per_person is provided, multiply by traveler count
       if (activityTyped.cost_per_person) {
         const parsed = parseFloat(activityTyped.cost_per_person);
+        if (!isNaN(parsed)) return total + (parsed * travelerCount);
+      }
+
+      // Check for explicit price field (assume it's total, not per-person)
+      if (activity.price) {
+        const parsed = parseFloat(activity.price);
         if (!isNaN(parsed)) return total + parsed;
       }
+
+      // Fall back to cost estimates (average of min and max), multiply by travelers
+      if (activityTyped.cost_estimate_min && activityTyped.cost_estimate_max) {
+        const min = parseFloat(activityTyped.cost_estimate_min);
+        const max = parseFloat(activityTyped.cost_estimate_max);
+        if (!isNaN(min) && !isNaN(max)) {
+          return total + ((min + max) / 2) * travelerCount;
+        }
+      }
+
+      return total;
+    }, 0);
+
+    // Calculate activities cost (excluding dining and transportation)
+    // Multiply per-person costs by traveler count for group activities
+    let activitiesTotal = 0;
+    activitiesTotal = actualActivities.reduce((total, activity) => {
+      const activityTyped = activity as any;
+
+      // Prefer total_cost if backend already calculated for all travelers
+      if (activityTyped.total_cost) {
+        const parsed = parseFloat(activityTyped.total_cost);
+        if (!isNaN(parsed)) return total + parsed;
+      }
+
+      // If cost_per_person is provided, multiply by traveler count
+      if (activityTyped.cost_per_person) {
+        const parsed = parseFloat(activityTyped.cost_per_person);
+        if (!isNaN(parsed)) return total + (parsed * travelerCount);
+      }
+
+      // Check for explicit price field (assume it's total, not per-person)
+      if (activity.price) {
+        const parsed = parseFloat(activity.price);
+        if (!isNaN(parsed)) return total + parsed;
+      }
+
       return total;
     }, 0);
 
@@ -101,7 +134,7 @@ export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
       meals: mealsTotal,
       accommodation: accommodationTotal,
     };
-  }, [dailyCost, activities, meals, accommodation]);
+  }, [activities, accommodation, isLastDay, travelerCount]);
 
   const accommodationCost = breakdownCosts.accommodation;
   const mealsCost = breakdownCosts.meals;

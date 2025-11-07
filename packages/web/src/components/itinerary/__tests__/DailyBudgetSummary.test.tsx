@@ -8,10 +8,8 @@ import { render, screen } from '@testing-library/react';
 import { DailyBudgetSummary } from '../DailyBudgetSummary';
 import {
   IItineraryActivity,
-  IMealRecommendation,
   IAccommodationInfo,
   ActivityCategory,
-  MealType,
 } from '@/lib/types';
 
 describe('DailyBudgetSummary', () => {
@@ -19,7 +17,7 @@ describe('DailyBudgetSummary', () => {
     {
       time_start: '09:00',
       time_end: '12:00',
-      category: 'cultural' as ActivityCategory,
+      category: 'attraction' as ActivityCategory,
       title: 'Museum Visit',
       description: 'Visit local museum',
       price: '25.00',
@@ -27,34 +25,34 @@ describe('DailyBudgetSummary', () => {
     {
       time_start: '14:00',
       time_end: '17:00',
-      category: 'adventure' as ActivityCategory,
+      category: 'exploration' as ActivityCategory,
       title: 'City Tour',
       description: 'Guided city tour',
       price: '46.00',
     },
-  ];
-
-  const mockMeals: IMealRecommendation[] = [
     {
-      restaurant_name: 'Morning Cafe',
-      cuisine_type: 'French',
-      meal_type: 'breakfast' as MealType,
-      time: '08:00',
-      price_range: '15-20',
+      time_start: '08:00',
+      time_end: '09:00',
+      category: 'dining' as ActivityCategory,
+      title: 'Breakfast at Morning Cafe',
+      description: 'French breakfast',
+      price: '17.50',
     },
     {
-      restaurant_name: 'Lunch Bistro',
-      cuisine_type: 'Italian',
-      meal_type: 'lunch' as MealType,
-      time: '13:00',
-      price_range: '25-30',
+      time_start: '13:00',
+      time_end: '14:00',
+      category: 'dining' as ActivityCategory,
+      title: 'Lunch at Bistro',
+      description: 'Italian lunch',
+      price: '27.50',
     },
     {
-      restaurant_name: 'Dinner Place',
-      cuisine_type: 'Local',
-      meal_type: 'dinner' as MealType,
-      time: '19:00',
-      price_range: '30-40',
+      time_start: '19:00',
+      time_end: '20:00',
+      category: 'dining' as ActivityCategory,
+      title: 'Dinner Place',
+      description: 'Local dinner',
+      price: '35.00',
     },
   ];
 
@@ -82,13 +80,12 @@ describe('DailyBudgetSummary', () => {
 
   it('should render daily total cost', () => {
     // Activities: 25 + 46 = 71
-    // Meals: avg(15,20) + avg(25,30) + avg(30,40) = 17.5 + 27.5 + 35 = 80
+    // Meals (dining activities): 17.5 + 27.5 + 35 = 80
     // Accommodation: 117
     // Total: 71 + 80 + 117 = 268
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
       />
     );
@@ -99,7 +96,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
       />
     );
@@ -113,7 +109,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
       />
     );
@@ -127,7 +122,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
         currency="USD"
       />
@@ -141,7 +135,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
         tripBudget={mockTripBudget}
       />
@@ -156,7 +149,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
         tripBudget={mockTripBudget}
       />
@@ -170,7 +162,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
       />
     );
@@ -182,7 +173,6 @@ describe('DailyBudgetSummary', () => {
     const { container } = render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
       />
     );
@@ -193,7 +183,7 @@ describe('DailyBudgetSummary', () => {
   });
 
   it('should handle zero costs correctly', () => {
-    render(<DailyBudgetSummary activities={[]} meals={[]} />);
+    render(<DailyBudgetSummary activities={[]} />);
 
     // There will be multiple €0.00 (one for each category and total)
     const zeroElements = screen.getAllByText('€0.00');
@@ -204,7 +194,6 @@ describe('DailyBudgetSummary', () => {
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
         tripBudget={mockTripBudget}
       />
@@ -215,15 +204,14 @@ describe('DailyBudgetSummary', () => {
   });
 
   it('should calculate totals from actual data arrays', () => {
-    // Test calculation from activities, meals, and accommodation arrays
+    // Test calculation from activities (including dining) and accommodation
     // Activities: 25 + 46 = 71
-    // Meals: avg(15,20) + avg(25,30) + avg(30,40) = 17.5 + 27.5 + 35 = 80
+    // Meals (dining activities): 17.5 + 27.5 + 35 = 80
     // Accommodation: 117
     // Total: 71 + 80 + 117 = 268
     render(
       <DailyBudgetSummary
         activities={mockActivities}
-        meals={mockMeals}
         accommodation={mockAccommodation}
       />
     );
@@ -234,11 +222,85 @@ describe('DailyBudgetSummary', () => {
     expect(screen.getByText('€117.00')).toBeInTheDocument(); // accommodation
   });
 
-  it('should handle missing meals gracefully', () => {
-    render(<DailyBudgetSummary activities={mockActivities} meals={[]} />);
+  it('should handle activities without dining gracefully', () => {
+    const nonDiningActivities = mockActivities.filter(a => a.category !== 'dining');
+    render(<DailyBudgetSummary activities={nonDiningActivities} />);
 
-    // Without meals, meals category should show 0
+    // Without dining activities, meals category should show 0
     const elements = screen.getAllByText(/€\d+\.\d+/);
     expect(elements.length).toBeGreaterThan(0);
+  });
+
+  it('should exclude accommodation cost on last day', () => {
+    // On last day (checkout), accommodation should not be charged
+    // Activities: 25 + 46 = 71
+    // Meals: 17.5 + 27.5 + 35 = 80
+    // Accommodation: 0 (last day)
+    // Total: 71 + 80 = 151
+    render(
+      <DailyBudgetSummary
+        activities={mockActivities}
+        accommodation={mockAccommodation}
+        isLastDay={true}
+      />
+    );
+
+    expect(screen.getByText('€151.00')).toBeInTheDocument(); // total without accommodation
+    expect(screen.getByText('€0.00')).toBeInTheDocument(); // accommodation should be 0
+  });
+
+  it('should multiply accommodation cost by traveler count', () => {
+    // With 3 travelers, accommodation should be price_per_night × 3
+    // Activities: 25 + 46 = 71 (price field, assumed to be total)
+    // Meals: 17.5 + 27.5 + 35 = 80 (price field, assumed to be total)
+    // Accommodation: 117 × 3 = 351
+    // Total: 71 + 80 + 351 = 502
+    render(
+      <DailyBudgetSummary
+        activities={mockActivities}
+        accommodation={mockAccommodation}
+        travelerCount={3}
+      />
+    );
+
+    expect(screen.getByText('€502.00')).toBeInTheDocument(); // total with 3x accommodation
+    expect(screen.getByText('€351.00')).toBeInTheDocument(); // accommodation × 3
+  });
+
+  it('should multiply cost_per_person by traveler count for meals and activities', () => {
+    // Activities with cost_per_person instead of price
+    const activitiesWithCostPerPerson: IItineraryActivity[] = [
+      {
+        time_start: '09:00',
+        time_end: '12:00',
+        category: 'attraction' as ActivityCategory,
+        title: 'Museum Visit',
+        description: 'Visit local museum',
+        cost_per_person: 25,
+      } as any,
+      {
+        time_start: '08:00',
+        time_end: '09:00',
+        category: 'dining' as ActivityCategory,
+        title: 'Breakfast',
+        description: 'Morning meal',
+        cost_per_person: 15,
+      } as any,
+    ];
+
+    // With 3 travelers:
+    // Activities: 25 × 3 = 75
+    // Meals: 15 × 3 = 45
+    // Total: 75 + 45 = 120
+    render(
+      <DailyBudgetSummary
+        activities={activitiesWithCostPerPerson}
+        travelerCount={3}
+      />
+    );
+
+    expect(screen.getByText('€120.00')).toBeInTheDocument(); // total
+    expect(screen.getByText('€75.00')).toBeInTheDocument(); // activities × 3
+    expect(screen.getByText('€45.00')).toBeInTheDocument(); // meals × 3
   });
 });

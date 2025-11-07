@@ -41,6 +41,19 @@ CRITICAL OUTPUT REQUIREMENTS:
   Example: Oct 18 to Oct 25 = 8 days (18, 19, 20, 21, 22, 23, 24, 25)
   Formula: (end_date - start_date).days + 1
 
+CRITICAL COST CALCULATION REQUIREMENTS:
+- For FLIGHTS: total_price = price_per_person × number_of_travelers
+  Example: 3 travelers × $816.90 per person = $2,450.70 total
+- For ACCOMMODATION: total_cost = price_per_night × nights × number_of_travelers
+  Example: 3 travelers × $120 per night × 6 nights = $2,160 total
+  IMPORTANT: Each traveler typically needs their own room, so multiply by traveler count
+- For DINING/MEALS: total_cost = cost_per_person × number_of_travelers
+  Example: 3 travelers × $25 per person for lunch = $75 total
+  IMPORTANT: Every traveler eats, so multiply meal costs by traveler count
+- For ACTIVITIES: total_cost = cost_per_person × number_of_travelers (when applicable)
+  Example: 3 travelers × $30 museum entry = $90 total
+- Always account for ALL travelers in total cost calculations
+
 After completing your planning and tool usage, you MUST provide a final response containing ONLY a valid JSON object representing the complete trip itinerary. The JSON MUST conform to the following JSON Schema:
 
 ```json

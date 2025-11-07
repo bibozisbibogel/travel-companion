@@ -30,6 +30,7 @@ interface DayCardProps {
     remaining: string;
   };
   defaultExpanded?: boolean;
+  travelerCount?: number;
 }
 
 const TIME_OF_DAY_ICONS = {
@@ -46,6 +47,7 @@ export const DayCard: React.FC<DayCardProps> = ({
   isLastDay = false,
   tripBudget,
   defaultExpanded = false,
+  travelerCount = 1,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -170,10 +172,11 @@ export const DayCard: React.FC<DayCardProps> = ({
                 {/* Daily Budget Summary */}
                 <DailyBudgetSummary
                   activities={day.activities}
-                  meals={day.meals}
-                  accommodation={day.accommodation}
-                  dailyCost={day.daily_cost}
+                  {...(day.accommodation && { accommodation: day.accommodation })}
+                  {...(day.daily_cost && { dailyCost: day.daily_cost })}
                   currency={currency}
+                  isLastDay={isLastDay}
+                  travelerCount={travelerCount}
                   {...(tripBudget && { tripBudget })}
                 />
               </div>

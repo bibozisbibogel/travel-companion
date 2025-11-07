@@ -149,7 +149,7 @@ function TripDetailContent({ tripId }: { tripId: string }) {
   const [itinerary, setItinerary] = useState<IFullTripItinerary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentDayNumber, setCurrentDayNumber] = useState<number | null>(1); // null = all days view
+  const [currentDayNumber, setCurrentDayNumber] = useState<number | null>(null); // null = all days view
   const [routePolylines, setRoutePolylines] = useState<RoutePolyline[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   // Cache routes by day number to avoid refetching when switching between days

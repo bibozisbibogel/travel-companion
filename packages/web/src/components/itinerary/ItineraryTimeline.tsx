@@ -29,7 +29,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
   onDayChange
 }) => {
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
-  const [allExpanded, setAllExpanded] = useState(false);
+  const [allExpanded, setAllExpanded] = useState(true);
 
   const currentDay = itinerary.itinerary[currentDayIndex];
   const totalDays = itinerary.itinerary.length;
@@ -250,6 +250,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
               isFirstDay={index === 0}
               isLastDay={index === totalDays - 1}
               tripBudget={itinerary.trip.budget}
+              travelerCount={itinerary.trip.travelers.count}
               defaultExpanded={true}
             />
           ))
@@ -262,6 +263,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
             isFirstDay={currentDayIndex === 0}
             isLastDay={currentDayIndex === totalDays - 1}
             tripBudget={itinerary.trip.budget}
+            travelerCount={itinerary.trip.travelers.count}
             defaultExpanded={true}
           />
         ) : null}
