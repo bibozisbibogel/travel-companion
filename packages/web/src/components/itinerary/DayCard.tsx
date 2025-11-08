@@ -10,8 +10,6 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Calendar, Sun, Sunset, Moon, CloudMoon } from 'lucide-react';
 import { IDailyItinerary } from '@/lib/types';
 import { ActivityCard } from './ActivityCard';
-import { MealCard } from './MealCard';
-import { AccommodationCard } from './AccommodationCard';
 import { DailyBudgetSummary } from './DailyBudgetSummary';
 import {
   groupActivitiesByTimeOfDay,
@@ -31,6 +29,7 @@ interface DayCardProps {
     remaining: string;
   };
   defaultExpanded?: boolean;
+  travelerCount?: number;
 }
 
 const TIME_OF_DAY_ICONS = {
@@ -47,18 +46,17 @@ export const DayCard: React.FC<DayCardProps> = ({
   isLastDay = false,
   tripBudget,
   defaultExpanded = false,
+  travelerCount = 1,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const sortedActivities = sortActivitiesByTime(day.activities);
   const groupedActivities = groupActivitiesByTimeOfDay(sortedActivities);
 
-  const hasContent =
-    day.activities.length > 0 || (day.meals && day.meals.length > 0) || day.accommodation;
+  const hasContent = day.activities.length > 0 || day.accommodation;
 
   // Summary info for collapsed view
   const activityCount = day.activities.length;
-  const mealCount = day.meals?.length || 0;
 
   return (
     <div className="bg-white border-2 border-gray-200 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
@@ -100,7 +98,6 @@ export const DayCard: React.FC<DayCardProps> = ({
             {!isExpanded && (
               <div className="hidden sm:flex items-center gap-3 text-sm text-gray-600">
                 <span>{activityCount} activities</span>
-                {mealCount > 0 && <span>• {mealCount} meals</span>}
               </div>
             )}
             <button
@@ -157,46 +154,19 @@ export const DayCard: React.FC<DayCardProps> = ({
                     </div>
                   );
                 })}
-
-                {/* Meal Recommendations */}
-                {day.meals && day.meals.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <h4 className="text-lg font-semibold text-gray-800">
-                        Dining Recommendations
-                      </h4>
-                      <div className="flex-grow h-px bg-gray-200 ml-2" />
-                    </div>
-
-                    <div className="space-y-3">
-                      {day.meals.map((meal, index) => (
-                        <MealCard key={`meal-${index}`} meal={meal} />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Sidebar - Accommodation and Budget */}
+              {/* Sidebar - Budget */}
               <div className="space-y-4">
-                {/* Accommodation */}
-                {day.accommodation && (
-                  <AccommodationCard
-                    accommodation={day.accommodation}
-                    currency={currency}
-                    isFirstDay={isFirstDay}
-                    isLastDay={isLastDay}
-                  />
-                )}
-
                 {/* Daily Budget Summary */}
-                {day.daily_cost && (
-                  <DailyBudgetSummary
-                    dailyCost={day.daily_cost}
-                    currency={currency}
-                    {...(tripBudget && { tripBudget })}
-                  />
-                )}
+                <DailyBudgetSummary
+                  activities={day.activities}
+                  {...(day.daily_cost && { dailyCost: day.daily_cost })}
+                  currency={currency}
+                  isLastDay={isLastDay}
+                  travelerCount={travelerCount}
+                  {...(tripBudget && { tripBudget })}
+                />
               </div>
             </div>
           </div>

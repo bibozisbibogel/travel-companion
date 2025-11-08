@@ -163,4 +163,106 @@ describe('MultiSelect', () => {
 
     expect(screen.getByText('Select your preferences')).toBeInTheDocument()
   })
+
+  it('does not show search input when searchable is false', () => {
+    render(
+      <MultiSelect
+        label="Test Options"
+        options={mockOptions}
+        value={[]}
+        onChange={vi.fn()}
+        searchable={false}
+      />
+    )
+
+    expect(screen.queryByPlaceholderText('Search cuisines...')).not.toBeInTheDocument()
+  })
+
+  it('shows search input when searchable is true', () => {
+    render(
+      <MultiSelect
+        label="Test Options"
+        options={mockOptions}
+        value={[]}
+        onChange={vi.fn()}
+        searchable={true}
+      />
+    )
+
+    expect(screen.getByPlaceholderText('Search cuisines...')).toBeInTheDocument()
+  })
+
+  it('filters options based on search query', async () => {
+    render(
+      <MultiSelect
+        label="Test Options"
+        options={mockOptions}
+        value={[]}
+        onChange={vi.fn()}
+        searchable={true}
+      />
+    )
+
+    const searchInput = screen.getByPlaceholderText('Search cuisines...')
+    await userEvent.type(searchInput, 'Option 1')
+
+    expect(screen.getByText('Option 1')).toBeInTheDocument()
+    expect(screen.queryByText('Option 2')).not.toBeInTheDocument()
+    expect(screen.queryByText('Option 3')).not.toBeInTheDocument()
+  })
+
+  it('shows filtered count when searching', async () => {
+    render(
+      <MultiSelect
+        label="Test Options"
+        options={mockOptions}
+        value={[]}
+        onChange={vi.fn()}
+        searchable={true}
+      />
+    )
+
+    const searchInput = screen.getByPlaceholderText('Search cuisines...')
+    await userEvent.type(searchInput, 'Option 1')
+
+    expect(screen.getByText('Showing 1 of 3 options')).toBeInTheDocument()
+  })
+
+  it('filters are case-insensitive', async () => {
+    render(
+      <MultiSelect
+        label="Test Options"
+        options={mockOptions}
+        value={[]}
+        onChange={vi.fn()}
+        searchable={true}
+      />
+    )
+
+    const searchInput = screen.getByPlaceholderText('Search cuisines...')
+    await userEvent.type(searchInput, 'option 1')
+
+    expect(screen.getByText('Option 1')).toBeInTheDocument()
+    expect(screen.queryByText('Option 2')).not.toBeInTheDocument()
+  })
+
+  it('clears filter when search is cleared', async () => {
+    render(
+      <MultiSelect
+        label="Test Options"
+        options={mockOptions}
+        value={[]}
+        onChange={vi.fn()}
+        searchable={true}
+      />
+    )
+
+    const searchInput = screen.getByPlaceholderText('Search cuisines...')
+    await userEvent.type(searchInput, 'Option 1')
+    await userEvent.clear(searchInput)
+
+    expect(screen.getByText('Option 1')).toBeInTheDocument()
+    expect(screen.getByText('Option 2')).toBeInTheDocument()
+    expect(screen.getByText('Option 3')).toBeInTheDocument()
+  })
 })

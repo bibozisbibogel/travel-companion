@@ -12,6 +12,7 @@ interface IDatePickerProps {
   maxDate?: string
   className?: string
   id?: string
+  required?: boolean
 }
 
 export default function DatePicker({
@@ -23,7 +24,8 @@ export default function DatePicker({
   minDate,
   maxDate,
   className = '',
-  id
+  id,
+  required = false
 }: IDatePickerProps) {
   const [displayValue, setDisplayValue] = useState('')
 
@@ -63,7 +65,7 @@ export default function DatePicker({
   return (
     <div className="relative">
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
+        {label} {required && <span className="text-red-500">*</span>}
       </label>
       
       <div className="relative">

@@ -87,36 +87,42 @@ export default function GeocodingDebugPage() {
           trip.itinerary?.forEach((day) => {
             day.activities?.forEach((activity) => {
               if (activity.coordinates?.geocoding_status === "failed") {
-                failures.push({
+                const failure: GeocodingFailure = {
                   tripId,
                   destination: trip.trip.destination.city,
                   locationType: "activity",
                   locationName: activity.title,
-                  locationAddress: activity.location,
                   errorMessage: activity.coordinates.geocoding_error_message || null,
                   failedAt: activity.coordinates.geocoded_at || null,
                   coordinates: {
                     latitude: activity.coordinates.latitude,
                     longitude: activity.coordinates.longitude,
                   },
-                });
+                };
+                if (activity.location) {
+                  failure.locationAddress = activity.location;
+                }
+                failures.push(failure);
               }
 
               // Check venue in activity
               if (activity.venue?.coordinates?.geocoding_status === "failed") {
-                failures.push({
+                const failure: GeocodingFailure = {
                   tripId,
                   destination: trip.trip.destination.city,
                   locationType: "restaurant",
                   locationName: activity.venue.name,
-                  locationAddress: activity.venue.location,
-                  errorMessage: activity.coordinates.geocoding_error_message || null,
-                  failedAt: activity.coordinates.geocoded_at || null,
+                  errorMessage: activity.venue.coordinates.geocoding_error_message || null,
+                  failedAt: activity.venue.coordinates.geocoded_at || null,
                   coordinates: {
                     latitude: activity.venue.coordinates.latitude,
                     longitude: activity.venue.coordinates.longitude,
                   },
-                });
+                };
+                if (activity.venue.location) {
+                  failure.locationAddress = activity.venue.location;
+                }
+                failures.push(failure);
               }
             });
           });

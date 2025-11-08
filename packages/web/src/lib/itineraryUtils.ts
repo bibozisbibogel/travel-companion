@@ -6,6 +6,8 @@ import {
   ActivityCategory,
   TimeOfDay,
   IItineraryActivity,
+  IDailyItinerary,
+  IFullTripItinerary,
   IMealRecommendation,
 } from './types';
 import {
@@ -254,4 +256,91 @@ export function sortActivitiesByTime(
     if (hourA !== hourB) return hourA - hourB;
     return minA - minB;
   });
+}
+
+/**
+ * Parse the daily_cost.breakdown string to extract category costs
+ * Format: "Attractions (51), Meals (69-96)" or "Activities (100), Accommodation (150)"
+ */
+export function parseDailyCostBreakdown(
+  breakdown: string | undefined
+): {
+  activities: number;
+  meals: number;
+  accommodation: number;
+} {
+  const result = {
+    activities: 0,
+    meals: 0,
+    accommodation: 0,
+  };
+
+  if (!breakdown) return result;
+
+  // Match patterns like "Category (amount)" or "Category (min-max)"
+  const regex = /(\w+)\s*\(([^)]+)\)/g;
+  let match;
+
+  while ((match = regex.exec(breakdown)) !== null) {
+    const category = match[1]?.toLowerCase() || '';
+    const valueStr = match[2] || '';
+
+    // Parse the value (could be single number or range like "69-96")
+    let value = 0;
+    if (valueStr.includes('-')) {
+      // It's a range, take the average
+      const parts = valueStr.split('-');
+      const min = parseFloat(parts[0] || '0');
+      const max = parseFloat(parts[1] || '0');
+      value = (min + max) / 2;
+    } else {
+      value = parseFloat(valueStr);
+    }
+
+    // Map category names to our structure
+    if (category.includes('meal') || category.includes('food') || category.includes('dining')) {
+      result.meals += value;
+    } else if (
+      category.includes('accommod') ||
+      category.includes('hotel') ||
+      category.includes('lodging')
+    ) {
+      result.accommodation += value;
+    } else if (
+      category.includes('activit') ||
+      category.includes('attraction') ||
+      category.includes('entertain') ||
+      category.includes('tour')
+    ) {
+      result.activities += value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Transform backend itinerary response to frontend format
+ * Distributes accommodation per day and keeps dining activities integrated
+ */
+export function transformItineraryResponse(
+  backendData: IFullTripItinerary
+): IFullTripItinerary {
+  const topLevelAccommodation = backendData.accommodation;
+
+  const transformedItinerary: IDailyItinerary[] = backendData.itinerary.map((day) => {
+    // Keep all activities including dining - they'll be shown in their time slots
+    // Distribute accommodation to each day (the same accommodation for all days)
+    return {
+      ...day,
+      activities: day.activities,
+      // No longer extracting meals separately - dining activities stay in their time slots
+      accommodation: topLevelAccommodation,
+    };
+  });
+
+  return {
+    ...backendData,
+    itinerary: transformedItinerary,
+  };
 }

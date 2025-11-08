@@ -60,7 +60,7 @@ export function isValidJWT(token: string): boolean {
   if (!token) return false;
 
   const parts = token.split(".");
-  if (parts.length !== 3) return false;
+  if (parts.length !== 3 || !parts[1]) return false;
 
   try {
     const payload = JSON.parse(atob(parts[1]));

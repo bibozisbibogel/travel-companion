@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { InteractiveMap } from "./InteractiveMap";
+import type { RoutePolyline } from "@/lib/geoapifyRouting";
 import { DaySelector } from "./DaySelector";
 import { MapLegend } from "./MapLegend";
 import { ActivityMarker } from "./ActivityMarker";
@@ -19,6 +20,7 @@ interface TripMapViewProps {
   accommodations: AccommodationMarkerType[];
   routes: DayRoute[];
   tripCenter?: { lat: number; lng: number } | undefined;
+  routePolylines?: RoutePolyline[];
 }
 
 export function TripMapView({
@@ -26,6 +28,7 @@ export function TripMapView({
   accommodations,
   routes,
   tripCenter,
+  routePolylines = [],
 }: TripMapViewProps) {
   const {
     selectedDay,
@@ -33,6 +36,8 @@ export function TripMapView({
     highlightedActivityId,
     setHighlightedActivityId,
   } = useMapTimeline();
+
+  console.log(`🗺️ [TripMapView] Rendering with selectedDay: ${selectedDay}, routePolylines: ${routePolylines.length}`);
 
   // Calculate total days from activities
   const totalDays = useMemo(() => {
@@ -72,6 +77,7 @@ export function TripMapView({
           selectedDay={selectedDay}
           center={tripCenter}
           onMarkerClick={handleMarkerClick}
+          routes={routePolylines}
         />
         <MapLegend />
       </div>

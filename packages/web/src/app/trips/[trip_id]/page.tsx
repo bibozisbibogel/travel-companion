@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { ItineraryTimeline } from '@/components/itinerary';
 import { IFullTripItinerary } from '@/lib/types';
@@ -14,8 +14,10 @@ import { apiClient } from '@/lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { MainLayout } from '@/components/layouts';
 import { LazyMapLoader } from '@/components/maps';
-import { MapTimelineProvider } from '@/contexts/MapTimelineContext';
+import { MapTimelineProvider, useMapTimeline } from '@/contexts/MapTimelineContext';
+import { transformItineraryResponse } from '@/lib/itineraryUtils';
 import type { ActivityMarker, AccommodationMarker, DayRoute } from '@/lib/types/map';
+import { fetchDayRoute, type RoutePolyline } from '@/lib/geoapifyRouting';
 
 /**
  * City coordinates mapping for common destinations
@@ -142,12 +144,47 @@ function transformItineraryToMapData(itinerary: IFullTripItinerary) {
   return { activities, accommodations, routes, tripCenter };
 }
 
-export default function TripDetailPage() {
-  const params = useParams();
-  const tripId = params.trip_id as string;
+// Inner component that has access to MapTimelineContext
+function TripDetailContent({ tripId }: { tripId: string }) {
   const [itinerary, setItinerary] = useState<IFullTripItinerary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentDayNumber, setCurrentDayNumber] = useState<number | null>(null); // null = all days view
+  const [routePolylines, setRoutePolylines] = useState<RoutePolyline[]>([]);
+  const [loadingRoutes, setLoadingRoutes] = useState(false);
+  // Cache routes by day number to avoid refetching when switching between days
+  const [routeCache, setRouteCache] = useState<Record<number, RoutePolyline>>({});
+
+  // Get selectedDay from MapTimelineContext
+  const { selectedDay } = useMapTimeline();
+
+  // Sync selectedDay from context with currentDayNumber for route fetching
+  useEffect(() => {
+    console.log(`🔗 [page.tsx] MapTimeline selectedDay changed to: ${selectedDay}`);
+    setCurrentDayNumber(selectedDay);
+  }, [selectedDay]);
+
+  // Log routePolylines changes
+  useEffect(() => {
+    console.log(`🛣️ [page.tsx] routePolylines STATE changed:`, routePolylines.length, 'routes');
+    if (routePolylines.length > 0) {
+      routePolylines.forEach((route, idx) => {
+        console.log(`  Route ${idx}: ${route.coordinates.length} coords, ${(route.distance / 1000).toFixed(1)}km`);
+      });
+    }
+  }, [routePolylines]);
+
+  // Log currentDayNumber changes
+  useEffect(() => {
+    console.log(`🎯 [page.tsx] currentDayNumber STATE: ${currentDayNumber}`);
+  }, [currentDayNumber]);
+
+  // Handle day change from ItineraryTimeline - memoized to prevent infinite loops
+  const handleDayChange = useCallback((dayNumber: number | null) => {
+    console.log(`🔄 [page.tsx] handleDayChange CALLED with: ${dayNumber}`);
+    console.log(`🔄 [page.tsx] About to call setCurrentDayNumber(${dayNumber})`);
+    setCurrentDayNumber(dayNumber);
+  }, []);
 
   // Transform itinerary data for map visualization
   const mapData = useMemo(() => {
@@ -169,7 +206,10 @@ export default function TripDetailPage() {
 
         // If the trip has a plan, use it
         if (tripData?.plan) {
-          setItinerary(tripData.plan);
+          // Transform the backend response to match frontend expectations
+          // This extracts meals from dining activities and distributes accommodation per day
+          const transformedPlan = transformItineraryResponse(tripData.plan);
+          setItinerary(transformedPlan);
         } else {
           // No plan available yet - trip might be in draft status
           throw new Error('Trip has no itinerary plan yet. Please complete trip planning first.');
@@ -186,6 +226,129 @@ export default function TripDetailPage() {
       loadItinerary();
     }
   }, [tripId]);
+
+  // Fetch routes for the currently selected day
+  useEffect(() => {
+    const fetchRoutesForDay = async () => {
+      console.log(`🗺️ [page.tsx] fetchRoutesForDay EFFECT FIRED`);
+      console.log(`🗺️ [page.tsx] currentDayNumber: ${currentDayNumber}`);
+      console.log(`🗺️ [page.tsx] mapData exists: ${!!mapData}`);
+      console.log(`🗺️ [page.tsx] routeCache:`, routeCache);
+
+      if (!mapData || !currentDayNumber) {
+        // No specific day selected (all days view) - clear routes
+        console.log('🗺️ [page.tsx] No day selected or no mapData - clearing routes');
+        setRoutePolylines([]);
+        return;
+      }
+
+      // ALWAYS clear routes first before fetching/setting new ones
+      console.log(`🧹 [page.tsx] Clearing existing routes before Day ${currentDayNumber}`);
+      setRoutePolylines([]);
+
+      // Small delay to ensure clearing is processed
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Check cache first
+      if (routeCache[currentDayNumber]) {
+        console.log(`✅ [page.tsx] Using cached route for Day ${currentDayNumber}`);
+        const cachedRoute = routeCache[currentDayNumber];
+        console.log(`✅ [page.tsx] Setting single cached route: ${cachedRoute.coordinates.length} coords`);
+        setRoutePolylines([cachedRoute]);
+        return;
+      }
+
+      setLoadingRoutes(true);
+      console.log(`📍 Fetching NEW route for Day ${currentDayNumber}`);
+
+      try {
+        // Get activities for the current day
+        const dayActivities = mapData.activities.filter(
+          activity => activity.day === currentDayNumber
+        );
+
+        console.log(`Day ${currentDayNumber}: Found ${dayActivities.length} activities`,
+          dayActivities.map(a => ({ name: a.name, time: a.time, day: a.day }))
+        );
+
+        if (dayActivities.length === 0) {
+          console.log(`❌ Day ${currentDayNumber}: No activities found`);
+          setRoutePolylines([]);
+          return;
+        }
+
+        // Sort activities by time
+        const sortedActivities = dayActivities.sort((a, b) => {
+          return a.time.localeCompare(b.time);
+        });
+
+        // Create waypoints from activities with detailed logging
+        const locations = sortedActivities.map((activity, idx) => {
+          const coord = {
+            latitude: activity.location.latitude,
+            longitude: activity.location.longitude
+          };
+          console.log(`  📍 Waypoint ${idx + 1}: ${activity.name} at [${coord.latitude}, ${coord.longitude}]`);
+          return coord;
+        });
+
+        console.log(`Day ${currentDayNumber}: Activity waypoints summary:`, locations);
+
+        // Add accommodation at the start and end if available
+        // But only if no activities are already at the accommodation location
+        if (mapData.accommodations.length > 0) {
+          const accommodation = mapData.accommodations[0]!;
+          const accommodationLocation = {
+            latitude: accommodation.location.latitude,
+            longitude: accommodation.location.longitude
+          };
+
+          // Check if any activity is already at accommodation location (within 50 meters)
+          const hasActivityAtAccommodation = locations.some(loc => {
+            const distance = Math.sqrt(
+              Math.pow((loc.latitude - accommodationLocation.latitude) * 111000, 2) +
+              Math.pow((loc.longitude - accommodationLocation.longitude) * 85000, 2)
+            );
+            return distance < 50; // 50 meter threshold
+          });
+
+          if (hasActivityAtAccommodation) {
+            console.log(`Day ${currentDayNumber}: Activity already at accommodation, not adding duplicate waypoints`);
+          } else {
+            locations.unshift(accommodationLocation);
+            locations.push(accommodationLocation);
+            console.log(`Day ${currentDayNumber}: Added accommodation at start and end`, accommodationLocation);
+          }
+        }
+
+        console.log(`Day ${currentDayNumber}: Total waypoints (with accommodation): ${locations.length}`);
+
+        // Fetch route for the day
+        if (locations.length >= 2) {
+          const route = await fetchDayRoute(locations, 'walk');
+          if (route) {
+            console.log(`✅ Day ${currentDayNumber}: Route fetched - ${route.coordinates.length} coords, ${route.distance}m`);
+            console.log(`✅ Day ${currentDayNumber}: Setting SINGLE newly fetched route`);
+            console.log(`✅ Day ${currentDayNumber}: Route details - distance: ${route.distance}m, coords: ${route.coordinates.length}`);
+            setRoutePolylines([route]);
+            // Cache the route
+            setRouteCache(prev => ({ ...prev, [currentDayNumber]: route }));
+          } else {
+            console.warn(`❌ Day ${currentDayNumber}: Failed to fetch route`);
+            setRoutePolylines([]);
+          }
+        }
+      } catch (err) {
+        console.error(`❌ Day ${currentDayNumber}: Error fetching routes:`, err);
+        setRoutePolylines([]);
+      } finally {
+        setLoadingRoutes(false);
+      }
+    };
+
+    fetchRoutesForDay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDayNumber, mapData]);
 
   if (loading) {
     return (
@@ -221,25 +384,68 @@ export default function TripDetailPage() {
   }
 
   return (
-    <MapTimelineProvider>
-      <MainLayout className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
-          {/* Map Section */}
-          {mapData && (
-            <div className="mb-8 h-[500px] rounded-lg overflow-hidden shadow-lg">
+    <MainLayout className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Map Section - Overview with Routes for Current Day */}
+        {mapData && (
+          <div className="mb-8">
+            <div className="mb-2">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {(() => {
+                  console.log(`📺 [page.tsx] RENDERING map title with currentDayNumber: ${currentDayNumber}`);
+                  return currentDayNumber ? `Day ${currentDayNumber} Route Map` : 'Trip Overview Map';
+                })()}
+              </h2>
+              <p className="text-sm text-gray-600">
+                {currentDayNumber
+                  ? `Showing route for Day ${currentDayNumber} activities`
+                  : 'All activities across all days'}
+              </p>
+              {loadingRoutes && (
+                <div className="flex items-center gap-2 text-sm text-blue-600 mt-1">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Loading route...</span>
+                </div>
+              )}
+              {!loadingRoutes && routePolylines.length > 0 && routePolylines[0] && (
+                <div className="flex items-center gap-2 text-sm text-green-600 mt-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Route loaded ({(routePolylines[0].distance / 1000).toFixed(1)} km)</span>
+                </div>
+              )}
+            </div>
+            <div className="h-[500px] rounded-lg overflow-hidden shadow-lg">
               <LazyMapLoader
                 activities={mapData.activities}
                 accommodations={mapData.accommodations}
                 routes={mapData.routes}
                 tripCenter={mapData.tripCenter}
+                routePolylines={routePolylines}
               />
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Timeline Section */}
-          <ItineraryTimeline itinerary={itinerary} />
-        </div>
-      </MainLayout>
+        {/* Timeline Section */}
+        <ItineraryTimeline
+          itinerary={itinerary}
+          onDayChange={handleDayChange}
+        />
+      </div>
+    </MainLayout>
+  );
+}
+
+// Outer component that provides MapTimelineContext
+export default function TripDetailPage() {
+  const params = useParams();
+  const tripId = params.trip_id as string;
+
+  return (
+    <MapTimelineProvider>
+      <TripDetailContent tripId={tripId} />
     </MapTimelineProvider>
   );
 }

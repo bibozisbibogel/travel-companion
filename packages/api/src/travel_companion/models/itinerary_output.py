@@ -176,9 +176,13 @@ class AccommodationInfo(BaseModel):
         None, description="Geocoded coordinates for accommodation location"
     )
     amenities: list[str] = Field(default_factory=list, description="Available amenities")
-    price_per_night: Decimal = Field(..., gt=0, description="Price per night")
+    price_per_night: Decimal = Field(..., gt=0, description="Price per night per room/unit")
     nights: int = Field(..., ge=1, description="Number of nights")
-    total_cost: Decimal = Field(..., gt=0, description="Total accommodation cost")
+    total_cost: Decimal = Field(
+        ...,
+        gt=0,
+        description="Total accommodation cost (price_per_night × nights × number_of_travelers)",
+    )
     location_notes: str | None = Field(None, description="Location description/notes")
 
 
@@ -199,7 +203,9 @@ class OptionalActivity(BaseModel):
 
     title: str = Field(..., description="Activity title")
     cost_per_person: Decimal | None = Field(None, ge=0, description="Cost per person")
-    total_cost: Decimal | None = Field(None, ge=0, description="Total cost")
+    total_cost: Decimal | None = Field(
+        None, ge=0, description="Total cost (cost_per_person × number_of_travelers when applicable)"
+    )
 
 
 class ItineraryActivity(BaseModel):
@@ -217,7 +223,9 @@ class ItineraryActivity(BaseModel):
     visit_type: str | None = Field(None, description="Visit type (self-guided, guided, etc.)")
     duration_minutes: int | None = Field(None, gt=0, description="Duration in minutes")
     cost_per_person: Decimal | None = Field(None, ge=0, description="Cost per person")
-    total_cost: Decimal | None = Field(None, ge=0, description="Total cost")
+    total_cost: Decimal | None = Field(
+        None, ge=0, description="Total cost (cost_per_person × number_of_travelers when applicable)"
+    )
     booking_required: bool = Field(default=False, description="Booking required flag")
     booking_notes: str | None = Field(None, description="Booking instructions")
     highlights: list[str] = Field(default_factory=list, description="Activity highlights")

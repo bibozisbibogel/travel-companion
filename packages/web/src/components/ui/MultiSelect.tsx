@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 interface IMultiSelectOption {
   id: string
   label: string
@@ -15,6 +17,8 @@ interface IMultiSelectProps {
   error?: string
   className?: string
   columns?: number
+  searchable?: boolean
+  maxHeight?: string
 }
 
 export default function MultiSelect({
@@ -26,7 +30,11 @@ export default function MultiSelect({
   error,
   className = '',
   columns = 4,
+  searchable = false,
+  maxHeight = 'max-h-96',
 }: IMultiSelectProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+
   const toggleOption = (optionId: string) => {
     const newValue = value.includes(optionId)
       ? value.filter(id => id !== optionId)
@@ -34,6 +42,13 @@ export default function MultiSelect({
 
     onChange(newValue)
   }
+
+  const filteredOptions = searchable && searchQuery
+    ? options.filter(option =>
+        option.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        option.id.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : options
 
   const gridColsClass = {
     2: 'grid-cols-2',
@@ -54,8 +69,26 @@ export default function MultiSelect({
         </p>
       )}
 
-      <div className={`grid ${gridColsClass} gap-3`}>
-        {options.map((option) => {
+      {searchable && (
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search cuisines..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+          {searchQuery && (
+            <p className="text-xs text-gray-500 mt-2">
+              Showing {filteredOptions.length} of {options.length} options
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className={`overflow-y-auto overflow-x-hidden ${maxHeight}`}>
+        <div className={`grid ${gridColsClass} gap-3`}>
+          {filteredOptions.map((option) => {
           const isSelected = value.includes(option.id)
 
           return (
@@ -67,7 +100,7 @@ export default function MultiSelect({
                 relative p-3 rounded-lg border-2 text-center transition-all duration-200
                 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500
                 ${isSelected
-                  ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
+                  ? 'border-blue-600 bg-blue-100 text-blue-900 shadow-md font-semibold'
                   : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                 }
               `}
@@ -81,9 +114,9 @@ export default function MultiSelect({
               </div>
 
               {isSelected && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary-500 rounded-full">
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
                   <svg
-                    className="w-3 h-3 text-white absolute top-1 left-1"
+                    className="w-4 h-4 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -98,6 +131,7 @@ export default function MultiSelect({
             </button>
           )
         })}
+        </div>
       </div>
 
       {value.length > 0 && (

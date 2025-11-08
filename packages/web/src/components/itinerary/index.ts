@@ -8,4 +8,6 @@ export { MealCard } from './MealCard';
 export { AccommodationCard } from './AccommodationCard';
 export { DailyBudgetSummary } from './DailyBudgetSummary';
 export { DayCard } from './DayCard';
+export { DayMapView } from './DayMapView';
 export { ItineraryTimeline } from './ItineraryTimeline';
+export { TripOverviewCard } from './TripOverviewCard';
