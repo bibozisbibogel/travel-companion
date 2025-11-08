@@ -10,7 +10,6 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Calendar, Sun, Sunset, Moon, CloudMoon } from 'lucide-react';
 import { IDailyItinerary } from '@/lib/types';
 import { ActivityCard } from './ActivityCard';
-import { AccommodationCard } from './AccommodationCard';
 import { DailyBudgetSummary } from './DailyBudgetSummary';
 import {
   groupActivitiesByTimeOfDay,
@@ -157,22 +156,11 @@ export const DayCard: React.FC<DayCardProps> = ({
                 })}
               </div>
 
-              {/* Sidebar - Accommodation and Budget */}
+              {/* Sidebar - Budget */}
               <div className="space-y-4">
-                {/* Accommodation */}
-                {day.accommodation && (
-                  <AccommodationCard
-                    accommodation={day.accommodation}
-                    currency={currency}
-                    isFirstDay={isFirstDay}
-                    isLastDay={isLastDay}
-                  />
-                )}
-
                 {/* Daily Budget Summary */}
                 <DailyBudgetSummary
                   activities={day.activities}
-                  {...(day.accommodation && { accommodation: day.accommodation })}
                   {...(day.daily_cost && { dailyCost: day.daily_cost })}
                   currency={currency}
                   isLastDay={isLastDay}

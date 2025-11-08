@@ -10,12 +10,12 @@ import { LazyMapLoader } from '@/components/maps';
 import { Loader2 } from 'lucide-react';
 import { fetchDayRoute, type RoutePolyline } from '@/lib/geoapifyRouting';
 import type { ActivityMarker, AccommodationMarker } from '@/lib/types/map';
-import { IActivity, IAccommodation } from '@/lib/types';
+import { IItineraryActivity, IAccommodationInfo } from '@/lib/types';
 
 interface DayMapViewProps {
   dayNumber: number;
-  activities: IActivity[];
-  accommodation?: IAccommodation;
+  activities: IItineraryActivity[];
+  accommodation?: IAccommodationInfo;
   destinationCoords: { lat: number; lng: number };
 }
 
@@ -23,7 +23,7 @@ interface DayMapViewProps {
  * Transform activities to map markers
  */
 function transformActivitiesToMarkers(
-  activities: IActivity[],
+  activities: IItineraryActivity[],
   dayNumber: number,
   destinationCoords: { lat: number; lng: number }
 ): ActivityMarker[] {
@@ -64,7 +64,7 @@ function transformActivitiesToMarkers(
  * Transform accommodation to map marker
  */
 function transformAccommodationToMarker(
-  accommodation: IAccommodation,
+  accommodation: IAccommodationInfo,
   destinationCoords: { lat: number; lng: number }
 ): AccommodationMarker {
   const accommodationCoords = accommodation.coordinates;
@@ -151,10 +151,11 @@ export const DayMapView: React.FC<DayMapViewProps> = ({
         }));
 
         // Add accommodation at the start and end if available
-        if (mapData.accommodations.length > 0) {
+        const firstAccommodation = mapData.accommodations[0];
+        if (firstAccommodation?.location) {
           const accommodationLocation = {
-            latitude: mapData.accommodations[0].location.latitude,
-            longitude: mapData.accommodations[0].location.longitude
+            latitude: firstAccommodation.location.latitude,
+            longitude: firstAccommodation.location.longitude
           };
           locations.unshift(accommodationLocation);
           locations.push(accommodationLocation);
@@ -193,7 +194,7 @@ export const DayMapView: React.FC<DayMapViewProps> = ({
             <span>Loading route...</span>
           </div>
         )}
-        {!loadingRoutes && routePolylines.length > 0 && (
+        {!loadingRoutes && routePolylines.length > 0 && routePolylines[0] && (
           <div className="flex items-center gap-2 text-sm text-green-600">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

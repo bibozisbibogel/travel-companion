@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { IFullTripItinerary } from '@/lib/types';
 import { DayCard } from './DayCard';
+import { TripOverviewCard } from './TripOverviewCard';
 
 interface ItineraryTimelineProps {
   itinerary: IFullTripItinerary;
@@ -45,12 +46,12 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
 
   // Notify parent when day changes
   React.useEffect(() => {
-    console.log(`📅 [ItineraryTimeline] Effect fired - currentDayIndex: ${currentDayIndex}, allExpanded: ${allExpanded}, currentDay.day: ${currentDay.day}`);
+    console.log(`📅 [ItineraryTimeline] Effect fired - currentDayIndex: ${currentDayIndex}, allExpanded: ${allExpanded}, currentDay.day: ${currentDay?.day}`);
     if (onDayChange) {
       if (allExpanded) {
         console.log('📅 [ItineraryTimeline] Calling onDayChange(null) - All days expanded');
         onDayChange(null); // All days view - no specific day
-      } else {
+      } else if (currentDay) {
         console.log(`📅 [ItineraryTimeline] Calling onDayChange(${currentDay.day}) - Day ${currentDay.day} (index ${currentDayIndex})`);
         onDayChange(currentDay.day); // Current day number
       }
@@ -58,7 +59,7 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
       console.log('📅 [ItineraryTimeline] onDayChange is null/undefined!');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDayIndex, allExpanded, currentDay.day]);
+  }, [currentDayIndex, allExpanded, currentDay?.day]);
 
   const handlePreviousDay = () => {
     console.log(`⬅️ Previous button clicked. Current index: ${currentDayIndex}`);
@@ -237,6 +238,19 @@ export const ItineraryTimeline: React.FC<ItineraryTimelineProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Trip Overview - Flights and Accommodation */}
+      {(itinerary.flights || itinerary.accommodation) && (
+        <TripOverviewCard
+          flights={itinerary.flights}
+          accommodation={itinerary.accommodation}
+          tripDates={{
+            start: itinerary.trip.dates.start,
+            end: itinerary.trip.dates.end,
+          }}
+          currency={currency}
+        />
+      )}
 
       {/* Timeline - Show All Days or Single Day */}
       <div className="space-y-6">

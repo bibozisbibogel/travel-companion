@@ -8,6 +8,7 @@ import {
   IItineraryActivity,
   IDailyItinerary,
   IFullTripItinerary,
+  IMealRecommendation,
 } from './types';
 import {
   Compass,

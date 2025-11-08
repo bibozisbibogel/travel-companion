@@ -7,7 +7,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { DollarSign, TrendingUp, Hotel, Utensils, Compass } from 'lucide-react';
+import { DollarSign, Utensils, Compass } from 'lucide-react';
 import { formatCurrency } from '@/lib/itineraryUtils';
 import { IItineraryActivity, IAccommodationInfo } from '@/lib/types';
 
@@ -48,13 +48,7 @@ export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
 }) => {
   // Calculate costs from actual data since backend breakdown is just descriptive text
   const breakdownCosts = useMemo(() => {
-    // Calculate accommodation cost (excluding last day - checkout day with no night stay)
-    // Use price_per_night × travelerCount (each traveler typically needs their own room)
-    let accommodationTotal = 0;
-    if (accommodation?.price_per_night && !isLastDay) {
-      const parsed = parseFloat(accommodation.price_per_night);
-      accommodationTotal = isNaN(parsed) ? 0 : parsed * travelerCount;
-    }
+    // NOTE: Accommodation is now excluded from daily budget (shown in trip-level overview)
 
     // Separate activities by category
     // Dining activities -> Meals budget category
@@ -132,22 +126,14 @@ export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
     return {
       activities: activitiesTotal,
       meals: mealsTotal,
-      accommodation: accommodationTotal,
     };
-  }, [activities, accommodation, isLastDay, travelerCount]);
+  }, [activities, travelerCount]);
 
-  const accommodationCost = breakdownCosts.accommodation;
   const mealsCost = breakdownCosts.meals;
   const activitiesCost = breakdownCosts.activities;
-  const totalCost = accommodationCost + mealsCost + activitiesCost;
+  const totalCost = mealsCost + activitiesCost;
 
   const categories: BudgetCategory[] = [
-    {
-      label: 'Accommodation',
-      amount: accommodationCost,
-      icon: <Hotel className="w-4 h-4" />,
-      color: 'text-indigo-600 bg-indigo-50',
-    },
     {
       label: 'Meals',
       amount: mealsCost,
@@ -161,25 +147,6 @@ export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
       color: 'text-blue-600 bg-blue-50',
     },
   ];
-
-  const calculatePercentage = (amount: number, total: number): number => {
-    if (total === 0) return 0;
-    return (amount / total) * 100;
-  };
-
-  const calculateBudgetProgress = (): number => {
-    if (!tripBudget) return 0;
-    const spent = parseFloat(tripBudget.spent);
-    const total = parseFloat(tripBudget.total);
-    if (total === 0) return 0;
-    return (spent / total) * 100;
-  };
-
-  const getBudgetStatusColor = (percentage: number): string => {
-    if (percentage < 70) return 'bg-green-500';
-    if (percentage < 90) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
@@ -199,13 +166,11 @@ export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
       </div>
 
       {/* Category Breakdown */}
-      <div className="space-y-3 mb-4">
+      <div className="space-y-2">
         {categories.map((category) => {
-          const percentage = calculatePercentage(category.amount, totalCost);
-
           return (
             <div key={category.label}>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`p-1.5 rounded ${category.color}`}>
                     {category.icon}
@@ -218,64 +183,10 @@ export const DailyBudgetSummary: React.FC<DailyBudgetSummaryProps> = ({
                   {formatCurrency(category.amount.toString(), currency)}
                 </span>
               </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${category.color.split(' ')[1]?.replace('bg-', 'bg-').replace('-50', '-500') || 'bg-gray-500'}`}
-                  style={{ width: `${Math.min(percentage, 100)}%` }}
-                  role="progressbar"
-                  aria-valuenow={percentage}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                />
-              </div>
             </div>
           );
         })}
       </div>
-
-      {/* Trip Budget Progress (if provided) */}
-      {tripBudget && (
-        <div className="pt-4 border-t border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">Trip Budget Progress</span>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Spent</span>
-              <span className="font-semibold text-gray-900">
-                {formatCurrency(tripBudget.spent, currency)}
-              </span>
-            </div>
-
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all duration-300 ${getBudgetStatusColor(calculateBudgetProgress())}`}
-                style={{ width: `${Math.min(calculateBudgetProgress(), 100)}%` }}
-                role="progressbar"
-                aria-valuenow={calculateBudgetProgress()}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Remaining</span>
-              <span className="font-semibold text-green-600">
-                {formatCurrency(tripBudget.remaining, currency)}
-              </span>
-            </div>
-
-            <div className="text-xs text-gray-500 text-center">
-              {calculateBudgetProgress().toFixed(1)}% of{' '}
-              {formatCurrency(tripBudget.total, currency)} total budget
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

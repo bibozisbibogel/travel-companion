@@ -110,6 +110,10 @@ export async function fetchGeoapifyRoute(
     }
 
     const feature = data.features[0];
+    if (!feature) {
+      console.error('No feature found in response');
+      return null;
+    }
     const properties = feature.properties;
     const geometry = feature.geometry;
 
@@ -132,7 +136,7 @@ export async function fetchGeoapifyRoute(
     if (Array.isArray(geometry.coordinates[0]) && Array.isArray(geometry.coordinates[0][0])) {
       console.log('  ℹ️ MultiLineString detected with', geometry.coordinates.length, 'segments');
       // Concatenate all segments into one array
-      geometry.coordinates.forEach((segment: number[][], idx: number) => {
+      (geometry.coordinates as unknown as number[][][]).forEach((segment, idx) => {
         console.log(`    Segment ${idx}: ${segment.length} coordinates`);
         flatCoordinates.push(...segment);
       });

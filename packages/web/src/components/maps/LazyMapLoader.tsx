@@ -46,7 +46,7 @@ export function LazyMapLoader({
         accommodations={accommodations}
         routes={routes}
         tripCenter={tripCenter}
-        routePolylines={routePolylines}
+        {...(routePolylines && { routePolylines })}
       />
     </Suspense>
   );
