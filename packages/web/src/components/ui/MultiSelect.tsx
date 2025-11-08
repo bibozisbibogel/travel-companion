@@ -86,7 +86,7 @@ export default function MultiSelect({
         </div>
       )}
 
-      <div className={`overflow-y-auto ${maxHeight}`}>
+      <div className={`overflow-y-auto overflow-x-hidden ${maxHeight}`}>
         <div className={`grid ${gridColsClass} gap-3`}>
           {filteredOptions.map((option) => {
           const isSelected = value.includes(option.id)
@@ -100,7 +100,7 @@ export default function MultiSelect({
                 relative p-3 rounded-lg border-2 text-center transition-all duration-200
                 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500
                 ${isSelected
-                  ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
+                  ? 'border-blue-600 bg-blue-100 text-blue-900 shadow-md font-semibold'
                   : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                 }
               `}
@@ -114,9 +114,9 @@ export default function MultiSelect({
               </div>
 
               {isSelected && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary-500 rounded-full">
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
                   <svg
-                    className="w-3 h-3 text-white absolute top-1 left-1"
+                    className="w-4 h-4 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >

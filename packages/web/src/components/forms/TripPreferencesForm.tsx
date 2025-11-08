@@ -285,6 +285,7 @@ export default function TripPreferencesForm({
                 value={field.value || ''}
                 onChange={field.onChange}
                 error={errors.startDate?.message || ""}
+                required={true}
               />
             )}
           />
@@ -299,6 +300,7 @@ export default function TripPreferencesForm({
                 value={field.value || ''}
                 onChange={field.onChange}
                 error={errors.endDate?.message || ""}
+                required={true}
                 {...(startDate && { minDate: startDate })}
               />
             )}
