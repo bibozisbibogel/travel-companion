@@ -1,34 +1,34 @@
-"""Food and restaurant recommendation agent using Geoapify API."""
+"""Food and restaurant recommendation agent using Google Places API."""
 
 from typing import Any
 
 from travel_companion.agents.base import BaseAgent
 from travel_companion.models.external import (
-    GeoapifyCateringCategory,
     RestaurantComparisonResult,
+    RestaurantLocation,
     RestaurantOption,
     RestaurantSearchRequest,
     RestaurantSearchResponse,
 )
 from travel_companion.services.cache import CacheManager
-from travel_companion.services.external_apis.geoapify import GeoapifyClient
+from travel_companion.services.external_apis.google_places import GooglePlacesNewAPI, Place
 from travel_companion.utils.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 from travel_companion.utils.errors import ExternalAPIError
 
 
 class FoodAgent(BaseAgent[RestaurantSearchResponse]):
-    """Food and restaurant recommendation agent with Geoapify API integration."""
+    """Food and restaurant recommendation agent with Google Places API integration."""
 
     def __init__(self, **kwargs: Any) -> None:
-        """Initialize food agent with Geoapify API client and circuit breaker."""
+        """Initialize food agent with Google Places API client and circuit breaker."""
         super().__init__(**kwargs)
 
-        # Initialize Geoapify client
-        self.geoapify_client = GeoapifyClient()
+        # Initialize Google Places client
+        self.places_client = GooglePlacesNewAPI(api_key=self.settings.google_places_api_key)
 
-        # Circuit breaker for Geoapify API
-        self.geoapify_circuit_breaker = CircuitBreaker(
-            name="geoapify_api", failure_threshold=5, recovery_timeout=60
+        # Circuit breaker for Google Places API
+        self.places_circuit_breaker = CircuitBreaker(
+            name="google_places_api", failure_threshold=5, recovery_timeout=60
         )
 
         # Initialize cache manager
@@ -37,7 +37,7 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.settings, "food_cache_ttl_seconds", 1800
         )  # 30 minutes default
 
-        self.logger.info("FoodAgent initialized with Geoapify API client and circuit breaker")
+        self.logger.info("FoodAgent initialized with Google Places API client and circuit breaker")
 
     @property
     def agent_name(self) -> str:
@@ -47,44 +47,125 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
     @property
     def agent_version(self) -> str:
         """Version of the agent for compatibility and debugging."""
-        return "2.0.0"  # Updated version for Geoapify integration
+        return "3.0.0"  # Updated version for Google Places integration
 
-    async def _geocode_location_if_needed(
-        self, location: str | None, latitude: float | None, longitude: float | None
-    ) -> tuple[float | None, float | None]:
-        """Geocode location to coordinates if needed.
+    def _convert_place_to_restaurant(
+        self, place: Place, search_lat: float | None = None, search_lon: float | None = None
+    ) -> RestaurantOption | None:
+        """Convert Google Place to RestaurantOption.
 
         Args:
-            location: Location name to geocode
-            latitude: Existing latitude (if available)
-            longitude: Existing longitude (if available)
+            place: Google Place object
+            search_lat: Search origin latitude for distance calculation
+            search_lon: Search origin longitude for distance calculation
 
         Returns:
-            Tuple of (latitude, longitude), either geocoded or original values
+            RestaurantOption or None if conversion fails
         """
-        # If we already have coordinates or no location, return as-is
-        if (latitude and longitude) or not location:
-            return latitude, longitude
-
         try:
-            self.logger.info(f"Geocoding location: {location}")
-            geocode_result = await self.geoapify_client.geocode_city(location)
+            # Extract name
+            name = place.display_name.get("text", "Unknown Restaurant")
+            if not name or name == "Unknown Restaurant":
+                return None
 
-            geocoded_lat = geocode_result["latitude"]
-            geocoded_lon = geocode_result["longitude"]
-
-            self.logger.info(f"Geocoded '{location}' to: {geocoded_lat}, {geocoded_lon}")
-            return geocoded_lat, geocoded_lon
-
-        except ExternalAPIError as e:
-            self.logger.warning(
-                f"Failed to geocode location '{location}': {e}. Falling back to text-based search."
+            # Create location
+            location = RestaurantLocation(
+                latitude=place.location.latitude if place.location else 0.0,
+                longitude=place.location.longitude if place.location else 0.0,
+                address=place.formatted_address,
+                city=self._extract_city_from_address(place.formatted_address),
+                country=self._extract_country_from_address(place.formatted_address),
             )
-            # Return original values if geocoding fails
-            return latitude, longitude
+
+            # Calculate distance if search coordinates provided
+            distance_meters = None
+            if (
+                search_lat is not None
+                and search_lon is not None
+                and place.location is not None
+            ):
+                distance_meters = int(
+                    self._calculate_distance(
+                        search_lat, search_lon, place.location.latitude, place.location.longitude
+                    )
+                )
+
+            # Extract categories from types
+            categories = [f"restaurant.{t}" for t in place.types if t]
+
+            # Create restaurant option
+            restaurant = RestaurantOption(
+                external_id=f"google_places_{place.id}",
+                name=name,
+                categories=categories,
+                location=location,
+                formatted_address=place.formatted_address,
+                distance_meters=distance_meters,
+                provider="google_places",
+            )
+
+            return restaurant
+
+        except Exception as e:
+            self.logger.warning(f"Failed to convert place to restaurant: {e}")
+            return None
+
+    def _extract_city_from_address(self, address: str | None) -> str | None:
+        """Extract city from formatted address."""
+        if not address:
+            return None
+        # Simple extraction - takes the second to last part before country
+        parts = address.split(", ")
+        if len(parts) >= 2:
+            return parts[-2]
+        return None
+
+    def _extract_country_from_address(self, address: str | None) -> str | None:
+        """Extract country from formatted address."""
+        if not address:
+            return None
+        # Simple extraction - takes the last part
+        parts = address.split(", ")
+        if parts:
+            return parts[-1]
+        return None
+
+    def _calculate_distance(
+        self, lat1: float, lon1: float, lat2: float, lon2: float
+    ) -> float:
+        """Calculate distance between two coordinates using Haversine formula.
+
+        Args:
+            lat1: Latitude of first point
+            lon1: Longitude of first point
+            lat2: Latitude of second point
+            lon2: Longitude of second point
+
+        Returns:
+            Distance in meters
+        """
+        import math
+
+        # Earth radius in meters
+        R = 6371000
+
+        # Convert to radians
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+
+        # Haversine formula
+        a = (
+            math.sin(delta_phi / 2) ** 2
+            + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+        )
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        return R * c
 
     async def process(self, request_data: dict[str, Any]) -> RestaurantSearchResponse:
-        """Process restaurant search request using Geoapify Places API.
+        """Process restaurant search request using Google Places API.
 
         Args:
             request_data: Restaurant search parameters
@@ -92,6 +173,8 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         Returns:
             RestaurantSearchResponse with restaurant recommendations
         """
+        import time
+
         try:
             # Generate cache key
             cache_key = await self._cache_key(request_data)
@@ -105,38 +188,66 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             # Validate and parse request
             search_request = RestaurantSearchRequest(**request_data)
 
-            # Geocode location if needed
-            lat, lon = await self._geocode_location_if_needed(
-                search_request.location, search_request.latitude, search_request.longitude
-            )
+            # Build search query
+            query = self._build_restaurant_query(search_request)
 
-            # Update request with geocoded coordinates if we got them
-            if lat and lon and not (search_request.latitude and search_request.longitude):
-                search_request.latitude = lat
-                search_request.longitude = lon
+            # Determine location bias
+            location_bias = None
+            if search_request.latitude is not None and search_request.longitude is not None:
+                location_bias = (search_request.latitude, search_request.longitude)
 
             # Log what we're searching
-            if search_request.latitude and search_request.longitude:
+            if location_bias:
                 self.logger.info(
-                    f"Processing restaurant search at coordinates: "
-                    f"{search_request.latitude}, {search_request.longitude}"
+                    f"Processing restaurant search at coordinates: {location_bias} "
+                    f"with query: '{query}'"
                 )
             elif search_request.location:
                 self.logger.info(
-                    f"Processing restaurant search for location: {search_request.location}"
+                    f"Processing restaurant search for location: {search_request.location} "
+                    f"with query: '{query}'"
                 )
 
-            # Search using Geoapify with circuit breaker protection
-            async with self.geoapify_circuit_breaker:
-                response = await self.geoapify_client.search_restaurants(search_request)
-
-            # If we have results, sort by distance
-            if response.restaurants and any(
-                r.distance_meters is not None for r in response.restaurants
-            ):
-                response.restaurants = sorted(
-                    response.restaurants, key=lambda r: r.distance_meters or float("inf")
+            # Search using Google Places with circuit breaker protection
+            start_time = time.time()
+            async with self.places_circuit_breaker:
+                places = await self.places_client.text_search(
+                    text_query=query,
+                    location_bias=location_bias,
+                    radius=search_request.radius_meters,
+                    max_result_count=min(search_request.max_results, 20),
                 )
+            search_time_ms = int((time.time() - start_time) * 1000)
+
+            # Convert places to restaurants
+            restaurants = []
+            for place in places:
+                restaurant = self._convert_place_to_restaurant(
+                    place,
+                    search_lat=search_request.latitude,
+                    search_lon=search_request.longitude,
+                )
+                if restaurant:
+                    restaurants.append(restaurant)
+
+            # Sort by distance if we have distance data
+            if restaurants and any(r.distance_meters is not None for r in restaurants):
+                restaurants = sorted(
+                    restaurants, key=lambda r: r.distance_meters or float("inf")
+                )
+
+            # Build response
+            response = RestaurantSearchResponse(
+                restaurants=restaurants,
+                search_metadata={
+                    "query": query,
+                    "location_bias": location_bias,
+                    "radius_meters": search_request.radius_meters,
+                },
+                total_results=len(restaurants),
+                search_time_ms=search_time_ms,
+                cached=False,
+            )
 
             # Cache the result
             await self._cache_manager.set_restaurant_cache(
@@ -144,8 +255,8 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             )
 
             self.logger.info(
-                f"Restaurant search completed: {len(response.restaurants)} restaurants found "
-                f"in {response.search_time_ms}ms"
+                f"Restaurant search completed: {len(restaurants)} restaurants found "
+                f"in {search_time_ms}ms"
             )
 
             return response
@@ -154,57 +265,130 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             self.logger.error(f"Restaurant search failed: {e}")
             raise ExternalAPIError(f"Restaurant search failed: {e}") from e
 
+    def _build_restaurant_query(self, request: RestaurantSearchRequest) -> str:
+        """Build Google Places search query from restaurant search request.
+
+        Args:
+            request: Restaurant search request
+
+        Returns:
+            Search query string for Google Places
+        """
+        query_parts = []
+
+        # Add location if provided
+        if request.location:
+            query_parts.append(f"restaurants in {request.location}")
+        else:
+            query_parts.append("restaurants")
+
+        # Add category keywords if specific categories provided
+        if request.categories and request.categories != ["catering.restaurant"]:
+            # Extract cuisine types from categories
+            for category in request.categories:
+                cuisine_type = self._extract_cuisine_from_category(category)
+                if cuisine_type:
+                    query_parts.append(cuisine_type)
+
+        return " ".join(query_parts)
+
+    def _extract_cuisine_from_category(self, category: str) -> str | None:
+        """Extract cuisine type from category string.
+
+        Args:
+            category: Category string (e.g., 'restaurant.italian', 'catering.fast_food')
+
+        Returns:
+            Cuisine type or None
+        """
+        # Map common category patterns to cuisine types
+        category_lower = category.lower()
+
+        # Extract from restaurant.* pattern
+        if "restaurant." in category_lower:
+            cuisine = category_lower.split("restaurant.")[-1]
+            return cuisine.replace("_", " ")
+
+        # Extract from catering.* pattern
+        if "catering." in category_lower:
+            cuisine = category_lower.split("catering.")[-1]
+            if cuisine != "restaurant":  # Don't return generic "restaurant"
+                return cuisine.replace("_", " ")
+
+        # Extract from cafe.* or fast_food.* patterns
+        if "cafe." in category_lower or "fast_food." in category_lower:
+            return category_lower.split(".")[-1].replace("_", " ")
+
+        return None
+
     async def search_by_cuisine(
         self,
         location: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
-        cuisine_category: GeoapifyCateringCategory | str = GeoapifyCateringCategory.RESTAURANT,
+        cuisine_type: str = "restaurant",
         radius_meters: int = 5000,
         max_results: int = 50,
     ) -> RestaurantSearchResponse:
-        """Search for restaurants by specific cuisine category.
+        """Search for restaurants by specific cuisine type.
 
         Args:
             location: Location name to search near
             latitude: Latitude coordinate
             longitude: Longitude coordinate
-            cuisine_category: Geoapify cuisine category
+            cuisine_type: Cuisine type (e.g., 'italian', 'chinese', 'mexican')
             radius_meters: Search radius in meters
             max_results: Maximum number of results
 
         Returns:
             RestaurantSearchResponse with filtered restaurants
         """
+        import time
+
         try:
-            # Convert enum to string if needed
-            if isinstance(cuisine_category, GeoapifyCateringCategory):
-                category_str = cuisine_category.value
+            self.logger.info(f"Searching for {cuisine_type} restaurants")
+
+            # Build search query with cuisine type
+            if location:
+                query = f"{cuisine_type} restaurants in {location}"
             else:
-                category_str = cuisine_category
+                query = f"{cuisine_type} restaurants"
 
-            # Geocode location if needed
-            latitude, longitude = await self._geocode_location_if_needed(
-                location, latitude, longitude
+            # Determine location bias
+            location_bias = None
+            if latitude is not None and longitude is not None:
+                location_bias = (latitude, longitude)
+
+            # Search using Google Places
+            start_time = time.time()
+            async with self.places_circuit_breaker:
+                places = await self.places_client.text_search(
+                    text_query=query,
+                    location_bias=location_bias,
+                    radius=radius_meters,
+                    max_result_count=min(max_results, 20),
+                )
+            search_time_ms = int((time.time() - start_time) * 1000)
+
+            # Convert places to restaurants
+            restaurants = []
+            for place in places:
+                restaurant = self._convert_place_to_restaurant(
+                    place, search_lat=latitude, search_lon=longitude
+                )
+                if restaurant:
+                    restaurants.append(restaurant)
+
+            # Build response
+            response = RestaurantSearchResponse(
+                restaurants=restaurants,
+                search_metadata={"cuisine_type": cuisine_type, "query": query},
+                total_results=len(restaurants),
+                search_time_ms=search_time_ms,
+                cached=False,
             )
 
-            # Build search request
-            search_request = RestaurantSearchRequest(
-                location=location,
-                latitude=latitude,
-                longitude=longitude,
-                categories=[category_str],
-                radius_meters=radius_meters,
-                max_results=max_results,
-            )
-
-            self.logger.info(f"Searching for {category_str} restaurants")
-
-            # Search using Geoapify
-            async with self.geoapify_circuit_breaker:
-                response = await self.geoapify_client.search_restaurants(search_request)
-
-            self.logger.info(f"Found {len(response.restaurants)} {category_str} restaurants")
+            self.logger.info(f"Found {len(restaurants)} {cuisine_type} restaurants")
             return response
 
         except Exception as e:
@@ -227,43 +411,64 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         Returns:
             RestaurantSearchResponse with local specialty restaurants
         """
+        import time
+
         try:
-            # Geocode location if needed
-            latitude, longitude = await self._geocode_location_if_needed(
-                location, latitude, longitude
+            # Determine local cuisines based on location
+            local_cuisines = self._get_local_cuisines(location)
+
+            # Build search query
+            if location:
+                if local_cuisines:
+                    # Search for specific local cuisines
+                    query = f"{', '.join(local_cuisines)} restaurants in {location}"
+                else:
+                    # Generic local/regional restaurants
+                    query = f"local restaurants in {location}"
+            else:
+                query = "local specialty restaurants"
+
+            self.logger.info(f"Searching local specialties with query: '{query}'")
+
+            # Determine location bias
+            location_bias = None
+            if latitude is not None and longitude is not None:
+                location_bias = (latitude, longitude)
+
+            # Search using Google Places
+            start_time = time.time()
+            async with self.places_circuit_breaker:
+                places = await self.places_client.text_search(
+                    text_query=query,
+                    location_bias=location_bias,
+                    radius=3000,  # Smaller radius for local places
+                    max_result_count=20,
+                )
+            search_time_ms = int((time.time() - start_time) * 1000)
+
+            # Convert places to restaurants
+            restaurants = []
+            for place in places:
+                restaurant = self._convert_place_to_restaurant(
+                    place, search_lat=latitude, search_lon=longitude
+                )
+                if restaurant:
+                    restaurants.append(restaurant)
+
+            # Build response
+            response = RestaurantSearchResponse(
+                restaurants=restaurants,
+                search_metadata={
+                    "search_type": "local_specialties",
+                    "local_cuisines": local_cuisines,
+                    "query": query,
+                },
+                total_results=len(restaurants),
+                search_time_ms=search_time_ms,
+                cached=False,
             )
 
-            # Determine cuisine categories based on location
-            specialty_categories = self._get_local_cuisine_categories(location)
-
-            if not specialty_categories:
-                # Default to regional/international if no specific match
-                specialty_categories = [
-                    GeoapifyCateringCategory.RESTAURANT_REGIONAL.value,
-                    GeoapifyCateringCategory.RESTAURANT_INTERNATIONAL.value,
-                ]
-
-            self.logger.info(f"Searching local specialties with categories: {specialty_categories}")
-
-            # Build search request with local specialty categories
-            search_request = RestaurantSearchRequest(
-                location=location,
-                latitude=latitude,
-                longitude=longitude,
-                categories=specialty_categories,
-                radius_meters=3000,  # Smaller radius for local places
-                max_results=30,
-            )
-
-            # Search using Geoapify
-            async with self.geoapify_circuit_breaker:
-                response = await self.geoapify_client.search_restaurants(search_request)
-
-            # Update metadata to indicate specialty search
-            response.search_metadata["search_type"] = "local_specialties"
-            response.search_metadata["specialty_categories"] = specialty_categories
-
-            self.logger.info(f"Found {len(response.restaurants)} local specialty restaurants")
+            self.logger.info(f"Found {len(restaurants)} local specialty restaurants")
             return response
 
         except Exception as e:
@@ -277,91 +482,66 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 cached=False,
             )
 
-    def _get_local_cuisine_categories(self, location: str | None) -> list[str]:
-        """Map location to relevant local cuisine categories."""
+    def _get_local_cuisines(self, location: str | None) -> list[str]:
+        """Map location to relevant local cuisine types for Google Places queries.
+
+        Args:
+            location: Location name
+
+        Returns:
+            List of cuisine types for the location
+        """
         if not location:
             return []
 
         location_lower = location.lower()
-        categories: list[str] = []
+        cuisines: list[str] = []
 
-        # Location-based cuisine mapping using Geoapify categories
-        location_cuisines = {
-            "italy": [GeoapifyCateringCategory.RESTAURANT_ITALIAN.value],
-            "rome": [GeoapifyCateringCategory.RESTAURANT_ITALIAN.value],
-            "milan": [GeoapifyCateringCategory.RESTAURANT_ITALIAN.value],
-            "france": [GeoapifyCateringCategory.RESTAURANT_FRENCH.value],
-            "paris": [GeoapifyCateringCategory.RESTAURANT_FRENCH.value],
-            "mexico": [
-                GeoapifyCateringCategory.RESTAURANT_MEXICAN.value,
-                GeoapifyCateringCategory.RESTAURANT_TEX_MEX.value,
-            ],
-            "japan": [
-                GeoapifyCateringCategory.RESTAURANT_JAPANESE.value,
-                GeoapifyCateringCategory.RESTAURANT_SUSHI.value,
-                GeoapifyCateringCategory.RESTAURANT_RAMEN.value,
-            ],
-            "tokyo": [
-                GeoapifyCateringCategory.RESTAURANT_JAPANESE.value,
-                GeoapifyCateringCategory.RESTAURANT_SUSHI.value,
-            ],
-            "china": [
-                GeoapifyCateringCategory.RESTAURANT_CHINESE.value,
-                GeoapifyCateringCategory.RESTAURANT_DUMPLING.value,
-            ],
-            "beijing": [GeoapifyCateringCategory.RESTAURANT_CHINESE.value],
-            "india": [
-                GeoapifyCateringCategory.RESTAURANT_INDIAN.value,
-                GeoapifyCateringCategory.RESTAURANT_CURRY.value,
-            ],
-            "thailand": [GeoapifyCateringCategory.RESTAURANT_THAI.value],
-            "bangkok": [GeoapifyCateringCategory.RESTAURANT_THAI.value],
-            "greece": [GeoapifyCateringCategory.RESTAURANT_GREEK.value],
-            "athens": [GeoapifyCateringCategory.RESTAURANT_GREEK.value],
-            "spain": [
-                GeoapifyCateringCategory.RESTAURANT_SPANISH.value,
-                GeoapifyCateringCategory.RESTAURANT_TAPAS.value,
-            ],
-            "barcelona": [
-                GeoapifyCateringCategory.RESTAURANT_SPANISH.value,
-                GeoapifyCateringCategory.RESTAURANT_TAPAS.value,
-            ],
-            "germany": [
-                GeoapifyCateringCategory.RESTAURANT_GERMAN.value,
-                GeoapifyCateringCategory.RESTAURANT_BAVARIAN.value,
-            ],
-            "munich": [GeoapifyCateringCategory.RESTAURANT_BAVARIAN.value],
-            "turkey": [
-                GeoapifyCateringCategory.RESTAURANT_TURKISH.value,
-                GeoapifyCateringCategory.RESTAURANT_KEBAB.value,
-            ],
-            "istanbul": [GeoapifyCateringCategory.RESTAURANT_TURKISH.value],
-            "korea": [GeoapifyCateringCategory.RESTAURANT_KOREAN.value],
-            "seoul": [GeoapifyCateringCategory.RESTAURANT_KOREAN.value],
-            "vietnam": [GeoapifyCateringCategory.RESTAURANT_VIETNAMESE.value],
-            "texas": [
-                GeoapifyCateringCategory.RESTAURANT_TEX_MEX.value,
-                GeoapifyCateringCategory.RESTAURANT_BARBECUE.value,
-                GeoapifyCateringCategory.RESTAURANT_STEAK_HOUSE.value,
-            ],
-            "new york": [
-                GeoapifyCateringCategory.RESTAURANT_PIZZA.value,
-                GeoapifyCateringCategory.RESTAURANT_AMERICAN.value,
-            ],
-            "louisiana": [
-                GeoapifyCateringCategory.RESTAURANT_SEAFOOD.value,
-                GeoapifyCateringCategory.RESTAURANT_AMERICAN.value,
-            ],
-            "caribbean": [GeoapifyCateringCategory.RESTAURANT_CARIBBEAN.value],
-            "jamaica": [GeoapifyCateringCategory.RESTAURANT_JAMAICAN.value],
+        # Location-based cuisine mapping for Google Places
+        location_cuisines_map = {
+            "italy": ["italian"],
+            "rome": ["italian"],
+            "milan": ["italian"],
+            "florence": ["italian"],
+            "france": ["french"],
+            "paris": ["french"],
+            "lyon": ["french"],
+            "mexico": ["mexican"],
+            "japan": ["japanese", "sushi", "ramen"],
+            "tokyo": ["japanese", "sushi"],
+            "china": ["chinese"],
+            "beijing": ["chinese"],
+            "shanghai": ["chinese"],
+            "india": ["indian"],
+            "thailand": ["thai"],
+            "bangkok": ["thai"],
+            "greece": ["greek"],
+            "athens": ["greek"],
+            "spain": ["spanish", "tapas"],
+            "barcelona": ["spanish", "tapas"],
+            "madrid": ["spanish"],
+            "germany": ["german"],
+            "munich": ["bavarian", "german"],
+            "berlin": ["german"],
+            "turkey": ["turkish"],
+            "istanbul": ["turkish"],
+            "korea": ["korean"],
+            "seoul": ["korean"],
+            "vietnam": ["vietnamese"],
+            "hanoi": ["vietnamese"],
+            "texas": ["tex-mex", "barbecue"],
+            "new york": ["pizza", "american"],
+            "louisiana": ["cajun", "creole", "seafood"],
+            "caribbean": ["caribbean"],
+            "jamaica": ["jamaican"],
         }
 
         # Check for matches
-        for loc_key, cuisine_categories in location_cuisines.items():
+        for loc_key, loc_cuisines in location_cuisines_map.items():
             if loc_key in location_lower:
-                categories.extend(cuisine_categories)
+                cuisines.extend(loc_cuisines)
 
-        return list(set(categories))  # Remove duplicates
+        return list(set(cuisines))  # Remove duplicates
 
     async def compare_restaurants(
         self, restaurants: list[RestaurantOption], preferred_categories: list[str] | None = None
@@ -487,22 +667,52 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         Returns:
             RestaurantSearchResponse with nearby cafes
         """
-        cafe_categories = [
-            GeoapifyCateringCategory.CAFE.value,
-            GeoapifyCateringCategory.CAFE_COFFEE.value,
-            GeoapifyCateringCategory.CAFE_COFFEE_SHOP.value,
-        ]
+        import time
 
-        search_request = RestaurantSearchRequest(
-            location=None,  # Using coordinates instead
-            latitude=latitude,
-            longitude=longitude,
-            categories=cafe_categories,
-            radius_meters=radius_meters,
-            max_results=20,
-        )
+        try:
+            query = "cafes coffee shops"
 
-        return await self.search_restaurants(search_request)
+            self.logger.info(f"Searching for cafes near {latitude}, {longitude}")
+
+            # Search using Google Places
+            start_time = time.time()
+            async with self.places_circuit_breaker:
+                places = await self.places_client.text_search(
+                    text_query=query,
+                    location_bias=(latitude, longitude),
+                    radius=radius_meters,
+                    max_result_count=20,
+                )
+            search_time_ms = int((time.time() - start_time) * 1000)
+
+            # Convert places to restaurants
+            restaurants = []
+            for place in places:
+                restaurant = self._convert_place_to_restaurant(
+                    place, search_lat=latitude, search_lon=longitude
+                )
+                if restaurant:
+                    restaurants.append(restaurant)
+
+            # Build response
+            return RestaurantSearchResponse(
+                restaurants=restaurants,
+                search_metadata={"search_type": "cafes", "query": query},
+                total_results=len(restaurants),
+                search_time_ms=search_time_ms,
+                cached=False,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Cafe search failed: {e}")
+            return RestaurantSearchResponse(
+                restaurants=[],
+                cache_expires_at=None,
+                search_metadata={"error": str(e)},
+                total_results=0,
+                search_time_ms=0,
+                cached=False,
+            )
 
     async def get_fast_food_options(
         self,
@@ -522,31 +732,66 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
         Returns:
             RestaurantSearchResponse with fast food options
         """
-        # Geocode location if needed
-        latitude, longitude = await self._geocode_location_if_needed(location, latitude, longitude)
+        import time
 
-        fast_food_categories = [
-            GeoapifyCateringCategory.FAST_FOOD.value,
-            GeoapifyCateringCategory.FAST_FOOD_BURGER.value,
-            GeoapifyCateringCategory.FAST_FOOD_PIZZA.value,
-            GeoapifyCateringCategory.FAST_FOOD_SANDWICH.value,
-        ]
+        try:
+            # Build search query
+            if location:
+                query = f"fast food restaurants in {location}"
+            else:
+                query = "fast food restaurants"
 
-        search_request = RestaurantSearchRequest(
-            location=location,
-            latitude=latitude,
-            longitude=longitude,
-            categories=fast_food_categories,
-            radius_meters=radius_meters,
-            max_results=30,
-        )
+            self.logger.info(f"Searching for fast food with query: '{query}'")
 
-        return await self.search_restaurants(search_request)
+            # Determine location bias
+            location_bias = None
+            if latitude is not None and longitude is not None:
+                location_bias = (latitude, longitude)
+
+            # Search using Google Places
+            start_time = time.time()
+            async with self.places_circuit_breaker:
+                places = await self.places_client.text_search(
+                    text_query=query,
+                    location_bias=location_bias,
+                    radius=radius_meters,
+                    max_result_count=20,
+                )
+            search_time_ms = int((time.time() - start_time) * 1000)
+
+            # Convert places to restaurants
+            restaurants = []
+            for place in places:
+                restaurant = self._convert_place_to_restaurant(
+                    place, search_lat=latitude, search_lon=longitude
+                )
+                if restaurant:
+                    restaurants.append(restaurant)
+
+            # Build response
+            return RestaurantSearchResponse(
+                restaurants=restaurants,
+                search_metadata={"search_type": "fast_food", "query": query},
+                total_results=len(restaurants),
+                search_time_ms=search_time_ms,
+                cached=False,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Fast food search failed: {e}")
+            return RestaurantSearchResponse(
+                restaurants=[],
+                cache_expires_at=None,
+                search_metadata={"error": str(e)},
+                total_results=0,
+                search_time_ms=0,
+                cached=False,
+            )
 
     async def search_restaurants(
         self, search_request: RestaurantSearchRequest
     ) -> RestaurantSearchResponse:
-        """Direct search using Geoapify with the provided request.
+        """Direct search using Google Places with the provided request.
 
         Args:
             search_request: Search request with parameters
@@ -555,11 +800,11 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
             RestaurantSearchResponse with results
         """
         try:
-            async with self.geoapify_circuit_breaker:
-                result = await self.geoapify_client.search_restaurants(search_request)
-                return result
+            # Use the process method which handles Google Places search
+            result = await self.process(search_request.model_dump())
+            return result
         except CircuitBreakerOpenError as e:
-            self.logger.warning(f"Geoapify circuit breaker is open: {e}")
+            self.logger.warning(f"Google Places circuit breaker is open: {e}")
             return RestaurantSearchResponse(
                 restaurants=[],
                 cache_expires_at=None,
@@ -582,43 +827,33 @@ class FoodAgent(BaseAgent[RestaurantSearchResponse]):
                 cached=False,
             )
 
-        # This should never be reached, but added to satisfy mypy
-        return RestaurantSearchResponse(
-            restaurants=[],
-            cache_expires_at=None,
-            search_metadata={"error": "Unknown error"},
-            total_results=0,
-            search_time_ms=0,
-            cached=False,
-        )
-
     async def health_check(self) -> dict[str, Any]:
-        """Enhanced health check including Geoapify API service status."""
+        """Enhanced health check including Google Places API service status."""
         status = await super().health_check()
 
-        # Add Geoapify API health check
+        # Add Google Places API health check
         api_health: dict[str, str] = {}
 
         try:
-            api_health["geoapify"] = (
-                "healthy" if self.geoapify_circuit_breaker.is_closed else "circuit_open"
+            api_health["google_places"] = (
+                "healthy" if self.places_circuit_breaker.is_closed else "circuit_open"
             )
         except Exception:
-            api_health["geoapify"] = "unhealthy"
+            api_health["google_places"] = "unhealthy"
 
         status["dependencies"]["apis"] = api_health
 
         # Overall status degraded if API is unhealthy or circuit is open
-        if api_health.get("geoapify") != "healthy":
+        if api_health.get("google_places") != "healthy":
             status["status"] = "degraded"
 
         return status
 
     async def __aenter__(self) -> "FoodAgent":
         """Async context manager entry."""
-        await self.geoapify_client.__aenter__()
+        await self.places_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
-        await self.geoapify_client.__aexit__(exc_type, exc_val, exc_tb)
+        await self.places_client.__aexit__(exc_type, exc_val, exc_tb)
