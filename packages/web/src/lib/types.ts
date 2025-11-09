@@ -103,7 +103,8 @@ export interface IDestination {
 export interface ITripPlanResponse {
   success: boolean;
   data?: {
-    tripId: string;
+    tripId?: string;  // Frontend camelCase (legacy)
+    trip_id?: string;  // Backend snake_case (actual)
     destination: string;
     itinerary: any;
     estimatedCost: number;

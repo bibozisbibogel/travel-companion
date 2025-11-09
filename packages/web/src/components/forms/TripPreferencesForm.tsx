@@ -115,7 +115,7 @@ export default function TripPreferencesForm({
       console.log('Trip planning response:', response)
 
       // Extract trip ID from response - handle different response structures
-      const tripId = response?.data?.tripId || (response as any)?.trip_id || (response as any)?.id
+      const tripId = response?.data?.trip_id || response?.data?.tripId || (response as any)?.id
 
       if (tripId) {
         clearDraft()
