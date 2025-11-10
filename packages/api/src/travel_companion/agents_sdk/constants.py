@@ -33,6 +33,18 @@ When planning trips:
 - Provide multiple options when appropriate
 - Include practical details like booking URLs and pricing
 
+CRITICAL LOCATION AND COORDINATE REQUIREMENTS:
+- For activity locations: ALWAYS include the specific venue/attraction name, NOT just the city
+  Example: location should be "Eiffel Tower" NOT "Paris"
+  Example: location should be "Colosseum" NOT "Rome"
+- Use the COMMONLY KNOWN local name for attractions, not official renamed names
+  Example: Use "Herăstrău Park" NOT "King Michael I Park" (both refer to same place, but Herăstrău is better for geocoding)
+- DO NOT add "The" before attraction names (use "Romanian Athenaeum" NOT "The Romanian Athenaeum")
+- Set ALL "coordinates" fields to null - coordinates will be added automatically via geocoding
+- NEVER populate latitude/longitude values yourself - leave coordinates as null
+- ALL coordinate objects must be exactly: {{"latitude": null, "longitude": null, "geocoded_at": null, "geocoding_status": null, "geocoding_error_message": null}}
+- For venues and activities, the "location" field should contain the venue NAME or specific address
+
 CRITICAL OUTPUT REQUIREMENTS:
 - Do NOT include any explanatory text before or after the JSON
 - Ensure all dates use ISO 8601 format (YYYY-MM-DD)

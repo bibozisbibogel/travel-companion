@@ -1,9 +1,9 @@
 """Tests for geocoding service."""
 
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
-import googlemaps.exceptions  # type: ignore[import-untyped]
+import httpx
 import pytest
 
 from travel_companion.services.geocoding_service import (
@@ -18,7 +18,7 @@ def mock_settings() -> Any:
     """Mock settings for testing."""
     with patch("travel_companion.services.geocoding_service.get_settings") as mock:
         settings = Mock()
-        settings.google_places_api_key = "AIzaTest-API-Key-For-Testing-12345678"
+        settings.geoapify_api_key = "test-geoapify-api-key-12345678"
         settings.geocoding_retry_attempts = 3
         settings.geocoding_timeout_seconds = 5
         settings.geocoding_rate_limit_per_second = 50
@@ -29,10 +29,10 @@ def mock_settings() -> Any:
 @pytest.fixture
 def geocoding_service(mock_settings: Any) -> GeocodingService:
     """Create geocoding service for testing."""
-    with patch("googlemaps.Client"):
-        service = GeocodingService(api_key="AIzaTest-API-Key-For-Testing-12345678")
+    with patch("httpx.AsyncClient"):
+        service = GeocodingService(api_key="test-geoapify-api-key-12345678")
         # Mock the client to avoid actual API calls
-        service.client = Mock()
+        service.client = AsyncMock()
         return service
 
 
@@ -111,26 +111,26 @@ class TestGeocodingService:
 
     def test_initialization_with_api_key(self, mock_settings: Any) -> None:
         """Test service initialization with API key."""
-        with patch("googlemaps.Client"):
-            service = GeocodingService(api_key="AIzaCustom-API-Key-12345678")
-            assert service.api_key == "AIzaCustom-API-Key-12345678"
+        with patch("httpx.AsyncClient"):
+            service = GeocodingService(api_key="custom-geoapify-key-12345678")
+            assert service.api_key == "custom-geoapify-key-12345678"
             assert service.max_retries == 3
             assert service.timeout == 5
 
     def test_initialization_from_settings(self, mock_settings: Any) -> None:
         """Test service initialization from settings."""
-        with patch("googlemaps.Client"):
+        with patch("httpx.AsyncClient"):
             service = GeocodingService()
-            assert service.api_key == "AIzaTest-API-Key-For-Testing-12345678"
+            assert service.api_key == "test-geoapify-api-key-12345678"
 
     def test_initialization_no_api_key(self) -> None:
         """Test service initialization fails without API key."""
         with patch("travel_companion.services.geocoding_service.get_settings") as mock:
             settings = Mock()
-            settings.google_places_api_key = ""
+            settings.geoapify_api_key = ""
             mock.return_value = settings
 
-            with pytest.raises(ValueError, match="Google Maps Platform API key not provided"):
+            with pytest.raises(ValueError, match="Geoapify API key not provided"):
                 GeocodingService()
 
     def test_normalize_address(self, geocoding_service: GeocodingService) -> None:
@@ -153,15 +153,22 @@ class TestGeocodingService:
     @pytest.mark.asyncio
     async def test_geocode_location_success(self, geocoding_service: GeocodingService) -> None:
         """Test successful geocoding."""
-        mock_response = [
-            {
-                "geometry": {"location": {"lat": 41.9009, "lng": 12.4833}},
-                "formatted_address": "Trevi Fountain, Rome, Italy",
-            }
-        ]
+        mock_response_data = {
+            "results": [
+                {
+                    "lat": 41.9009,
+                    "lon": 12.4833,
+                    "formatted": "Trevi Fountain, Rome, Italy",
+                }
+            ]
+        }
 
-        with patch.object(geocoding_service.client, "geocode", return_value=mock_response):
-            result = await geocoding_service.geocode_location("Trevi Fountain, Rome")
+        mock_response = Mock()
+        mock_response.json.return_value = mock_response_data
+        mock_response.raise_for_status = Mock()
+
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+        result = await geocoding_service.geocode_location("Trevi Fountain, Rome")
 
         assert result.status == "success"
         assert result.latitude == 41.9009
@@ -172,8 +179,14 @@ class TestGeocodingService:
     @pytest.mark.asyncio
     async def test_geocode_location_zero_results(self, geocoding_service: GeocodingService) -> None:
         """Test geocoding with no results."""
-        with patch.object(geocoding_service.client, "geocode", return_value=[]):
-            result = await geocoding_service.geocode_location("Invalid Address XYZ123")
+        mock_response_data = {"results": []}
+
+        mock_response = Mock()
+        mock_response.json.return_value = mock_response_data
+        mock_response.raise_for_status = Mock()
+
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+        result = await geocoding_service.geocode_location("Invalid Address XYZ123")
 
         assert result.status == "failed"
         assert result.error_message is not None
@@ -186,10 +199,14 @@ class TestGeocodingService:
         self, geocoding_service: GeocodingService
     ) -> None:
         """Test geocoding with invalid response structure."""
-        mock_response: list[dict[str, Any]] = [{"geometry": {}}]  # Missing location data
+        mock_response_data = {"results": [{}]}  # Missing lat/lon
 
-        with patch.object(geocoding_service.client, "geocode", return_value=mock_response):
-            result = await geocoding_service.geocode_location("Some Address")
+        mock_response = Mock()
+        mock_response.json.return_value = mock_response_data
+        mock_response.raise_for_status = Mock()
+
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+        result = await geocoding_service.geocode_location("Some Address")
 
         assert result.status == "failed"
         assert result.error_message is not None
@@ -198,26 +215,24 @@ class TestGeocodingService:
     @pytest.mark.asyncio
     async def test_geocode_location_api_error(self, geocoding_service: GeocodingService) -> None:
         """Test geocoding with API error."""
-        with patch.object(
-            geocoding_service.client,
-            "geocode",
-            side_effect=googlemaps.exceptions.ApiError("REQUEST_DENIED"),
-        ):
-            result = await geocoding_service.geocode_location("Some Address")
+        mock_response = Mock()
+        mock_response.status_code = 403
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Forbidden", request=Mock(), response=mock_response
+        )
+
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+        result = await geocoding_service.geocode_location("Some Address")
 
         assert result.status == "failed"
         assert result.error_message is not None
-        assert "REQUEST_DENIED" in result.error_message
+        assert "403" in result.error_message
 
     @pytest.mark.asyncio
     async def test_geocode_location_timeout(self, geocoding_service: GeocodingService) -> None:
         """Test geocoding with timeout."""
-        with patch.object(
-            geocoding_service.client,
-            "geocode",
-            side_effect=googlemaps.exceptions.Timeout("Timeout"),
-        ):
-            result = await geocoding_service.geocode_location("Some Address")
+        geocoding_service.client.get = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
+        result = await geocoding_service.geocode_location("Some Address")
 
         assert result.status == "failed"
         assert result.error_message is not None
@@ -229,25 +244,38 @@ class TestGeocodingService:
     ) -> None:
         """Test retry logic on rate limit error."""
         # First call: rate limit, second call: success
-        mock_response = [
-            {
-                "geometry": {"location": {"lat": 41.9009, "lng": 12.4833}},
-                "formatted_address": "Rome, Italy",
-            }
-        ]
+        success_response_data = {
+            "results": [
+                {
+                    "lat": 41.9009,
+                    "lon": 12.4833,
+                    "formatted": "Rome, Italy",
+                }
+            ]
+        }
 
         call_count = 0
 
-        def mock_geocode(*args: Any, **kwargs: Any) -> Any:
+        async def mock_get(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise googlemaps.exceptions.ApiError("OVER_QUERY_LIMIT")
+                mock_response = Mock()
+                mock_response.status_code = 429
+                mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                    "Rate Limit", request=Mock(), response=mock_response
+                )
+                return mock_response
+
+            mock_response = Mock()
+            mock_response.json.return_value = success_response_data
+            mock_response.raise_for_status = Mock()
             return mock_response
 
-        with patch.object(geocoding_service.client, "geocode", side_effect=mock_geocode):
-            with patch("asyncio.sleep", return_value=None):  # Skip actual sleep
-                result = await geocoding_service.geocode_location("Rome, Italy")
+        geocoding_service.client.get = mock_get
+
+        with patch("asyncio.sleep", return_value=None):  # Skip actual sleep
+            result = await geocoding_service.geocode_location("Rome, Italy")
 
         assert result.status == "success"
         assert call_count == 2  # Should retry once
@@ -257,37 +285,45 @@ class TestGeocodingService:
         self, geocoding_service: GeocodingService
     ) -> None:
         """Test max retries exceeded on rate limit."""
-        with patch.object(
-            geocoding_service.client,
-            "geocode",
-            side_effect=googlemaps.exceptions.ApiError("OVER_QUERY_LIMIT"),
-        ):
-            with patch("asyncio.sleep", return_value=None):  # Skip actual sleep
-                result = await geocoding_service.geocode_location("Some Address")
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Rate Limit", request=Mock(), response=mock_response
+        )
+
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+
+        with patch("asyncio.sleep", return_value=None):  # Skip actual sleep
+            result = await geocoding_service.geocode_location("Some Address")
 
         assert result.status == "failed"
         assert result.error_message is not None
-        assert "OVER_QUERY_LIMIT" in result.error_message
+        assert "429" in result.error_message
 
     @pytest.mark.asyncio
     async def test_geocode_location_cache_hit(self, geocoding_service: GeocodingService) -> None:
         """Test cache returns cached result."""
-        mock_response = [
-            {
-                "geometry": {"location": {"lat": 48.8584, "lng": 2.2945}},
-                "formatted_address": "Eiffel Tower, Paris",
-            }
-        ]
+        mock_response_data = {
+            "results": [
+                {
+                    "lat": 48.8584,
+                    "lon": 2.2945,
+                    "formatted": "Eiffel Tower, Paris",
+                }
+            ]
+        }
 
-        with patch.object(geocoding_service.client, "geocode", return_value=mock_response):
-            # First call - should hit API
-            result1 = await geocoding_service.geocode_location("Eiffel Tower, Paris")
+        mock_response = Mock()
+        mock_response.json.return_value = mock_response_data
+        mock_response.raise_for_status = Mock()
 
-        # Second call - should use cache (client.geocode should not be called)
-        with patch.object(
-            geocoding_service.client, "geocode", side_effect=Exception("Should not be called")
-        ):
-            result2 = await geocoding_service.geocode_location("Eiffel Tower, Paris")
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+        # First call - should hit API
+        result1 = await geocoding_service.geocode_location("Eiffel Tower, Paris")
+
+        # Second call - should use cache (client.get should not be called)
+        geocoding_service.client.get = AsyncMock(side_effect=Exception("Should not be called"))
+        result2 = await geocoding_service.geocode_location("Eiffel Tower, Paris")
 
         # Both results should be identical
         assert result1.status == result2.status
@@ -299,21 +335,26 @@ class TestGeocodingService:
         self, geocoding_service: GeocodingService
     ) -> None:
         """Test cache works with different address formats."""
-        mock_response = [
-            {
-                "geometry": {"location": {"lat": 48.8584, "lng": 2.2945}},
-                "formatted_address": "Eiffel Tower, Paris",
-            }
-        ]
+        mock_response_data = {
+            "results": [
+                {
+                    "lat": 48.8584,
+                    "lon": 2.2945,
+                    "formatted": "Eiffel Tower, Paris",
+                }
+            ]
+        }
 
-        with patch.object(geocoding_service.client, "geocode", return_value=mock_response):
-            result1 = await geocoding_service.geocode_location("  Eiffel Tower, Paris  ")
+        mock_response = Mock()
+        mock_response.json.return_value = mock_response_data
+        mock_response.raise_for_status = Mock()
+
+        geocoding_service.client.get = AsyncMock(return_value=mock_response)
+        result1 = await geocoding_service.geocode_location("  Eiffel Tower, Paris  ")
 
         # Different format but same normalized address
-        with patch.object(
-            geocoding_service.client, "geocode", side_effect=Exception("Should not be called")
-        ):
-            result2 = await geocoding_service.geocode_location("EIFFEL TOWER, PARIS")
+        geocoding_service.client.get = AsyncMock(side_effect=Exception("Should not be called"))
+        result2 = await geocoding_service.geocode_location("EIFFEL TOWER, PARIS")
 
         assert result1.latitude == result2.latitude
 
@@ -322,37 +363,24 @@ class TestGeocodingService:
         """Test batch geocoding."""
         addresses = ["Paris, France", "Rome, Italy", "London, UK"]
 
-        mock_responses = [
-            [
-                {
-                    "geometry": {"location": {"lat": 48.8566, "lng": 2.3522}},
-                    "formatted_address": "Paris, France",
-                }
-            ],
-            [
-                {
-                    "geometry": {"location": {"lat": 41.9028, "lng": 12.4964}},
-                    "formatted_address": "Rome, Italy",
-                }
-            ],
-            [
-                {
-                    "geometry": {"location": {"lat": 51.5074, "lng": -0.1278}},
-                    "formatted_address": "London, UK",
-                }
-            ],
+        mock_responses_data = [
+            {"results": [{"lat": 48.8566, "lon": 2.3522, "formatted": "Paris, France"}]},
+            {"results": [{"lat": 41.9028, "lon": 12.4964, "formatted": "Rome, Italy"}]},
+            {"results": [{"lat": 51.5074, "lon": -0.1278, "formatted": "London, UK"}]},
         ]
 
         call_index = 0
 
-        def mock_geocode(*args: Any, **kwargs: Any) -> Any:
+        async def mock_get(*args: Any, **kwargs: Any) -> Any:
             nonlocal call_index
-            response = mock_responses[call_index]
+            mock_response = Mock()
+            mock_response.json.return_value = mock_responses_data[call_index]
+            mock_response.raise_for_status = Mock()
             call_index += 1
-            return response
+            return mock_response
 
-        with patch.object(geocoding_service.client, "geocode", side_effect=mock_geocode):
-            results = await geocoding_service.geocode_locations_batch(addresses)
+        geocoding_service.client.get = mock_get
+        results = await geocoding_service.geocode_locations_batch(addresses)
 
         assert len(results) == 3
         assert all(r.status == "success" for r in results)
@@ -367,18 +395,25 @@ class TestGeocodingService:
         """Test batch geocoding handles mixed success/failure."""
         addresses = ["Paris, France", "Invalid XYZ", "London, UK"]
 
-        def mock_geocode(address: str, **kwargs: Any) -> Any:
-            if "Invalid" in address:
-                return []  # Zero results
-            return [
-                {
-                    "geometry": {"location": {"lat": 48.0, "lng": 2.0}},
-                    "formatted_address": address,
-                }
-            ]
+        call_index = 0
 
-        with patch.object(geocoding_service.client, "geocode", side_effect=mock_geocode):
-            results = await geocoding_service.geocode_locations_batch(addresses)
+        async def mock_get(*args: Any, **kwargs: Any) -> Any:
+            nonlocal call_index
+            address = addresses[call_index]
+            call_index += 1
+
+            mock_response = Mock()
+            if "Invalid" in address:
+                mock_response.json.return_value = {"results": []}  # Zero results
+            else:
+                mock_response.json.return_value = {
+                    "results": [{"lat": 48.0, "lon": 2.0, "formatted": address}]
+                }
+            mock_response.raise_for_status = Mock()
+            return mock_response
+
+        geocoding_service.client.get = mock_get
+        results = await geocoding_service.geocode_locations_batch(addresses)
 
         assert len(results) == 3
         assert results[0].status == "success"
@@ -421,7 +456,7 @@ class TestGetGeocodingService:
         # Clear cache first
         get_geocoding_service.cache_clear()
 
-        with patch("googlemaps.Client"):
+        with patch("httpx.AsyncClient"):
             service1 = get_geocoding_service()
             service2 = get_geocoding_service()
 

@@ -55,10 +55,11 @@ class ItineraryGeocoder:
         accommodation_task = self._geocode_accommodation(itinerary.accommodation)
         geocoding_tasks.append(accommodation_task)
 
-        # 3. Geocode all activities across all days
+        # 3. Geocode all activities across all days (with destination context)
+        destination = itinerary.trip.destination
         for day in itinerary.itinerary:
             for activity in day.activities:
-                activity_task = self._geocode_activity(activity)
+                activity_task = self._geocode_activity(activity, destination)
                 geocoding_tasks.append(activity_task)
 
         # 4. Geocode flight airports
@@ -153,19 +154,25 @@ class ItineraryGeocoder:
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 
-    async def _geocode_activity(self, activity: ItineraryActivity) -> None:
+    async def _geocode_activity(
+        self, activity: ItineraryActivity, destination: Destination
+    ) -> None:
         """
-        Geocode activity location.
+        Geocode activity location with destination context.
 
         Args:
             activity: Activity object to update with coordinates
+            destination: Trip destination for geographic context
         """
         if not activity.location:
             logger.debug(f"Skipping geocoding for activity '{activity.title}' - no location")
             return
 
         try:
-            result = await self.geocoding_service.geocode_location(activity.location)
+            # Add destination context to ensure we geocode in the correct city
+            location_with_context = f"{activity.location}, {destination.city}, {destination.country}"
+
+            result = await self.geocoding_service.geocode_location(location_with_context)
 
             activity.coordinates = Coordinates(
                 latitude=result.latitude if result.latitude is not None else 0.0,
@@ -176,13 +183,13 @@ class ItineraryGeocoder:
             )
 
             logger.info(
-                f"Geocoded activity: {activity.title} -> "
+                f"Geocoded activity: {activity.title} at {location_with_context} -> "
                 f"({result.latitude}, {result.longitude}), status={result.status}"
             )
 
             # Geocode dining venue if present
             if activity.venue:
-                await self._geocode_venue(activity.venue)
+                await self._geocode_venue(activity.venue, destination)
 
         except Exception as e:
             logger.error(f"Failed to geocode activity {activity.title}: {e}")
@@ -194,19 +201,23 @@ class ItineraryGeocoder:
                 geocoding_error_message=f"Exception during geocoding: {str(e)}",
             )
 
-    async def _geocode_venue(self, venue: VenueInfo) -> None:
+    async def _geocode_venue(self, venue: VenueInfo, destination: Destination) -> None:
         """
-        Geocode restaurant/venue location.
+        Geocode restaurant/venue location with destination context.
 
         Args:
             venue: Venue object to update with coordinates
+            destination: Trip destination for geographic context
         """
         if not venue.location:
             logger.debug(f"Skipping geocoding for venue '{venue.name}' - no location")
             return
 
         try:
-            result = await self.geocoding_service.geocode_location(venue.location)
+            # Add destination context to ensure we geocode in the correct city
+            location_with_context = f"{venue.location}, {destination.city}, {destination.country}"
+
+            result = await self.geocoding_service.geocode_location(location_with_context)
 
             venue.coordinates = Coordinates(
                 latitude=result.latitude if result.latitude is not None else 0.0,
@@ -217,7 +228,7 @@ class ItineraryGeocoder:
             )
 
             logger.info(
-                f"Geocoded venue: {venue.name} -> "
+                f"Geocoded venue: {venue.name} at {location_with_context} -> "
                 f"({result.latitude}, {result.longitude}), status={result.status}"
             )
 

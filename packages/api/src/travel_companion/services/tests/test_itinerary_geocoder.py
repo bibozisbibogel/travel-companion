@@ -197,6 +197,8 @@ class TestItineraryGeocoder:
             cost=None,
         )
 
+        destination = Destination(city="Rome", country="Italy", coordinates=None)
+
         mock_geocoding_service.geocode_location.return_value = GeocodeResult(
             status="success",
             latitude=41.9009,
@@ -206,7 +208,7 @@ class TestItineraryGeocoder:
         )
 
         geocoder = ItineraryGeocoder()
-        await geocoder._geocode_activity(activity)
+        await geocoder._geocode_activity(activity, destination)
 
         # Verify coordinates were added
         assert activity.coordinates is not None
@@ -237,8 +239,10 @@ class TestItineraryGeocoder:
             cost=None,
         )
 
+        destination = Destination(city="Rome", country="Italy", coordinates=None)
+
         geocoder = ItineraryGeocoder()
-        await geocoder._geocode_activity(activity)
+        await geocoder._geocode_activity(activity, destination)
 
         # Verify geocoding service was not called
         mock_geocoding_service.geocode_location.assert_not_called()

@@ -6,7 +6,7 @@ import logging
 from functools import lru_cache
 from typing import Literal
 
-import googlemaps  # type: ignore[import-untyped]
+import httpx
 from pydantic import BaseModel, Field, field_validator
 
 from travel_companion.core.config import get_settings
@@ -37,29 +37,28 @@ class GeocodeResult(BaseModel):
 class GeocodingService:
     """Service for geocoding location strings to lat/lng coordinates."""
 
+    GEOCODING_ENDPOINT = "https://api.geoapify.com/v1/geocode/search"
+
     def __init__(self, api_key: str | None = None):
         """
         Initialize geocoding service.
 
         Args:
-            api_key: Google Maps Platform API key. If None, loads from settings.
+            api_key: Geoapify API key. If None, loads from settings.
 
         Raises:
             ValueError: If API key is not provided and not in settings
         """
         settings = get_settings()
-        self.api_key = api_key or settings.google_places_api_key
+        self.api_key = api_key or settings.geoapify_api_key
 
         if not self.api_key:
             raise ValueError(
-                "Google Maps Platform API key not provided. "
-                "Set GOOGLE_PLACES_API_KEY environment variable."
+                "Geoapify API key not provided. Set GEOAPIFY_API_KEY environment variable."
             )
 
-        # Initialize Google Maps client with timeout
-        self.client = googlemaps.Client(
-            key=self.api_key, timeout=settings.geocoding_timeout_seconds
-        )
+        # Initialize HTTP client with timeout
+        self.client = httpx.AsyncClient(timeout=settings.geocoding_timeout_seconds)
 
         # Configuration from settings
         self.max_retries = settings.geocoding_retry_attempts
@@ -71,7 +70,7 @@ class GeocodingService:
         self._cache_size = 1000
 
         logger.info(
-            "GeocodingService initialized",
+            "GeocodingService initialized with Geoapify",
             extra={
                 "max_retries": self.max_retries,
                 "timeout": self.timeout,
@@ -150,7 +149,7 @@ class GeocodingService:
 
     async def geocode_location(self, address: str, retry_count: int = 0) -> GeocodeResult:
         """
-        Geocode a location string to latitude/longitude coordinates.
+        Geocode a location string to latitude/longitude coordinates using Geoapify.
 
         Implements retry logic with exponential backoff for transient failures.
 
@@ -176,16 +175,25 @@ class GeocodingService:
             return cached_result
 
         try:
-            # Execute geocoding in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            geocode_result = await loop.run_in_executor(
-                None,
-                lambda: self.client.geocode(address=address),
-            )
+            # Build API parameters for Geoapify
+            params = {
+                "apiKey": self.api_key,
+                "text": address,
+                "format": "json",
+                "limit": 1,  # Get best match only
+            }
+
+            # Make API request
+            response = await self.client.get(self.GEOCODING_ENDPOINT, params=params)
+            response.raise_for_status()
+
+            # Parse response
+            data = response.json()
+            results = data.get("results", [])
 
             # Handle API response
-            if not geocode_result:
-                # ZERO_RESULTS - no results found
+            if not results:
+                # No results found
                 result = GeocodeResult(
                     status="failed",
                     latitude=None,
@@ -201,13 +209,11 @@ class GeocodingService:
                 return result
 
             # Extract coordinates from first result
-            first_result = geocode_result[0]
-            geometry = first_result.get("geometry", {})
-            location = geometry.get("location", {})
-
-            latitude = location.get("lat")
-            longitude = location.get("lng")
-            formatted_address = first_result.get("formatted_address")
+            # Note: Geoapify returns "lat" and "lon" at result level
+            first_result = results[0]
+            latitude = first_result.get("lat")
+            longitude = first_result.get("lon")
+            formatted_address = first_result.get("formatted")
 
             # Validate coordinates
             if latitude is None or longitude is None:
@@ -238,7 +244,7 @@ class GeocodingService:
             )
 
             logger.info(
-                "Geocoding successful",
+                "Geocoding successful with Geoapify",
                 extra={
                     "address": address[:100],
                     "latitude": latitude,
@@ -251,20 +257,21 @@ class GeocodingService:
             self._add_to_cache(normalized_address, result)
             return result
 
-        except googlemaps.exceptions.ApiError as e:
-            # API errors (REQUEST_DENIED, INVALID_REQUEST, etc.)
-            error_message = str(e)
+        except httpx.HTTPStatusError as e:
+            # API errors (403, 429, etc.)
+            error_message = f"Geoapify API error: {e.response.status_code}"
             logger.error(
-                "Google Geocoding API error",
+                "Geoapify Geocoding API HTTP error",
                 extra={
                     "address": address[:100],
+                    "status_code": e.response.status_code,
                     "error": error_message,
                     "retry_count": retry_count,
                 },
             )
 
-            # Check if this is a transient error that should be retried
-            if "OVER_QUERY_LIMIT" in error_message and retry_count < self.max_retries:
+            # Check if this is a rate limit error that should be retried
+            if e.response.status_code == 429 and retry_count < self.max_retries:
                 # Exponential backoff: 1s, 2s, 4s
                 backoff_seconds = 2**retry_count
                 logger.warning(
@@ -285,7 +292,7 @@ class GeocodingService:
             self._add_to_cache(normalized_address, result)
             return result
 
-        except googlemaps.exceptions.Timeout:
+        except httpx.TimeoutException:
             # Timeout error
             logger.warning(
                 "Geocoding request timeout",

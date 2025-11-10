@@ -165,8 +165,8 @@ class Settings(BaseSettings):
     # Hotel APIs
     liteapi_key: str = ""  # LiteAPI (Nuitée) key for hotel bookings
 
-    # Geocoding Service Configuration
-    geocoding_rate_limit_per_second: int = 50  # Google default: 50 QPS
+    # Geocoding Service Configuration (Geoapify)
+    geocoding_rate_limit_per_second: int = 50  # Rate limit per second
     geocoding_retry_attempts: int = 3  # Max retry attempts for transient failures
     geocoding_timeout_seconds: int = 5  # Timeout per geocoding request
     geocoding_cache_ttl_days: int = 30  # Cache TTL for geocoded locations

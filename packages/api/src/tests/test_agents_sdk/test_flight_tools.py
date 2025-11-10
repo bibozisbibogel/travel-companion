@@ -109,3 +109,53 @@ async def test_flight_search_tool_with_defaults():
     result_data = json.loads(result["content"][0]["text"])
     assert result_data["status"] == "success"
     assert "flights" in result_data
+
+
+@pytest.mark.asyncio
+async def test_flight_search_tool_city_name_normalization():
+    """Test that city names are properly converted to airport codes."""
+    from travel_companion.agents_sdk.tools.flight_tools import search_flights
+
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Use city names instead of airport codes
+    arguments = {
+        "origin": "New York",
+        "destination": "Bucharest",  # Should convert to OTP
+        "departure_date": tomorrow,
+        "passengers": 1,
+    }
+
+    result = await search_flights.handler(arguments)
+
+    # Should succeed with city name normalization (without validation errors)
+    import json
+
+    result_data = json.loads(result["content"][0]["text"])
+    assert result_data["status"] == "success"
+    assert "flights" in result_data
+    # Note: Mock data may return different destinations, but the important part
+    # is that the request didn't fail with a validation error about "BUCHAREST"
+    # being too long for the 4-character airport code field
+
+
+def test_normalize_airport_code():
+    """Test the normalize_airport_code function."""
+    from travel_companion.agents_sdk.tools.flight_tools import normalize_airport_code
+
+    # Test city name conversion
+    assert normalize_airport_code("bucharest") == "OTP"
+    assert normalize_airport_code("Bucharest") == "OTP"
+    assert normalize_airport_code("BUCHAREST") == "OTP"
+    assert normalize_airport_code("new york") == "JFK"
+    assert normalize_airport_code("paris") == "CDG"
+    assert normalize_airport_code("prague") == "PRG"
+    assert normalize_airport_code("warsaw") == "WAW"
+
+    # Test airport code passthrough
+    assert normalize_airport_code("JFK") == "JFK"
+    assert normalize_airport_code("otp") == "OTP"
+    assert normalize_airport_code("CDG") == "CDG"
+
+    # Test unknown city (should return uppercased original)
+    assert normalize_airport_code("UnknownCity") == "UNKNOWNCITY"

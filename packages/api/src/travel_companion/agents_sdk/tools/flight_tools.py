@@ -75,6 +75,19 @@ CITY_TO_AIRPORT = {
     "sao paulo": "GRU",
     "buenos aires": "EZE",
     "rio de janeiro": "GIG",
+    "bucharest": "OTP",
+    "prague": "PRG",
+    "warsaw": "WAW",
+    "budapest": "BUD",
+    "krakow": "KRK",
+    "dublin": "DUB",
+    "edinburgh": "EDI",
+    "brussels": "BRU",
+    "copenhagen": "CPH",
+    "stockholm": "ARN",
+    "oslo": "OSL",
+    "helsinki": "HEL",
+    "lisbon": "LIS",
 }
 
 
