@@ -100,15 +100,27 @@ npm run dev
 ```
 travel-companion/
 ├── packages/
-│   ├── api/                    # FastAPI backend
+│   ├── api/                        # FastAPI backend
 │   │   └── src/travel_companion/
-│   │       ├── agents_sdk/     # Multi-agent orchestration
+│   │       ├── agents_sdk/         # Multi-agent orchestration
 │   │       │   ├── travel_planner_agent.py
 │   │       │   ├── mcp_server.py
-│   │       │   └── tools/      # Flight, hotel, food, activity, weather tools
-│   │       ├── api/            # REST API routes
-│   │       └── models/         # Database models
-│   └── web/                    # Next.js frontend
+│   │       │   └── tools/          # Flight, hotel, food, activity, weather tools
+│   │       ├── api/                # REST API routes
+│   │       └── models/             # Database models
+│   └── web/                        # Next.js frontend
+│       └── src/
+│           ├── app/                # Pages (auth, trips)
+│           ├── components/
+│           │   ├── budget/         # Budget overview & tracking
+│           │   ├── forms/          # Trip preferences form
+│           │   ├── itinerary/      # Day-by-day itinerary view
+│           │   ├── maps/           # Interactive route map
+│           │   ├── trips/          # Trip list & cards
+│           │   └── ui/             # Shared UI components
+│           ├── contexts/           # Auth & global state
+│           ├── hooks/              # Custom React hooks
+│           └── lib/                # API client & utilities
 ├── docker-compose.yml
 ├── .env.example
 └── scripts/
