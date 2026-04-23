@@ -105,7 +105,7 @@ travel-companion/
 │   │       ├── agents_sdk/         # Multi-agent orchestration
 │   │       │   ├── travel_planner_agent.py
 │   │       │   ├── mcp_server.py
-│   │       │   └── tools/          # Flight, hotel, food, activity, weather tools
+│   │       │   └── tools/          # Flight, hotel, food, activity tools
 │   │       ├── api/                # REST API routes
 │   │       └── models/             # Database models
 │   └── web/                        # Next.js frontend
@@ -122,11 +122,14 @@ travel-companion/
 │           ├── hooks/              # Custom React hooks
 │           └── lib/                # API client & utilities
 ├── docker-compose.yml
+├── docker-compose.dev.yml
 ├── .env.example
 └── scripts/
     ├── setup.sh
     ├── dev.sh
-    └── test.sh
+    ├── test.sh
+    ├── deploy.sh
+    └── infra.sh
 ```
 
 ## Running Tests
