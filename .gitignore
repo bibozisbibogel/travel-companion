@@ -1,18 +1,74 @@
 # Environments
 .envrc
+.env
+.env.local
+.env.*.local
+*.env
+packages/web/.env
 .venv
 env/
 venv/
 temp/
-__pycache__
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
 .ruff_cache
 .pytest_cache
+*.egg-info/
+dist/
+build/
 
-# Cursor
+# Node
+node_modules/
+.next/
+out/
+.npm
+
+# Logs
+logs/
+*.log
+
+# AI tooling (internal use only)
+CLAUDE.md
+BMAD.md
+.claude/
+.bmad-core/
+.cursor/
 .cursorignore
 .cursorindexingignore
-node_modules
+.windsurf/
+Claude Code Version 2.0.5.md
+Claude's Plan.md
+IMPLEMENTATION_SUMMARY.md
 
-# Folders for different tests
+# GitHub Actions (AI-specific)
+.github/workflows/claude.yml
+.github/workflows/claude-code-review.yml
+
+# Internal docs
+docs/
+packages/api/API.md
+packages/api/ARCHITECTURE.md
+packages/api/DATABASE_SETUP.md
+packages/api/QUICK_SETUP.md
+
+# Personal test folders
 mihai/
 cristi/
+
+# Infrastructure secrets
+terraform/*.tfvars
+terraform/.terraform/
+*.tfstate
+*.tfstate.backup
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
