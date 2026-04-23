@@ -115,7 +115,9 @@ travel-companion/
 │           │   ├── budget/         # Budget overview & tracking
 │           │   ├── forms/          # Trip preferences form
 │           │   ├── itinerary/      # Day-by-day itinerary view
+│           │   ├── layouts/        # Page layout wrappers
 │           │   ├── maps/           # Interactive route map
+│           │   ├── monitoring/     # Health & status components
 │           │   ├── trips/          # Trip list & cards
 │           │   └── ui/             # Shared UI components
 │           ├── contexts/           # Auth & global state
@@ -127,9 +129,7 @@ travel-companion/
 └── scripts/
     ├── setup.sh
     ├── dev.sh
-    ├── test.sh
-    ├── deploy.sh
-    └── infra.sh
+    └── test.sh
 ```
 
 ## Running Tests
