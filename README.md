@@ -1,134 +1,129 @@
-An AI-powered multi-agent travel planner that helps users plan trips end-to-end: flights, hotels, food, and activities. The assistant uses LangGraph for multi-step reasoning and tool orchestration, with a Python backend exposing APIs and integrating with travel and payment providers.
+# Travel Companion
 
-# Ownership
+An AI-powered travel planner that uses multi-agent orchestration to generate full trip itineraries — covering flights, hotels, restaurants, activities, and weather — with interactive maps and budget tracking.
 
-## David
-- "weather_agent"
-- "flight_agent"
+## How It Works
 
-## Cristi
-- "hotel_agent"
-- "activity_agent"
+The user submits trip preferences (destination, dates, budget, travel style) and the system coordinates multiple specialized AI agents in parallel:
 
-## Mihai
-- "food_agent"
-- "itinerary_agent"
+- **Flight Agent** — searches Amadeus API, ranks options by price, duration, and stops
+- **Hotel Agent** — finds accommodations via Google Places API
+- **Food Agent** — recommends restaurants based on cuisine preferences and location
+- **Activity Agent** — suggests attractions and things to do
+- **Weather Agent** — fetches forecasts for each day of the trip
 
-# Testing APIs
-Some pytest tests run live API calls and consume credits. 
-Use the RUN_EXTERNAL_API_TESTS environment variable to control their execution.
-Tests will skip unless this variable is set to "true".
+All agents run through a central planner built with the **Claude Agent SDK** and exposed via an **MCP server**, returning a day-by-day itinerary with route visualization and a full budget breakdown.
 
-Example: `RUN_EXTERNAL_API_TESTS=true uv run pytest`
+## Tech Stack
 
-# Standalone tests (not part of pytest)
-These are tests that can be run to test individual API calls. They are located in a separate folder 'src/test_api'. They must be run from the 'packages/api' folder.
+**Backend**
+- Python 3.11+, FastAPI, Uvicorn
+- Claude Agent SDK (multi-agent orchestration)
+- MCP Server (tool exposure)
+- PostgreSQL (trip persistence), Redis (caching & rate limiting)
+- Amadeus API (flights), Google Places API (hotels & restaurants), Geoapify (routing & maps), OpenWeather API (forecasts)
 
-Example: `uv run python src/test_api/test_google_places.py`
+**Frontend**
+- Next.js 14, React, TypeScript, Tailwind CSS
+- Interactive map with day-by-day route visualization
 
-# Quick start
-  ./scripts/setup.sh      # Initial setup
-  ./scripts/dev.sh        # Start development environment  
-  ./scripts/test.sh       # Run all tests
+**Infrastructure**
+- Docker, Docker Compose
+- Terraform (infrastructure as code)
 
-  Services available at:
-  - 📡 API: http://localhost:8000 (with /docs)
-  - 🖥️ Frontend: http://localhost:3000
-  - ❤️ Health Check: http://localhost:8000/api/v1/health
+## Getting Started
 
-# How It Works (Workflow)
+### Prerequisites
 
-User submits request → “7-day trip to Tokyo, budget $2000, focus on food + culture.”
-
-1. LangGraph workflow kicks off:
-- Planner Agent parses request
-- **Flight Agent → fetches flights ✅ IMPLEMENTED**
-  - Searches Amadeus API with circuit breaker protection
-  - Compares options using weighted algorithm (price, duration, timing)
-  - Provides fallback mock data during API outages
-- Hotel Agent → fetches hotels (coming soon)
-- Activity Agent → fetches activities (coming soon)
-- Weather Agent → fetches weather (coming soon)  
-- Food Agent → suggests restaurants (coming soon)
-- Itinerary Agent → integrates results and builds schedule (coming soon)
-- Final Planner compiles everything into a daily itinerary + budget summary.
-- Returns JSON to frontend which displays it in a user-friendly way.
-
-2. Frontend displays:
-- Map with itinerary
-- Flights: sorted options
-- Hotels: top 3 recommendations
-- Food: curated list of restaurants
-- Itinerary: calendar-style view
-- Budget: chart comparing target vs. actual
-- Export to PDF for offline use.
-
-# User personas
-
-- Solo Traveler: Budget-conscious, flexible dates.
-- Family Planner: Fixed dates, comfort requirements, child-friendly.
-- Business Traveler: Tight schedules, loyalty preferences, invoice compliance.
-
-# Tech Stack
-
-## Backend
 - Python 3.11+
-- LangGraph (workflow engine)
-- LangChain (LLM integration if needed for reasoning/explanation)
-- FastAPI (expose workflow as REST API)
+- Node.js 18+
+- Docker & Docker Compose
+- API keys (see below)
 
-## Frontend
-- Next.js
-- React + Tailwind CSS
-- TypeScript
-- Mapbox or Google Maps API (visualizing itineraries)
+### 1. Clone the repo
 
-## APIs / Data Sources
-- Flights: Amadeus API / Skyscanner API
-- Hotels: Booking.com / Expedia API / Airbnb / Hotels APIs
-- Food & Places: Yelp / Zomato / Google Places API
-- Activities: TripAdvisor / Viator / GetYourGuide API
-- Maps: Google Maps Directions API or OpenStreetMap
+```bash
+git clone https://github.com/bibozisbibogel/travel-companion.git
+cd travel-companion
+```
 
-## Database
-- Supabase → store user travel plans, preferences, past itineraries, vector embeddings for RAG
-- Redis → cache API results (avoid hitting rate limits)
+### 2. Set up environment variables
 
-## Other Tools
-- Docker (containerize backend)
-- GitHub Projects + Issues (team collaboration)
+```bash
+cp .env.example .env
+```
 
-# Implementation Status
+Fill in the required API keys in `.env`:
 
-## ✅ Completed Features
+| Variable | Where to get it |
+|----------|----------------|
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
+| `AMADEUS_CLIENT_ID` / `AMADEUS_CLIENT_SECRET` | [developers.amadeus.com](https://developers.amadeus.com) |
+| `GOOGLE_PLACES_API_KEY` | [console.cloud.google.com](https://console.cloud.google.com) |
+| `GEOAPIFY_API_KEY` | [geoapify.com](https://www.geoapify.com) |
+| `OPENWEATHER_API_KEY` | [openweathermap.org](https://openweathermap.org/api) |
+| `DATABASE_URL` | Local PostgreSQL or Supabase |
+| `REDIS_URL` | Local Redis or managed instance |
 
-### Flight Agent & API Integration (Story 2.1)
-- **FlightAgent**: AI-powered flight search with Amadeus API integration
-- **Circuit Breaker Pattern**: Resilient external API calls with automatic failover  
-- **Smart Flight Comparison**: Weighted ranking algorithm (price, duration, timing, stops)
-- **Comprehensive Testing**: 90%+ code coverage with unit, integration, and resilience tests
-- **Mock Data Fallback**: Graceful degradation during API outages
-- **Rate Limit Management**: Automatic throttling and Redis caching optimization
+### 3. Start with Docker (recommended)
 
-## 🔄 In Progress
-- Story 2.2: Additional agent implementations (Hotels, Activities, Weather)
-- LangGraph workflow orchestration
-- Frontend integration with trip planning interface
+```bash
+docker-compose up --build
+```
 
-## 📋 Upcoming
-- User authentication and profile management
-- Trip persistence and history
-- Payment integration for booking
-- Mobile-responsive frontend
-- Real-time notifications
+Services will be available at:
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:8000
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/v1/health
 
-# Technical Documentation
+### 4. Start manually (without Docker)
 
-- **API Documentation**: `/packages/api/API.md` - Complete API specification
-- **Architecture Guide**: `/packages/api/ARCHITECTURE.md` - Technical implementation details  
-- **Setup Instructions**: `/packages/api/README.md` - Development environment setup
+**Backend:**
+```bash
+cd packages/api
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn src.travel_companion.main:app --reload --port 8000
+```
 
-# GitHub repo
-/frontend (Next.js + React)
-/packages/api (FastAPI + LangGraph + AI Agents)
-/docs (Architecture and story documentation)
+**Frontend:**
+```bash
+cd packages/web
+npm install
+npm run dev
+```
+
+## Project Structure
+
+```
+travel-companion/
+├── packages/
+│   ├── api/                    # FastAPI backend
+│   │   └── src/travel_companion/
+│   │       ├── agents_sdk/     # Multi-agent orchestration
+│   │       │   ├── travel_planner_agent.py
+│   │       │   ├── mcp_server.py
+│   │       │   └── tools/      # Flight, hotel, food, activity, weather tools
+│   │       ├── api/            # REST API routes
+│   │       └── models/         # Database models
+│   └── web/                    # Next.js frontend
+├── docker-compose.yml
+├── .env.example
+└── scripts/
+    ├── setup.sh
+    ├── dev.sh
+    └── test.sh
+```
+
+## Running Tests
+
+```bash
+cd packages/api
+# Unit tests only (no external API calls)
+uv run pytest
+
+# Include live API tests (consumes credits)
+RUN_EXTERNAL_API_TESTS=true uv run pytest
+```
